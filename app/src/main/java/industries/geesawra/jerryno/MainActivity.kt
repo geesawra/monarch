@@ -1,0 +1,381 @@
+package industries.geesawra.jerryno
+
+import android.app.Application
+import android.os.Bundle
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding // Added import
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MediumTopAppBar
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBarColors
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import app.bsky.feed.FeedViewPost
+import app.bsky.feed.FeedViewPostReasonUnion
+import app.bsky.feed.Post
+import app.bsky.feed.PostViewEmbedUnion
+import app.bsky.feed.ReplyRefParentUnion
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.android.lifecycle.HiltViewModel
+import industries.geesawra.jerryno.datalayer.Bluesky
+import industries.geesawra.jerryno.ui.theme.JerryNoTheme
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.decodeFromJsonElement
+import sh.christian.ozone.BlueskyJson
+
+
+@HiltAndroidApp
+class Application : Application() {}
+
+enum class TimelineScreen() {
+    Timeline,
+    Compose
+}
+
+enum class TabBarDestinations(
+    @StringRes val label: Int,
+    val icon: ImageVector,
+    @StringRes val contentDescription: Int
+) {
+    HOME(R.string.timeline, Icons.Filled.Home, R.string.timeline),
+    NOTIFICATIONS(R.string.notifications, Icons.Filled.Notifications, R.string.notifications)
+}
+
+@AndroidEntryPoint
+@OptIn(ExperimentalMaterial3Api::class)
+class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        setContent {
+            JerryNoTheme {
+                val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+                    rememberTopAppBarState()
+                )
+
+                val bluesky = Bluesky(
+                    "https://wallera.computer",
+                	// TODO: login here
+	    	)
+
+                val timelineViewModel = hiltViewModel<TimelineViewModel, TimelineViewModel.Factory>(
+                    creationCallback = { factory ->
+                        factory.create(bluesky)
+                    }
+                )
+
+                var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.HOME) }
+                val navController = rememberNavController()
+
+                val modalSheetState = rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                    confirmValueChange = { sv ->
+                        sv != SheetValue.PartiallyExpanded
+                    }
+                )
+                var showBottomSheet by remember { mutableStateOf(false) }
+                val focusRequester = remember { FocusRequester() }
+                val coroutineScope = rememberCoroutineScope()
+
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    NavigationSuiteScaffold(
+                        navigationSuiteItems = {
+                            TabBarDestinations.entries.forEach {
+                                item(
+                                    icon = {
+                                        Icon(
+                                            it.icon,
+                                            contentDescription = stringResource(it.contentDescription)
+                                        )
+                                    },
+                                    label = { Text(stringResource(it.label)) },
+                                    selected = it == currentDestination,
+                                    onClick = { currentDestination = it }
+                                )
+                            }
+                        }
+                    ) {
+                        Scaffold(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                            topBar = {
+                                MediumTopAppBar(
+                                    colors = TopAppBarColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        navigationIconContentColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                        actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    title = {
+                                        Text(text = "Jerry No")
+                                    },
+                                    scrollBehavior = scrollBehavior
+
+                                )
+                            },
+                            floatingActionButton = {
+                                FloatingActionButton(
+                                    onClick = {
+//                                        showBottomSheet = true
+                                        navController.navigate(TimelineScreen.Compose.name)
+                                    },
+                                ) {
+                                    Icon(Icons.Filled.Create, "Post")
+                                }
+                            },
+                        ) { values ->
+                            NavHost(
+                                navController = navController,
+                                startDestination = TimelineScreen.Timeline.name,
+                                modifier = Modifier.padding(values)
+                            ) {
+                                composable(route = TimelineScreen.Timeline.name) {
+                                    ShowSkeets(
+                                        viewModel = timelineViewModel
+                                    )
+
+                                    if (showBottomSheet) {
+                                        ComposeView(
+                                            modalSheetState = modalSheetState,
+                                            focusRequester = focusRequester,
+                                            coroutineScope = coroutineScope,
+                                            bluesky = bluesky,
+                                            onDismissRequest = {
+                                                showBottomSheet = false
+                                            }
+                                        )
+                                    }
+                                }
+                                composable(route = TimelineScreen.Compose.name) {
+                                    Text(
+                                        "Compose",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(10.dp)
+                                    )
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExoPlayerView(uri: String, modifier: Modifier) {
+    // Get the current context
+    val context = LocalContext.current
+
+    // Initialize ExoPlayer
+    val exoPlayer = ExoPlayer.Builder(context).build()
+
+    // Create a MediaSource
+    val mediaSource = remember(uri) {
+        MediaItem.fromUri(uri)
+    }
+
+    // Set MediaSource to ExoPlayer
+    LaunchedEffect(mediaSource) {
+        exoPlayer.setMediaItem(mediaSource)
+        exoPlayer.prepare()
+    }
+
+    // Manage lifecycle events
+    DisposableEffect(Unit) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    // Use AndroidView to embed an Android View (PlayerView) into Compose
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                player = exoPlayer
+            }
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun ShowSkeets(
+    viewModel: TimelineViewModel
+) {
+    viewModel.fetchTimeline()
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+
+        ) {
+        if (viewModel.uiState.skeets.isEmpty()) {
+            item {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .width(64.dp),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        trackColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+        } else {
+            viewModel.uiState.skeets.forEach { skeet ->
+                item(key = skeet.post.uri.toString()) { // Added a key for better performance
+                    SkeetRowView(skeet)
+                }
+            }
+        }
+
+    }
+}
+
+data class TimelineUiState(
+    val skeets: List<FeedViewPost> = listOf()
+)
+
+@HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
+class TimelineViewModel @AssistedInject constructor(
+    @Assisted private val bsky: Bluesky
+) : ViewModel() {
+
+    @AssistedFactory
+    interface Factory {
+        fun create(bsky: Bluesky): TimelineViewModel
+    }
+
+    var uiState by mutableStateOf(TimelineUiState())
+        private set
+
+    private var fetchJob: Job? = null
+
+    fun fetchTimeline() {
+        fetchJob?.cancel()
+
+        fetchJob = viewModelScope.launch {
+            bsky.fetchTimeline().onSuccess {
+                uiState = uiState.copy(skeets = it.feed)
+            }.onFailure { Log.e("TimelineViewModel", "Failed to fetch timeline: ${it.message}") }
+        }
+    }
+
+    fun post(content: String) {
+        viewModelScope.launch {
+            bsky.post(content)
+        }
+    }
+}

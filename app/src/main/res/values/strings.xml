@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Jerry No</string>
+    <string name="timeline">Timeline</string>
+    <string name="notifications">Notifications</string>
+</resources>
