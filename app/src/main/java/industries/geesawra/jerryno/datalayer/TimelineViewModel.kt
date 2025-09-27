@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 
 data class TimelineUiState(
     val skeets: List<FeedViewPost> = listOf(),
+    val isFetchingMoreTimeline: Boolean = false,
     val cursor: String? = null,
     val authenticated: Boolean = false,
     val sessionChecked: Boolean = false,
@@ -38,7 +39,6 @@ class TimelineViewModel @AssistedInject constructor(
 
     private var fetchJob: Job? = null
 
-
     fun create() {
         viewModelScope.launch {
             bskyConn.create()
@@ -58,12 +58,21 @@ class TimelineViewModel @AssistedInject constructor(
 
 
     fun fetchTimeline() {
+        uiState = uiState.copy(isFetchingMoreTimeline = true)
         fetchJob?.cancel()
 
         fetchJob = viewModelScope.launch {
             bskyConn.fetchTimeline(uiState.cursor).onSuccess {
-                uiState = uiState.copy(skeets = uiState.skeets + it.feed, cursor = it.cursor)
-            }.onFailure { Log.e("TimelineViewModel", "Failed to fetch timeline: ${it.message}") }
+                Log.d("TimelineViewModel", "New cursor ${it.cursor}")
+                uiState = uiState.copy(
+                    skeets = uiState.skeets + it.feed,
+                    cursor = it.cursor,
+                    isFetchingMoreTimeline = false
+                )
+            }.onFailure {
+                uiState = uiState.copy(isFetchingMoreTimeline = true)
+                Log.e("TimelineViewModel", "Failed to fetch timeline: ${it.message}")
+            }
         }
     }
 

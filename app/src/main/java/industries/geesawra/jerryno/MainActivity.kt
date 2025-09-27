@@ -10,6 +10,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,6 +38,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,9 +61,6 @@ import androidx.media3.ui.PlayerView
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.paging.Pager
-import androidx.paging.compose.collectAsLazyPagingItems
-import app.bsky.feed.FeedViewPost
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import industries.geesawra.jerryno.datalayer.BlueskyConn
@@ -217,7 +216,6 @@ class MainActivity : ComponentActivity() {
                                         ComposeView(
                                             modalSheetState = modalSheetState,
                                             focusRequester = focusRequester,
-                                            coroutineScope = coroutineScope,
                                             timelineViewModel = timelineViewModel,
                                             onDismissRequest = {
                                                 showBottomSheet = false
@@ -292,20 +290,24 @@ fun ExoPlayerView(uri: String, modifier: Modifier) {
 @Composable
 fun ShowSkeets(
     viewModel: TimelineViewModel,
-    pager: Pager<Int, FeedViewPost>,
     state: LazyListState = rememberLazyListState()
 ) {
-    val lazyPagingItems = pager.flow.collectAsLazyPagingItems()
+    LaunchedEffect(key1 = viewModel.uiState.skeets.isEmpty()) {
+        if (viewModel.uiState.skeets.isEmpty()) {
+            // Check if not already fetching, if you have such a state in ViewModel
+            // e.g., if (!viewModel.uiState.isFetchingTimeline)
+            viewModel.fetchTimeline()
+        }
+    }
 
-    viewModel.fetchTimeline()
 
     LazyColumn(
         state = state,
         modifier = Modifier
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
 
-        ) {
         if (viewModel.uiState.skeets.isEmpty()) {
             item {
                 Box(
@@ -324,8 +326,56 @@ fun ShowSkeets(
                     SkeetRowView(skeet)
                 }
             }
-        }
 
+            // Optional: Show a loading indicator at the bottom while fetching more items
+            if (viewModel.uiState.isFetchingMoreTimeline) { // Add isFetchingMore to your UiState
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .width(64.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Effect to detect scrolling to the bottom
+    val endOfListReached by remember {
+        derivedStateOf {
+            // Check if the last visible item is the last item in the list
+            // And if there are items to display
+            val layoutInfo = state.layoutInfo
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            if (layoutInfo.totalItemsCount == 0) {
+                false
+            } else {
+                val lastVisibleItem = visibleItemsInfo.lastOrNull()
+                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
+            }
+        }
+    }
+
+    // Trigger fetchTimeline when the end of the list is reached
+    // and not currently fetching more.
+    LaunchedEffect(endOfListReached) {
+        if (endOfListReached && viewModel.uiState.skeets.isNotEmpty()) {
+            // You might want to pass a cursor or page number to fetchTimeline
+            // if your API supports pagination.
+            // For example: viewModel.fetchTimeline(cursor = viewModel.uiState.lastCursor)
+            viewModel.fetchTimeline() // Or a specific function like viewModel.fetchMoreSkeets()
+        }
     }
 }
 

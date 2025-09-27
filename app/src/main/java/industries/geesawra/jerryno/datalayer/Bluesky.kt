@@ -222,7 +222,8 @@ class BlueskyConn(val context: Context) {
             create().getOrThrow()
             val timeline = client!!.getTimeline(
                 GetTimelineQueryParams(
-                    cursor
+                    limit = 25,
+                    cursor = cursor
                 )
             );
             val feed = when (timeline) {
