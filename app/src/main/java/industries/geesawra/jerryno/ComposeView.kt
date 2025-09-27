@@ -36,17 +36,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import industries.geesawra.jerryno.datalayer.Bluesky
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import industries.geesawra.jerryno.datalayer.TimelineViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ComposeView(
     modalSheetState: SheetState,
     focusRequester: FocusRequester,
-    coroutineScope: CoroutineScope,
-    bluesky: Bluesky,
+    timelineViewModel: TimelineViewModel,
     onDismissRequest: () -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
@@ -97,10 +94,9 @@ fun ComposeView(
                     Button(
                         enabled = text.isNotBlank() && text.length <= maxChars,
                         onClick = {
-                            coroutineScope.launch {
-                                bluesky.post(text)
-                                modalSheetState.hide() // Animate the sheet away
-                            }
+                            timelineViewModel.post(content = text, then = {
+                                modalSheetState.hide()
+                            })
                         },
                         modifier = Modifier.padding(4.dp)
                     ) {

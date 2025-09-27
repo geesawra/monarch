@@ -170,11 +170,11 @@ fun SkeetRowView(skeet: FeedViewPost) {
                             modifier = Modifier
                                 .height(200.dp)
                                 .fillMaxWidth()
-                                .padding(top = 4.dp),
+                                .padding(4.dp),
                             userScrollEnabled = false,
                             content = {
                                 items(img.size) { index ->
-                                    val img = img.get(index)
+                                    val img = img[index]
 
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
@@ -185,6 +185,15 @@ fun SkeetRowView(skeet: FeedViewPost) {
                                         contentDescription = img.alt,
                                         modifier = Modifier
                                             .height(200.dp)
+                                            .padding(
+                                                start = 4.dp,
+                                                end = 4.dp,
+                                                bottom = 10.dp
+                                            )
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .dropShadow(shape = RoundedCornerShape(12.dp), block = {
+                                                radius = 2f
+                                            })
                                             .fillMaxWidth()
                                     )
                                 }

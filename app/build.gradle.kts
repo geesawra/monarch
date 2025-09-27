@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    kotlin("plugin.serialization")
 }
 
 android {
@@ -60,7 +61,14 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.57.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
     implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
-    ksp("com.google.dagger:hilt-compiler:2.57.1")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
+    implementation("androidx.datastore:datastore:1.1.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(platform("androidx.compose:compose-bom:2025.09.00"))
+    implementation("androidx.paging:paging-compose:3.3.0-alpha05")
+    implementation(libs.androidx.compose.animation.core.lint)
+    ksp("com.google.dagger:hilt-compiler:2.57.2")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
