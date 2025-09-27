@@ -33,11 +33,6 @@ import sh.christian.ozone.api.Nsid
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import sh.christian.ozone.api.response.AtpResponse
 
-data class Client(
-    var client: AuthenticatedXrpcBlueskyApi,
-    var session: SessionData
-)
-
 enum class AuthData {
     PDSHost,
     SessionData,
@@ -225,14 +220,14 @@ class BlueskyConn(val context: Context) {
                     limit = 25,
                     cursor = cursor
                 )
-            );
+            )
             val feed = when (timeline) {
                 is AtpResponse.Failure<*> -> {
                     return Result.failure(Exception("Failed to fetch timeline: ${timeline.error}"))
                 }
 
                 is AtpResponse.Success<GetTimelineResponse> -> timeline.response
-            };
+            }
 
             return Result.success(feed)
         }
