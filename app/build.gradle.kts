@@ -31,11 +31,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     compileOptions {
-        version = JavaVersion.VERSION_11.toString()
+        version = JavaVersion.VERSION_21.toString()
     }
     buildFeatures {
         compose = true

@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -46,6 +47,8 @@ fun LoginView(
     val ctx = LocalContext.current
     val bc = BlueskyConn(ctx)
     val appPasswordRegex = "[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}".toRegex()
+    var currentPDS by remember { mutableStateOf("") }
+    var lookingUpPDS by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -62,14 +65,55 @@ fun LoginView(
             value = handle,
             onValueChange = { handle = it },
             label = { Text("Handle (e.g., yourname.bsky.social)") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focusState ->
+                    when (focusState.isFocused) {
+                        true -> {
+                            lookingUpPDS = false
+                            currentPDS = ""
+                        }
+
+                        false -> {
+                            if (handle.isEmpty()) {
+                                currentPDS = ""
+                                return@onFocusChanged
+                            }
+
+                            if (currentPDS != "") {
+                                return@onFocusChanged
+                            }
+
+                            scope.launch {
+                                lookingUpPDS = true
+                                currentPDS = BlueskyConn.pdsForHandle(handle).getOrElse {
+                                    Toast.makeText(
+                                        ctx,
+                                        it.message ?: "Unknown error",
+                                        Toast.LENGTH_LONG
+                                    )
+                                        .show()
+                                    return@launch
+                                }
+                                lookingUpPDS = false
+                            }
+                        }
+                    }
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                capitalization = KeyboardCapitalization.None,
+            )
         )
         TextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                capitalization = KeyboardCapitalization.None
+            ),
             trailingIcon = {
                 val image = if (passwordVisible)
                     Icons.Filled.Visibility
@@ -88,12 +132,7 @@ fun LoginView(
         Button(
             onClick = {
                 scope.launch {
-                    val pds = BlueskyConn.pdsForHandle(handle).getOrElse {
-                        Toast.makeText(ctx, it.message ?: "Unknown error", Toast.LENGTH_LONG).show()
-                        return@launch
-                    }
-
-                    bc.login(pds, handle, password).onSuccess {
+                    bc.login(currentPDS, handle, password).onSuccess {
                         navigate()
                     }.onFailure {
                         Log.e("LoginView", "Login failed", it)
@@ -102,15 +141,27 @@ fun LoginView(
                     }
                 }
             },
-            enabled = (Handle.Regex.matches(handle.removePrefix("@"))) && password.isNotEmpty(),
+            enabled = (Handle.Regex.matches(handle.removePrefix("@"))) && password.isNotEmpty() && currentPDS.isNotEmpty(),
             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         ) {
             Text("Login")
         }
 
+        var pdsString = "I'll look up your PDS automatically :^)"
+        if (currentPDS != "") {
+            if (currentPDS.endsWith("bsky.network")) {
+                pdsString = "Your PDS: bsky.app"
+            } else {
+                pdsString = "Your PDS: $currentPDS"
+            }
+        }
+        if (lookingUpPDS) {
+            pdsString = "Looking up your PDS..."
+        }
+
         Text(
-            text = "I'll look up your PDS automatically :^)",
-            style = MaterialTheme.typography.labelSmall
+            text = pdsString,
+            style = MaterialTheme.typography.labelMedium
         )
 
         if (password.isNotEmpty() && !password.matches(appPasswordRegex) && !isPasswordFocused) {
