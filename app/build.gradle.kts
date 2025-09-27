@@ -34,8 +34,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
+    compileOptions {
+        version = JavaVersion.VERSION_11.toString()
     }
     buildFeatures {
         compose = true
@@ -43,6 +43,7 @@ android {
 }
 
 dependencies {
+    implementation("io.ktor:ktor-client-cio:3.0.1") // Or another engine like OkHttp
     implementation("io.ktor:ktor-client-plugins:3.0.1") // Or more specifically:
     implementation("io.ktor:ktor-client-core:3.0.1") // Or the version aligned with the library
     implementation("io.ktor:ktor-client-okhttp:3.0.1") // Or your preferred engine
@@ -67,6 +68,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.paging:paging-compose:3.3.0-alpha05")
+
     implementation(libs.androidx.compose.animation.core.lint)
     ksp("com.google.dagger:hilt-compiler:2.57.2")
     implementation(libs.androidx.core.ktx)

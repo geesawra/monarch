@@ -88,7 +88,12 @@ fun LoginView(
         Button(
             onClick = {
                 scope.launch {
-                    bc.login("https://wallera.computer", handle, password).onSuccess {
+                    val pds = BlueskyConn.pdsForHandle(handle).getOrElse {
+                        Toast.makeText(ctx, it.message ?: "Unknown error", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
+
+                    bc.login(pds, handle, password).onSuccess {
                         navigate()
                     }.onFailure {
                         Log.e("LoginView", "Login failed", it)

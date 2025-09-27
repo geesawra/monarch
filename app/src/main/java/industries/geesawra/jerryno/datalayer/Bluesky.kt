@@ -9,15 +9,21 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.feed.GetTimelineQueryParams
 import app.bsky.feed.GetTimelineResponse
 import app.bsky.feed.Post
+import com.atproto.identity.ResolveHandleQueryParams
+import com.atproto.identity.ResolveHandleResponse
 import com.atproto.repo.CreateRecordRequest
 import com.atproto.server.CreateSessionRequest
 import com.atproto.server.CreateSessionResponse
 import com.atproto.server.GetSessionResponse
 import com.atproto.server.RefreshSessionResponse
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.get
+import io.ktor.http.URLProtocol
+import io.ktor.http.path
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -93,7 +99,67 @@ class BlueskyConn(val context: Context) {
         private val Context.dataStore by preferencesDataStore("bluesky")
         private val SESSION = stringPreferencesKey(AuthData.SessionData.name)
         private val PDSHOST = stringPreferencesKey(AuthData.PDSHost.name)
+
+        suspend fun pdsForHandle(handle: String): Result<String> {
+            return runCatching {
+                val api = XrpcBlueskyApi()
+
+                val rawId = api.resolveHandle(
+                    ResolveHandleQueryParams(
+                        handle = Handle(handle)
+                    )
+                )
+
+                val did = when (rawId) {
+                    is AtpResponse.Failure<*> -> {
+                        return Result.failure(Exception("Failed to resolve handle: ${rawId.error?.message}"))
+                    }
+
+                    is AtpResponse.Success<ResolveHandleResponse> -> {
+                        rawId.response.did.did
+                    }
+                }
+
+                val httpClient = HttpClient(OkHttp) {
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = 15000
+                        connectTimeoutMillis = 15000
+                        socketTimeoutMillis = 15000
+                    }
+                }
+
+                val rawDoc: String = httpClient.get {
+                    url {
+                        protocol = URLProtocol.HTTPS
+                        host = "plc.directory"
+                        path(did)
+                    }
+                }.body()
+
+                val solvedDoc: didDoc = BlueskyJson.decodeFromString(didDoc.serializer(), rawDoc)
+
+                for (ps in solvedDoc.service) {
+                    if (ps.id == "#atproto_pds" && ps.type == "AtprotoPersonalDataServer") {
+                        return Result.success(ps.serviceEndpoint)
+                    }
+                }
+
+                return Result.failure(Exception("No PDS service defined in the DID document associated with ${handle}"))
+            }
+        }
     }
+
+    @Serializable
+    private data class service(
+        val id: String,
+        val type: String,
+        val serviceEndpoint: String
+    )
+
+    @Serializable
+    private data class didDoc(
+        val service: List<service>
+    )
 
     var client: AuthenticatedXrpcBlueskyApi? = null
     var session: SessionData? = null

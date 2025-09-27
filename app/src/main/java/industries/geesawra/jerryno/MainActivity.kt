@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +43,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,6 +67,7 @@ import dagger.hilt.android.HiltAndroidApp
 import industries.geesawra.jerryno.datalayer.BlueskyConn
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import industries.geesawra.jerryno.ui.theme.JerryNoTheme
+import kotlinx.coroutines.launch
 
 
 @HiltAndroidApp
@@ -115,6 +118,9 @@ class MainActivity : ComponentActivity() {
                 )
                 var showBottomSheet by remember { mutableStateOf(false) }
                 val focusRequester = remember { FocusRequester() }
+                val listState = rememberLazyListState()
+                val coroutineScope = rememberCoroutineScope()
+
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -161,7 +167,12 @@ class MainActivity : ComponentActivity() {
                                     title = {
                                         Text(text = "Jerry No")
                                     },
-                                    scrollBehavior = scrollBehavior
+                                    scrollBehavior = scrollBehavior,
+                                    modifier = Modifier.clickable {
+                                        coroutineScope.launch {
+                                            listState.animateScrollToItem(0)
+                                        }
+                                    }
                                 )
                             },
                             floatingActionButton = {
@@ -201,9 +212,6 @@ class MainActivity : ComponentActivity() {
                                 composable(route = TimelineScreen.Timeline.name) {
                                     loggingIn.value = false
                                     timelineViewModel.create()
-
-                                    val listState = rememberLazyListState()
-                                    listState.canScrollBackward
 
                                     ShowSkeets(
                                         viewModel = timelineViewModel,
