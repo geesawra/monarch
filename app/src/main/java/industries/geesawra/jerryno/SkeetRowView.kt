@@ -38,11 +38,11 @@ import sh.christian.ozone.BlueskyJson
 
 @Composable
 fun SkeetRowView(skeet: FeedViewPost) {
-    val likes = skeet.post.likeCount;
-    val reposts = skeet.post.repostCount;
-    val replies = skeet.post.replyCount;
+    val likes = skeet.post.likeCount
+    val reposts = skeet.post.repostCount
+    val replies = skeet.post.replyCount
 
-    val minSize = 55.dp;
+    val minSize = 55.dp
 
     Row(
         verticalAlignment = Alignment.Top,
@@ -53,7 +53,7 @@ fun SkeetRowView(skeet: FeedViewPost) {
             modifier = Modifier
                 .weight(1f)
                 .sizeIn(minHeight = minSize)
-                .padding(start = 8.dp, end = 8.dp),
+                .padding(start = 16.dp, end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             ElevatedCard(
@@ -106,7 +106,7 @@ private fun SkeetContent(skeet: FeedViewPost) {
         color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier
-            .padding(bottom = 4.dp, start = 4.dp, end = 4.dp),
+            .padding(start = 4.dp, end = 4.dp),
     )
 
     val embed = skeet.post.embed
@@ -169,7 +169,7 @@ private fun SkeetContent(skeet: FeedViewPost) {
 
 @Composable
 private fun SkeetHeader(skeet: FeedViewPost) {
-    val authorName = skeet.post.author.displayName ?: skeet.post.author.handle.toString();
+    val authorName = skeet.post.author.displayName ?: skeet.post.author.handle.toString()
     var headerSet = false
 
     Column {
@@ -220,7 +220,7 @@ private fun SkeetHeader(skeet: FeedViewPost) {
 
         skeet.reply?.let {
             it
-            val parent = it.parent;
+            val parent = it.parent
             when (parent) {
                 is ReplyRefParentUnion.PostView -> {
                     Text(
