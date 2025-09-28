@@ -5,50 +5,25 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.StringRes
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumTopAppBar
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarColors
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -69,7 +44,6 @@ import dagger.hilt.android.HiltAndroidApp
 import industries.geesawra.jerryno.datalayer.BlueskyConn
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import industries.geesawra.jerryno.ui.theme.JerryNoTheme
-import kotlinx.coroutines.launch
 
 
 @HiltAndroidApp
@@ -79,15 +53,6 @@ enum class TimelineScreen() {
     Login,
     Timeline,
     Compose
-}
-
-enum class TabBarDestinations(
-    @param:StringRes val label: Int,
-    val icon: ImageVector,
-    @param:StringRes val contentDescription: Int
-) {
-    HOME(R.string.timeline, Icons.Filled.Home, R.string.timeline),
-    NOTIFICATIONS(R.string.notifications, Icons.Filled.Notifications, R.string.notifications)
 }
 
 @AndroidEntryPoint
@@ -118,178 +83,82 @@ class MainActivity : ComponentActivity() {
                         .build()
                 }
 
-                val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
-                    rememberTopAppBarState()
-                )
                 val conn = BlueskyConn(LocalContext.current)
                 val timelineViewModel = hiltViewModel<TimelineViewModel, TimelineViewModel.Factory>(
                     creationCallback = { factory ->
                         factory.create(conn)
                     }
                 )
-                var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.HOME) }
                 val navController = rememberNavController()
-                val loggingIn = remember { mutableStateOf(true) }
-                val modalSheetState = rememberModalBottomSheetState(
-                    skipPartiallyExpanded = true,
-                    confirmValueChange = { sv ->
-                        sv != SheetValue.PartiallyExpanded
-                    }
-                )
-                var showBottomSheet by remember { mutableStateOf(false) }
-                val focusRequester = remember { FocusRequester() }
-                val listState = rememberLazyListState()
-                val coroutineScope = rememberCoroutineScope()
-
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // TODO: maybe move this inside the timeline view?
-                    NavigationSuiteScaffold(
-                        navigationSuiteItems = {
-                            if (loggingIn.value) {
-                                return@NavigationSuiteScaffold
-                            }
 
-                            TabBarDestinations.entries.forEach {
-                                item(
-                                    icon = {
-                                        Icon(
-                                            it.icon,
-                                            contentDescription = stringResource(it.contentDescription)
-                                        )
-                                    },
-                                    label = { Text(stringResource(it.label)) },
-                                    selected = it == currentDestination,
-                                    onClick = { currentDestination = it }
-                                )
+                    timelineViewModel.loadSession()
+                    if (!timelineViewModel.uiState.sessionChecked) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(), // Make the Box take the full available space
+                            contentAlignment = Alignment.Center // Align content (LoginView) to the center
+                        ) {
+                        }
+
+                        return@Surface
+                    }
+
+                    val initialRoute =
+                        if (timelineViewModel.uiState.authenticated) TimelineScreen.Timeline.name else TimelineScreen.Login.name
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = initialRoute,
+                        modifier = Modifier.fillMaxSize(),
+                        popExitTransition = {
+                            scaleOut(
+                                targetScale = 0.9f,
+                                transformOrigin = TransformOrigin(0.5f, 0.5f)
+                            )
+                        },
+                        popEnterTransition = {
+                            EnterTransition.None
+                        },
+                    ) {
+                        composable(route = TimelineScreen.Timeline.name) {
+                            TimelineView(
+                                timelineViewModel = timelineViewModel,
+                                coroutineScope = rememberCoroutineScope()
+                            )
+                        }
+                        composable(route = TimelineScreen.Compose.name) {
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = MaterialTheme.colorScheme.background // Set compose screen background
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        "Compose",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(10.dp)
+                                    )
+                                }
                             }
                         }
-                    ) {
-                        Scaffold(
-                            containerColor = MaterialTheme.colorScheme.background,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .nestedScroll(scrollBehavior.nestedScrollConnection),
-                            topBar = {
-                                if (loggingIn.value) {
-                                    return@Scaffold
-                                }
-
-                                MediumTopAppBar(
-                                    colors = TopAppBarColors(
-                                        containerColor = MaterialTheme.colorScheme.background,
-                                        scrolledContainerColor = MaterialTheme.colorScheme.background,
-                                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground, // Ensuring correct contrast
-                                        titleContentColor = MaterialTheme.colorScheme.onBackground,
-                                        actionIconContentColor = MaterialTheme.colorScheme.onBackground
-                                    ),
-                                    title = {
-                                        Text(text = "Jerry No")
-                                    },
-                                    scrollBehavior = scrollBehavior,
-                                    modifier = Modifier.clickable {
-                                        coroutineScope.launch {
-                                            listState.animateScrollToItem(0)
-                                        }
-                                    }
-                                )
-                            },
-                            floatingActionButton = {
-                                if (loggingIn.value) {
-                                    return@Scaffold
-                                }
-
-                                FloatingActionButton(
-                                    onClick = {
-                                        navController.navigate(TimelineScreen.Compose.name)
-                                    },
-                                ) {
-                                    Icon(Icons.Filled.Create, "Post")
-                                }
-                            },
-                        ) { values ->
-                            timelineViewModel.loadSession()
-                            if (!timelineViewModel.uiState.sessionChecked) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(), // Make the Box take the full available space
-                                    contentAlignment = Alignment.Center // Align content (LoginView) to the center
-                                ) {
-                                }
-
-                                return@Scaffold
-                            }
-
-                            val initialRoute =
-                                if (timelineViewModel.uiState.authenticated) TimelineScreen.Timeline.name else TimelineScreen.Login.name
-
-                            NavHost(
-                                navController = navController,
-                                startDestination = initialRoute,
-                                modifier = Modifier.padding(values),
-                                popExitTransition = {
-                                    scaleOut(
-                                        targetScale = 0.9f,
-                                        transformOrigin = TransformOrigin(0.5f, 0.5f)
-                                    )
-                                },
-                                popEnterTransition = {
-                                    EnterTransition.None
-                                },
+                        composable(route = TimelineScreen.Login.name) {
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = MaterialTheme.colorScheme.background // Set login screen background
                             ) {
-                                composable(route = TimelineScreen.Timeline.name) {
-                                    loggingIn.value = false
-                                    timelineViewModel.create()
-
-                                    ShowSkeets(
-                                        viewModel = timelineViewModel,
-                                        state = listState
-                                    )
-
-                                    if (showBottomSheet) {
-                                        ComposeView(
-                                            modalSheetState = modalSheetState,
-                                            focusRequester = focusRequester,
-                                            timelineViewModel = timelineViewModel,
-                                            onDismissRequest = {
-                                                showBottomSheet = false
-                                            }
-                                        )
-                                    }
-                                }
-                                composable(route = TimelineScreen.Compose.name) {
-                                    Surface(
-                                        modifier = Modifier.fillMaxSize(),
-                                        color = MaterialTheme.colorScheme.background // Set compose screen background
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text(
-                                                "Compose",
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .padding(10.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                                composable(route = TimelineScreen.Login.name) {
-                                    Surface(
-                                        modifier = Modifier.fillMaxSize(),
-                                        color = MaterialTheme.colorScheme.background // Set login screen background
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            LoginView {
-                                                navController.navigate(TimelineScreen.Timeline.name)
-                                            }
-                                        }
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    LoginView {
+                                        navController.navigate(TimelineScreen.Timeline.name)
                                     }
                                 }
                             }

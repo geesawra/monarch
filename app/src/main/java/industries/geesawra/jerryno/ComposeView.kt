@@ -94,9 +94,9 @@ fun ComposeView(
                     Button(
                         enabled = text.isNotBlank() && text.length <= maxChars,
                         onClick = {
-                            timelineViewModel.post(content = text, then = {
+                            timelineViewModel.post(text) {
                                 modalSheetState.hide()
-                            })
+                            }
                         },
                         modifier = Modifier.padding(4.dp)
                     ) {

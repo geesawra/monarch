@@ -22,8 +22,9 @@ import industries.geesawra.jerryno.datalayer.TimelineViewModel
 
 @Composable
 fun ShowSkeets(
+    modifier: Modifier = Modifier,
     viewModel: TimelineViewModel,
-    state: LazyListState = rememberLazyListState()
+    state: LazyListState = rememberLazyListState(),
 ) {
     LaunchedEffect(key1 = viewModel.uiState.skeets.isEmpty()) {
         if (viewModel.uiState.skeets.isEmpty()) {
@@ -34,8 +35,7 @@ fun ShowSkeets(
 
     LazyColumn(
         state = state,
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
 
