@@ -175,14 +175,12 @@ private fun SkeetContent(skeet: FeedViewPost) {
 @Composable
 private fun SkeetHeader(skeet: FeedViewPost, modifier: Modifier = Modifier) {
     val authorName = skeet.post.author.displayName ?: skeet.post.author.handle.toString()
-    var headerSet = false
 
     Column(modifier = modifier) {
         skeet.reason?.let {
             it
             when (it) {
                 is FeedViewPostReasonUnion.ReasonRepost -> {
-                    headerSet = true
                     Text(
                         text = "Reposted by ${it.value.by.displayName ?: it.value.by.handle.toString()}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
