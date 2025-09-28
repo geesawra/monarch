@@ -58,6 +58,12 @@ import androidx.media3.ui.PlayerView
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.disk.directory
+import coil3.memory.MemoryCache
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import industries.geesawra.jerryno.datalayer.BlueskyConn
@@ -94,6 +100,24 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             JerryNoTheme {
+                val context = LocalContext.current
+                SingletonImageLoader.setSafe {
+                    ImageLoader.Builder(context)
+                        .components { add(OkHttpNetworkFetcherFactory()) }
+                        .memoryCache {
+                            MemoryCache.Builder()
+                                .maxSizePercent(context, 0.25)
+                                .build()
+                        }
+                        .diskCache {
+                            DiskCache.Builder()
+                                .directory(context.cacheDir.resolve("image_cache"))
+                                .maxSizePercent(0.02)
+                                .build()
+                        }
+                        .build()
+                }
+
                 val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
                     rememberTopAppBarState()
                 )
