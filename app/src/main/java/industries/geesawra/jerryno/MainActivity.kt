@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
 
 
 @HiltAndroidApp
-class Application : Application() {}
+class Application : Application()
 
 enum class TimelineScreen() {
     Login,
@@ -120,7 +120,9 @@ class MainActivity : ComponentActivity() {
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
                 ) {
+                    // TODO: maybe move this inside the timeline view?
                     NavigationSuiteScaffold(
                         navigationSuiteItems = {
                             if (loggingIn.value) {
@@ -143,7 +145,7 @@ class MainActivity : ComponentActivity() {
                         }
                     ) {
                         Scaffold(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            containerColor = MaterialTheme.colorScheme.background,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -154,11 +156,11 @@ class MainActivity : ComponentActivity() {
 
                                 MediumTopAppBar(
                                     colors = TopAppBarColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        navigationIconContentColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                                        actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                                        containerColor = MaterialTheme.colorScheme.background,
+                                        scrolledContainerColor = MaterialTheme.colorScheme.background,
+                                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground, // Ensuring correct contrast
+                                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                                        actionIconContentColor = MaterialTheme.colorScheme.onBackground
                                     ),
                                     title = {
                                         Text(text = "Jerry No")
@@ -234,7 +236,10 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 composable(route = TimelineScreen.Compose.name) {
-                                    Surface(modifier = Modifier.fillMaxSize()) {
+                                    Surface(
+                                        modifier = Modifier.fillMaxSize(),
+                                        color = MaterialTheme.colorScheme.background // Set compose screen background
+                                    ) {
                                         Box(
                                             modifier = Modifier.fillMaxSize(),
                                             contentAlignment = Alignment.Center,
@@ -249,12 +254,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 composable(route = TimelineScreen.Login.name) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(), // Make the Box take the full available space
-                                        contentAlignment = Alignment.Center // Align content (LoginView) to the center
+                                    Surface(
+                                        modifier = Modifier.fillMaxSize(),
+                                        color = MaterialTheme.colorScheme.background // Set login screen background
                                     ) {
-                                        LoginView {
-                                            navController.navigate(TimelineScreen.Timeline.name)
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            LoginView {
+                                                navController.navigate(TimelineScreen.Timeline.name)
+                                            }
                                         }
                                     }
                                 }
