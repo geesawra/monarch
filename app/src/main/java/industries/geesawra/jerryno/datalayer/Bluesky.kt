@@ -1,6 +1,7 @@
 package industries.geesawra.jerryno.datalayer
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toLowerCase
 import androidx.datastore.preferences.core.edit
@@ -27,6 +28,7 @@ import io.ktor.http.path
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import sh.christian.ozone.BlueskyJson
@@ -163,6 +165,7 @@ class BlueskyConn(val context: Context) {
 
     var client: AuthenticatedXrpcBlueskyApi? = null
     var session: SessionData? = null
+    var createMutex: Mutex = Mutex()
 
     suspend fun storeSessionData(pdsURL: String, session: SessionData) {
         context.dataStore.edit { settings ->
@@ -221,10 +224,13 @@ class BlueskyConn(val context: Context) {
 
     suspend fun create(): Result<Unit> {
         return runCatching {
+            createMutex.lock()
             if (session != null && client != null) {
+                createMutex.unlock()
                 return Result.success(Unit)
             }
 
+            Log.d("Bluesky", "create called without session or client")
             val pdsURLFlow: Flow<String> = context.dataStore.data.map { settings ->
                 settings[PDSHOST] ?: ""
             }
@@ -236,11 +242,11 @@ class BlueskyConn(val context: Context) {
             val sessionDataString = sessionDataStringFlow.first()
 
             if (pdsURL.isEmpty() || sessionDataString.isEmpty()) {
+                createMutex.unlock()
                 return Result.failure(Exception("No session data found"))
             }
 
             val sessionData = SessionData.decodeFromJson(sessionDataString)
-
 
             val httpClient = HttpClient(OkHttp) {
                 defaultRequest {
@@ -257,24 +263,32 @@ class BlueskyConn(val context: Context) {
                 BlueskyAuthPlugin.Tokens(sessionData.accessJwt, sessionData.refreshJwt)
             val authClient = AuthenticatedXrpcBlueskyApi(httpClient, tokens)
 
-            val gs = authClient.getSession().maybeResponse()
-            gs?.let {
-                this.client = authClient
-                this.session = SessionData.fromGetSessionResponse(it)
+            val gs = authClient.getSession()
+            when (gs) {
+                is AtpResponse.Failure<*> -> run {
+                    return@run
+                }
 
-                return Result.success(Unit)
+                is AtpResponse.Success<GetSessionResponse> -> {
+                    this.client = authClient
+                    this.session = SessionData.fromGetSessionResponse(gs.response)
+                    createMutex.unlock()
+                    return Result.success(Unit)
+                }
             }
 
             // No session, try to refresh
-            val rs = authClient.refreshSession().maybeResponse()
-            rs?.let {
-                this.client = authClient
-                this.session = SessionData.fromRefreshSessionResponse(it)
-
-                return Result.success(Unit)
+            val rs = authClient.refreshSession()
+            when (rs) {
+                is AtpResponse.Failure<*> -> return Result.failure(Exception("Could not refresh session, maybe login again?"))
+                is AtpResponse.Success<RefreshSessionResponse> -> {
+                    this.client = authClient
+                    this.session = SessionData.fromRefreshSessionResponse(rs.response)
+                    storeSessionData(pdsURL, this.session!!)
+                    createMutex.unlock()
+                    return Result.success(Unit)
+                }
             }
-
-            return Result.failure(Exception("Could not refresh session, maybe login again?"))
         }
     }
 
