@@ -12,15 +12,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -44,23 +46,26 @@ fun SkeetRowView(skeet: FeedViewPost) {
 
     val minSize = 55.dp
 
-    Row(
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.Start,
-        modifier = Modifier.fillMaxWidth()
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .sizeIn(minHeight = minSize)
-                .padding(start = 16.dp, end = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        Row(
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .sizeIn(minHeight = minSize),
             ) {
+
                 Row(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -69,31 +74,29 @@ fun SkeetRowView(skeet: FeedViewPost) {
                             .build(),
                         contentDescription = "Avatar",
                         modifier = Modifier
-                            .padding(end = 8.dp, start = 8.dp, top = 10.dp)
                             .size(minSize)
-                            .dropShadow(shape = RoundedCornerShape(12.dp), block = {
-                                radius = 2f
-                            })
-                            .clip(RoundedCornerShape(12.dp))
-
+                            .clip(CircleShape)
                     )
 
-                    SkeetHeader(skeet)
+                    SkeetHeader(modifier = Modifier.padding(start = 16.dp), skeet = skeet)
                 }
 
                 SkeetContent(skeet)
 
                 TimelinePostActionsView(
                     modifier = Modifier
-                        .padding(start = 8.dp)
                         .fillMaxWidth(),
                     replies = replies,
                     likes = likes,
                     reposts = reposts,
                 )
-            }
-        }
 
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+
+        }
     }
 }
 
@@ -104,75 +107,77 @@ private fun SkeetContent(skeet: FeedViewPost) {
     Text(
         text = content.text,
         color = MaterialTheme.colorScheme.onSurface,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier
-            .padding(start = 4.dp, end = 4.dp),
+        style = MaterialTheme.typography.bodyLarge,
     )
 
     val embed = skeet.post.embed
-    when (embed) {
-        is PostViewEmbedUnion.ImagesView -> {
-            val img = embed.value.images
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed({
-                    when (img.size) {
-                        1 -> 1
-                        else -> 2
-                    }
-                }()),
-                modifier = Modifier
-                    .height(200.dp)
-                    .fillMaxWidth()
-                    .padding(4.dp),
-                userScrollEnabled = false,
-                content = {
-                    items(img.size) { index ->
-                        val img = img[index]
+    if (embed == null) {
+        return
+    }
 
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(img.thumb.toString())
-                                .crossfade(true)
-                                .build(),
-                            contentScale = ContentScale.Crop,
-                            contentDescription = img.alt,
-                            modifier = Modifier
-                                .height(200.dp)
-                                .padding(
-                                    start = 4.dp,
-                                    end = 4.dp,
-                                    bottom = 10.dp
-                                )
-                                .clip(RoundedCornerShape(12.dp))
-                                .dropShadow(shape = RoundedCornerShape(12.dp), block = {
-                                    radius = 2f
-                                })
-                                .fillMaxWidth()
-                        )
+    Card(
+        modifier = Modifier.padding(top = 8.dp)
+    ) {
+        when (embed) {
+            is PostViewEmbedUnion.ImagesView -> {
+                val img = embed.value.images
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed({
+                        when (img.size) {
+                            1 -> 1
+                            else -> 2
+                        }
+                    }()),
+                    modifier = Modifier
+                        .height(200.dp)
+                        .fillMaxWidth(),
+                    userScrollEnabled = false,
+                    content = {
+                        items(img.size) { index ->
+                            val img = img[index]
+
+                            val pv = {
+                                when (index % 2 == 0) {
+                                    true -> PaddingValues(4.dp)
+                                    false -> PaddingValues(top = 4.dp, end = 4.dp, bottom = 4.dp)
+                                }
+                            }()
+
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(img.thumb.toString())
+                                    .crossfade(true)
+                                    .build(),
+                                contentScale = ContentScale.Crop,
+                                contentDescription = img.alt,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .padding(pv)
+                                    .clip(RoundedCornerShape(12.dp))
+                            )
+                        }
                     }
-                }
-            )
+                )
+            }
+
+            is PostViewEmbedUnion.VideoView -> {
+                embed.value
+                Text("Videos TBD")
+            } // TODO: build this
+            else -> {}
         }
-
-        is PostViewEmbedUnion.VideoView -> {
-            val video = embed.value
-            ExoPlayerView(
-                video.playlist.uri,
-                modifier = Modifier // TODO: https://github.com/fengdai/compose-media
-                    .height(200.dp)
-            )
-        } // TODO: build this
-        else -> {}
     }
 }
 
 @Composable
-private fun SkeetHeader(skeet: FeedViewPost) {
+private fun SkeetHeader(skeet: FeedViewPost, modifier: Modifier = Modifier) {
     val authorName = skeet.post.author.displayName ?: skeet.post.author.handle.toString()
     var headerSet = false
 
-    Column {
+    Column(modifier = modifier) {
         skeet.reason?.let {
             it
             when (it) {
@@ -181,10 +186,10 @@ private fun SkeetHeader(skeet: FeedViewPost) {
                     Text(
                         text = "Reposted by ${it.value.by.displayName ?: it.value.by.handle.toString()}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 4.dp, start = 4.dp, end = 4.dp),
+                            .padding(bottom = 4.dp),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -193,19 +198,10 @@ private fun SkeetHeader(skeet: FeedViewPost) {
             }
         }
 
-        val titlePadding = {
-            when (headerSet) {
-                true -> PaddingValues(top = 1.dp, bottom = 1.dp, start = 4.dp, end = 4.dp)
-                false -> PaddingValues(top = 4.dp, bottom = 1.dp, start = 4.dp, end = 4.dp)
-            }
-        }()
-
         Text(
             text = authorName,
             color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .padding(paddingValues = titlePadding),
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold
         )
 
@@ -214,7 +210,7 @@ private fun SkeetHeader(skeet: FeedViewPost) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier
-                .padding(bottom = 4.dp, start = 4.dp, end = 4.dp),
+                .padding(top = 4.dp),
 
             )
 
@@ -224,12 +220,12 @@ private fun SkeetHeader(skeet: FeedViewPost) {
             when (parent) {
                 is ReplyRefParentUnion.PostView -> {
                     Text(
-                        text = "↪ In reply to ${parent.value.author.displayName ?: parent.value.author.handle.toString()}",
+                        text = "In reply to ${parent.value.author.displayName ?: parent.value.author.handle.toString()}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
+                            .padding(top = 4.dp),
                     )
                 }
 
