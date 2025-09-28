@@ -1,5 +1,6 @@
 package industries.geesawra.jerryno
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -8,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.ReplyAll
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 
@@ -59,6 +62,7 @@ fun TimelinePostActionsView(
     replies: Long?,
     likes: Long?,
     reposts: Long?,
+    uri: String
 ) {
 
     Row(
@@ -102,6 +106,27 @@ fun TimelinePostActionsView(
                 Icons.Default.Repeat,
                 contentDescription = "Repost",
                 number = reposts,
+            )
+        }
+
+        val ctx = LocalContext.current
+        IconButton(
+            onClick = {
+                val sendIntent: Intent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, uri)
+                }
+                ctx.startActivity(
+                    Intent.createChooser(sendIntent, "Share Bluesky post")
+                )
+            }
+        ) {
+            Icon(
+                modifier = Modifier.size(15.dp),
+                imageVector = Icons.Default.Share,
+                contentDescription = "Share",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

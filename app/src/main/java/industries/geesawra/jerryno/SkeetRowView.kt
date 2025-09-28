@@ -89,6 +89,11 @@ fun SkeetRowView(skeet: FeedViewPost) {
                     replies = replies,
                     likes = likes,
                     reposts = reposts,
+                    uri = "https://bsky.app/profile/${skeet.post.author.handle.handle}/post/${
+                        skeet.post.uri.split(
+                            "/"
+                        ).last()
+                    }"
                 )
 
                 HorizontalDivider(
@@ -139,9 +144,10 @@ private fun SkeetContent(skeet: FeedViewPost) {
                             val img = img[index]
 
                             val pv = {
+                                val v = 12.dp
                                 when (index % 2 == 0) {
-                                    true -> PaddingValues(4.dp)
-                                    false -> PaddingValues(top = 4.dp, end = 4.dp, bottom = 4.dp)
+                                    true -> PaddingValues(v)
+                                    false -> PaddingValues(top = v, end = v, bottom = v)
                                 }
                             }()
 
