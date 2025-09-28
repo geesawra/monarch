@@ -6,22 +6,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -39,7 +35,6 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -189,7 +185,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                         ) { values ->
-
                             timelineViewModel.loadSession()
                             if (!timelineViewModel.uiState.sessionChecked) {
                                 Box(
@@ -207,7 +202,16 @@ class MainActivity : ComponentActivity() {
                             NavHost(
                                 navController = navController,
                                 startDestination = initialRoute,
-                                modifier = Modifier.padding(values)
+                                modifier = Modifier.padding(values),
+                                popExitTransition = {
+                                    scaleOut(
+                                        targetScale = 0.9f,
+                                        transformOrigin = TransformOrigin(0.5f, 0.5f)
+                                    )
+                                },
+                                popEnterTransition = {
+                                    EnterTransition.None
+                                },
                             ) {
                                 composable(route = TimelineScreen.Timeline.name) {
                                     loggingIn.value = false
@@ -230,12 +234,19 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 composable(route = TimelineScreen.Compose.name) {
-                                    Text(
-                                        "Compose",
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(10.dp)
-                                    )
+                                    Surface(modifier = Modifier.fillMaxSize()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                "Compose",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(10.dp)
+                                            )
+                                        }
+                                    }
                                 }
                                 composable(route = TimelineScreen.Login.name) {
                                     Box(
@@ -291,97 +302,5 @@ fun ExoPlayerView(uri: String, modifier: Modifier) {
         },
         modifier = modifier
     )
-}
-
-@Composable
-fun ShowSkeets(
-    viewModel: TimelineViewModel,
-    state: LazyListState = rememberLazyListState()
-) {
-    LaunchedEffect(key1 = viewModel.uiState.skeets.isEmpty()) {
-        if (viewModel.uiState.skeets.isEmpty()) {
-            // Check if not already fetching, if you have such a state in ViewModel
-            // e.g., if (!viewModel.uiState.isFetchingTimeline)
-            viewModel.fetchTimeline()
-        }
-    }
-
-
-    LazyColumn(
-        state = state,
-        modifier = Modifier
-            .fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-
-        if (viewModel.uiState.skeets.isEmpty()) {
-            item {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .width(64.dp),
-                    )
-                }
-            }
-        } else {
-            viewModel.uiState.skeets.forEach { skeet ->
-                item(key = skeet.post.uri.toString()) { // Added a key for better performance
-                    SkeetRowView(skeet)
-                }
-            }
-
-            // Optional: Show a loading indicator at the bottom while fetching more items
-            if (viewModel.uiState.isFetchingMoreTimeline) { // Add isFetchingMore to your UiState
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .width(64.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Effect to detect scrolling to the bottom
-    val endOfListReached by remember {
-        derivedStateOf {
-            // Check if the last visible item is the last item in the list
-            // And if there are items to display
-            val layoutInfo = state.layoutInfo
-            val visibleItemsInfo = layoutInfo.visibleItemsInfo
-            if (layoutInfo.totalItemsCount == 0) {
-                false
-            } else {
-                val lastVisibleItem = visibleItemsInfo.lastOrNull()
-                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
-            }
-        }
-    }
-
-    // Trigger fetchTimeline when the end of the list is reached
-    // and not currently fetching more.
-    LaunchedEffect(endOfListReached) {
-        if (endOfListReached && viewModel.uiState.skeets.isNotEmpty()) {
-            // You might want to pass a cursor or page number to fetchTimeline
-            // if your API supports pagination.
-            // For example: viewModel.fetchTimeline(cursor = viewModel.uiState.lastCursor)
-            viewModel.fetchTimeline() // Or a specific function like viewModel.fetchMoreSkeets()
-        }
-    }
 }
 
