@@ -319,7 +319,16 @@ class BlueskyConn(val context: Context) {
         val r = BlueskyJson.encodeAsJsonContent(
             Post(
                 text = content,
-                createdAt = Clock.System.now()
+                createdAt = Clock.System.now(),
+//                embed = PostEmbedUnion.Images(
+//                    value = Images(
+//                        images = List<ImagesImage>(2, init = {
+//                            ImagesImage(
+//                                image = Blob()
+//                            )
+//                        })
+//                    )
+//                )
             )
         )
         client!!.createRecord(
@@ -329,7 +338,7 @@ class BlueskyConn(val context: Context) {
                 record = r,
             )
         )
-
-
     }
+
+//    suspend fun uploadImages(images: List<>)
 }

@@ -32,7 +32,6 @@ fun ShowSkeets(
         }
     }
 
-
     LazyColumn(
         state = state,
         modifier = modifier.fillMaxSize(),

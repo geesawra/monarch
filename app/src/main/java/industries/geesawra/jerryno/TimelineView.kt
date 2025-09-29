@@ -1,14 +1,37 @@
 package industries.geesawra.jerryno
 
+// import androidx.compose.foundation.layout.height // Will be removed for the sheet content Box
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -20,24 +43,32 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -59,22 +90,187 @@ fun TimelineView(
     timelineViewModel: TimelineViewModel,
     coroutineScope: CoroutineScope
 ) {
-    var showBottomSheet by remember { mutableStateOf(false) }
-    var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.HOME) }
-    val modalSheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { sv ->
-            sv != SheetValue.PartiallyExpanded
+    val scaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true // Keep true if you only want fully expanded or hidden
+        ),
+    )
+    var postText by remember { mutableStateOf("") }
+    val maxChars = 300
+
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
+
+    LaunchedEffect(scaffoldState.bottomSheetState.isVisible) {
+        if (scaffoldState.bottomSheetState.isVisible) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } else {
+            keyboardController?.hide()
+        }
+    }
+
+    val pickMedia =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(4)) { uris ->
+            if (uris.isEmpty()) {
+                return@rememberLauncherForActivityResult
+            }
+
+            val urisMap = uris.associateWith {
+                val mimeType: String? = context.contentResolver.getType(it)
+                mimeType?.let {
+                    if (mimeType.startsWith("image/")) {
+                        return@associateWith "image"
+                    } else if (mimeType.startsWith("video/")) {
+                        return@associateWith "video"
+                    }
+                }
+
+                return@associateWith null
+            }
+
+            if (urisMap.size > 1 && urisMap.values.find {
+                    it?.let {
+                        return@find (it == "video")
+                    }
+
+                    return@find false
+                } != null) {
+                Toast.makeText(
+                    context,
+                    "Can only post up to 1 video or 4 pictures",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+
+    BottomSheetScaffold(
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = 0.dp,
+        modifier = Modifier.consumeWindowInsets(WindowInsets.ime),
+        sheetContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.ime)
+                    .padding(16.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(350.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "New Post",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    val charCount = remember { mutableStateOf(0) }
+                    val wasEdited = remember { mutableStateOf(false) }
+
+                    OutlinedTextField(
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                this.defaultKeyboardAction(ImeAction.Done)
+                                // Optionally hide keyboard here
+                                keyboardController?.hide()
+                            }
+                        ),
+                        value = postText,
+                        onValueChange = {
+                            wasEdited.value = true
+                            postText = it
+                            charCount.value = it.length
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .weight(1f), // TextField takes available space, crucial for resizing
+                        label = {
+                            if (wasEdited.value) {
+                                Text(
+                                    text = "${maxChars - charCount.value}",
+                                    color = if (postText.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                )
+                                // return@OutlinedTextField // This return might be causing label issues, consider removing or restructuring
+                            } else {
+                                Text(
+                                    text = "Less cringe this time, okay?",
+                                )
+                            }
+                        },
+                        isError = postText.length > maxChars
+                    )
+
+                    Spacer(modifier = Modifier.padding(4.dp)) // Reduced spacer, was Modifier.height(8.dp)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                            }
+                        ) {
+                            Icon(Icons.Default.Attachment, contentDescription = "Attach media")
+                        }
+                        Button(
+                            onClick = {
+                                if (postText.isNotBlank() && postText.length <= maxChars) {
+                                    // viewModel.postSkeet(postText) // Example action
+                                    coroutineScope.launch {
+                                        scaffoldState.bottomSheetState.hide()
+                                    }
+                                    postText = "" // Clear the text field
+                                    wasEdited.value = false // Reset edited state
+                                }
+                            },
+                            enabled = postText.isNotBlank() && postText.length <= maxChars
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text("Skeet")
+                        }
+                    }
+                }
+            }
+        },
+        content = { paddingValues ->
+            InnerTimelineView(
+                modifier = Modifier.padding(paddingValues),
+                coroutineScope = coroutineScope,
+                timelineViewModel = timelineViewModel,
+            ) {
+                coroutineScope.launch {
+                    scaffoldState.bottomSheetState.expand()
+                }
+            }
         }
     )
-    val focusRequester = remember { FocusRequester() }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InnerTimelineView(
+    modifier: Modifier = Modifier,
+    coroutineScope: CoroutineScope,
+    timelineViewModel: TimelineViewModel,
+    fobOnClick: () -> Unit // Changed to fobOnClick to avoid confusion with FAB acronym
+) {
+    var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.HOME) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
     )
     val listState = rememberLazyListState()
 
-
     ModalNavigationDrawer(
+        modifier = modifier,
         drawerContent = {
             ModalDrawerSheet {
                 Text("Drawer title", modifier = Modifier.padding(16.dp))
@@ -114,9 +310,7 @@ fun TimelineView(
             },
             floatingActionButton = {
                 FloatingActionButton(
-                    onClick = {
-                        showBottomSheet = true
-                    },
+                    onClick = fobOnClick
                 ) {
                     Icon(Icons.Filled.Create, "Post")
                 }
@@ -146,17 +340,6 @@ fun TimelineView(
                 state = listState,
                 modifier = Modifier.padding(values)
             )
-
-            if (showBottomSheet) {
-                ComposeView(
-                    modalSheetState = modalSheetState,
-                    focusRequester = focusRequester,
-                    timelineViewModel = timelineViewModel,
-                    onDismissRequest = {
-                        showBottomSheet = false
-                    }
-                )
-            }
         }
     }
 }
