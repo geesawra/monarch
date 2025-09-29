@@ -442,8 +442,6 @@ private fun InnerTimelineView(
                 }
             }
         ) { values ->
-            timelineViewModel.create()
-
             ShowSkeets(
                 viewModel = timelineViewModel,
                 state = listState,
@@ -473,11 +471,6 @@ fun FeedsDrawer(
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
-        if (timelineViewModel.uiState.feeds.isEmpty()) {
-            CircularProgressIndicator()
-            return@ModalDrawerSheet
-        }
-
         NavigationDrawerItem(
             label = {
                 Row(
