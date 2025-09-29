@@ -172,14 +172,13 @@ fun TimelineView(
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
-        modifier = Modifier.consumeWindowInsets(WindowInsets.ime),
         sheetContent = {
             val uploadingPost = remember { mutableStateOf(false) }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.ime)
-                    .padding(16.dp),
+                    .consumeWindowInsets(WindowInsets.ime)
             ) {
                 Column(
                     modifier = Modifier
@@ -222,7 +221,6 @@ fun TimelineView(
                                     text = "${maxChars - charCount.intValue}",
                                     color = if (postText.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                                 )
-                                // return@OutlinedTextField // This return might be causing label issues, consider removing or restructuring
                             } else {
                                 Text(
                                     text = "Less cringe this time, okay?",
@@ -284,7 +282,14 @@ fun TimelineView(
                                         uploadingPost.value = true
                                         timelineViewModel.post(
                                             postText,
-                                            mediaSelected.value.keys.toList(),
+                                            {
+                                                val list = mediaSelected.value.keys.toList()
+                                                if (list.isEmpty()) {
+                                                    null
+                                                } else {
+                                                    list
+                                                }
+                                            }(),
                                             null
                                         ).onSuccess {
                                             scaffoldState.bottomSheetState.hide()
