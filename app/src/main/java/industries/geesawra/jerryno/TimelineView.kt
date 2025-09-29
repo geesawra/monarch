@@ -14,8 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -42,7 +41,6 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -170,6 +168,7 @@ fun TimelineView(
 
 
     BottomSheetScaffold(
+        modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout),
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
         sheetContent = {
@@ -177,13 +176,14 @@ fun TimelineView(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.ime)
-                    .consumeWindowInsets(WindowInsets.ime)
+                    .windowInsetsPadding(
+                        WindowInsets.ime
+                    )
+                    .padding(16.dp) // General content padding
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(),
+                        .fillMaxWidth(), // Removed .fillMaxHeight()
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row {
@@ -201,7 +201,6 @@ fun TimelineView(
                         keyboardActions = KeyboardActions(
                             onDone = {
                                 this.defaultKeyboardAction(ImeAction.Done)
-                                // Optionally hide keyboard here
                                 keyboardController?.hide()
                             }
                         ),
@@ -237,7 +236,7 @@ fun TimelineView(
                             modifier = Modifier
                                 .heightIn(max = 180.dp)
                                 .fillMaxWidth()
-                                .padding(8.dp)
+                                .padding(8.dp) // This padding is for the Card itself, not the Box's content
                         ) {
                             PostImageGallery(
                                 modifier = Modifier
@@ -253,8 +252,7 @@ fun TimelineView(
                         }
                     }
 
-                    Spacer(modifier = Modifier.padding(4.dp)) // Reduced spacer, was Modifier.height(8.dp)
-
+                    Spacer(modifier = Modifier.padding(4.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -293,8 +291,8 @@ fun TimelineView(
                                             null
                                         ).onSuccess {
                                             scaffoldState.bottomSheetState.hide()
-                                            postText = "" // Clear the text field
-                                            wasEdited.value = false // Reset edited state
+                                            postText = ""
+                                            wasEdited.value = false
                                             postButtonEnabled.value = true
                                             uploadingPost.value = false
                                         }.onFailure {
@@ -492,7 +490,6 @@ fun FeedsDrawer(
                 selectFeed("following", "Following", null)
             }
         )
-        HorizontalDivider()
 
         timelineViewModel.uiState.feeds.forEach {
             NavigationDrawerItem(
@@ -522,7 +519,6 @@ fun FeedsDrawer(
                     selectFeed(it.uri.atUri, it.displayName, it.avatar?.uri)
                 }
             )
-            HorizontalDivider()
         }
 
     }
