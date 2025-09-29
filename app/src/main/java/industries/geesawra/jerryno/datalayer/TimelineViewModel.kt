@@ -72,17 +72,21 @@ class TimelineViewModel @AssistedInject constructor(
                     isFetchingMoreTimeline = false
                 )
             }.onFailure {
-                uiState = uiState.copy(isFetchingMoreTimeline = true)
+                uiState = uiState.copy(isFetchingMoreTimeline = false)
                 Log.e("TimelineViewModel", "Failed to fetch timeline: ${it.message}")
             }
         }
     }
 
-    fun post(content: String, images: List<Uri>? = null, video: Uri? = null) {
-        viewModelScope.launch {
-            bskyConn.post(content, images, video).onFailure {
-                uiState = uiState.copy(postError = it.message)
-            }
+    fun reset() {
+        uiState = uiState.copy(
+            skeets = listOf(), isFetchingMoreTimeline = false, cursor = null,
+        )
+    }
+
+    suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
+        return bskyConn.post(content, images, video).onFailure {
+            uiState = uiState.copy(postError = it.message)
         }
     }
 }

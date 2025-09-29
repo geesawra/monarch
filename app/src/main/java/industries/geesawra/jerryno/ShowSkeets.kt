@@ -10,10 +10,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,70 +34,78 @@ fun ShowSkeets(
         }
     }
 
-    LazyColumn(
-        state = state,
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    val isRefreshing = remember { mutableStateOf(false) }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing.value,
+        onRefresh = {
+            viewModel.reset()
+            viewModel.fetchTimeline()
+        },
     ) {
 
-        if (viewModel.uiState.skeets.isEmpty()) {
-            item {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .width(64.dp),
-                    )
-                }
-            }
-        } else {
-            viewModel.uiState.skeets.forEach { skeet ->
-                item(key = skeet.post.uri.toString()) {
-                    SkeetRowView(skeet)
-                }
-            }
+        LazyColumn(
+            state = state,
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
 
-            if (viewModel.uiState.isFetchingMoreTimeline) {
+            if (viewModel.uiState.skeets.isEmpty()) {
                 item {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
                     ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            } else {
+                viewModel.uiState.skeets.forEach { skeet ->
+                    item(key = skeet.post.uri.toString()) {
+                        SkeetRowView(skeet)
+                    }
+                }
+
+                if (viewModel.uiState.isFetchingMoreTimeline) {
+                    item {
                         Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .width(64.dp),
-                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .width(64.dp),
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    val endOfListReached by remember {
-        derivedStateOf {
-            val layoutInfo = state.layoutInfo
-            val visibleItemsInfo = layoutInfo.visibleItemsInfo
-            if (layoutInfo.totalItemsCount == 0) {
-                false
-            } else {
-                val lastVisibleItem = visibleItemsInfo.lastOrNull()
-                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
+        val endOfListReached by remember {
+            derivedStateOf {
+                val layoutInfo = state.layoutInfo
+                val visibleItemsInfo = layoutInfo.visibleItemsInfo
+                if (layoutInfo.totalItemsCount == 0) {
+                    false
+                } else {
+                    val lastVisibleItem = visibleItemsInfo.lastOrNull()
+                    lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
+                }
             }
         }
-    }
 
-    LaunchedEffect(endOfListReached) {
-        if (endOfListReached && viewModel.uiState.skeets.isNotEmpty()) {
-            viewModel.fetchTimeline()
+        LaunchedEffect(endOfListReached) {
+            if (endOfListReached && viewModel.uiState.skeets.isNotEmpty()) {
+                viewModel.fetchTimeline()
+            }
         }
     }
 }
