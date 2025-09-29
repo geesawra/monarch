@@ -70,6 +70,7 @@ dependencies {
     implementation("androidx.paging:paging-compose:3.3.0-alpha05")
 
     implementation(libs.androidx.compose.animation.core.lint)
+    implementation(libs.androidx.material3)
     ksp("com.google.dagger:hilt-compiler:2.57.2")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
