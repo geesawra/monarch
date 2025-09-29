@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.actor.PreferencesUnion
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
+import app.bsky.embed.Video
 import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetFeedGeneratorsQueryParams
 import app.bsky.feed.GetTimelineQueryParams
@@ -340,30 +341,37 @@ class BlueskyConn(val context: Context) {
         return runCatching {
             create().getOrThrow()
 
-            val blobs = mutableListOf<Blob>()
+            var postEmbed: PostEmbedUnion? = null
 
             if (images != null) {
-                blobs += uploadImages(images).getOrThrow()
+                val blobs = uploadImages(images).getOrThrow()
+                postEmbed = PostEmbedUnion.Images(
+                    value = Images(
+                        images = blobs.map {
+                            ImagesImage(
+                                image = it,
+                                alt = "",
+                            )
+                        }
+                    )
+                )
             }
 
             if (video != null) {
-                blobs += uploadVideo(video).getOrThrow()
+                val blob = uploadVideo(video).getOrThrow()
+                postEmbed = PostEmbedUnion.Video(
+                    value = Video(
+                        video = blob,
+                        alt = "",
+                    )
+                )
             }
 
             val r = BlueskyJson.encodeAsJsonContent(
                 Post(
                     text = content,
                     createdAt = Clock.System.now(),
-                    embed = PostEmbedUnion.Images(
-                        value = Images(
-                            images = blobs.map {
-                                ImagesImage(
-                                    image = it,
-                                    alt = "",
-                                )
-                            }
-                        )
-                    )
+                    embed = postEmbed
                 )
             )
 
@@ -404,7 +412,7 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun uploadVideo(video: Uri): Result<List<Blob>> {
+    suspend fun uploadVideo(video: Uri): Result<Blob> {
         return runCatching {
             create().getOrThrow()
 
@@ -422,7 +430,7 @@ class BlueskyConn(val context: Context) {
             }
 
 
-            return Result.success(uploadedBlobs)
+            return Result.success(uploadedBlobs.first())
         }
     }
 

@@ -280,15 +280,7 @@ fun TimelineView(
                                         uploadingPost.value = true
                                         timelineViewModel.post(
                                             postText,
-                                            {
-                                                val list = mediaSelected.value.keys.toList()
-                                                if (list.isEmpty()) {
-                                                    null
-                                                } else {
-                                                    list
-                                                }
-                                            }(),
-                                            null
+                                            mediaSelected.value.keys.toList().ifEmpty { null }
                                         ).onSuccess {
                                             scaffoldState.bottomSheetState.hide()
                                             postText = ""
