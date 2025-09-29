@@ -35,6 +35,7 @@ import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -58,6 +59,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -161,6 +163,7 @@ fun TimelineView(
         sheetPeekHeight = 0.dp,
         modifier = Modifier.consumeWindowInsets(WindowInsets.ime),
         sheetContent = {
+            val uploadingPost = remember { mutableStateOf(false) }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -173,13 +176,15 @@ fun TimelineView(
                         .fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        "New Post",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
+                    Row {
+                        Text(
+                            "New Post",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
 
-                    val charCount = remember { mutableStateOf(0) }
+                    val charCount = remember { mutableIntStateOf(0) }
                     val wasEdited = remember { mutableStateOf(false) }
 
                     OutlinedTextField(
@@ -194,7 +199,7 @@ fun TimelineView(
                         onValueChange = {
                             wasEdited.value = true
                             postText = it
-                            charCount.value = it.length
+                            charCount.intValue = it.length
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -203,7 +208,7 @@ fun TimelineView(
                         label = {
                             if (wasEdited.value) {
                                 Text(
-                                    text = "${maxChars - charCount.value}",
+                                    text = "${maxChars - charCount.intValue}",
                                     color = if (postText.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                                 )
                                 // return@OutlinedTextField // This return might be causing label issues, consider removing or restructuring
@@ -255,18 +260,41 @@ fun TimelineView(
                             Icon(Icons.Default.Attachment, contentDescription = "Attach media")
                         }
 
+                        if (uploadingPost.value) {
+                            CircularProgressIndicator()
+                        }
+
+                        val postButtonEnabled = remember { mutableStateOf(true) }
                         Button(
                             onClick = {
                                 if (postText.isNotBlank() && postText.length <= maxChars) {
-                                    // viewModel.postSkeet(postText) // Example action
                                     coroutineScope.launch {
-                                        scaffoldState.bottomSheetState.hide()
+                                        postButtonEnabled.value = false
+                                        uploadingPost.value = true
+                                        timelineViewModel.post(
+                                            postText,
+                                            mediaSelected.value.keys.toList(),
+                                            null
+                                        ).onSuccess {
+                                            scaffoldState.bottomSheetState.hide()
+                                            postText = "" // Clear the text field
+                                            wasEdited.value = false // Reset edited state
+                                            postButtonEnabled.value = true
+                                            uploadingPost.value = false
+                                        }.onFailure {
+                                            postButtonEnabled.value = true
+                                            Toast.makeText(
+                                                context,
+                                                "Could not post: ${it.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            uploadingPost.value = false
+                                            postButtonEnabled.value = true
+                                        }
                                     }
-                                    postText = "" // Clear the text field
-                                    wasEdited.value = false // Reset edited state
                                 }
                             },
-                            enabled = postText.isNotBlank() && postText.length <= maxChars
+                            enabled = (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars && postButtonEnabled.value
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
                             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
