@@ -8,8 +8,11 @@ import androidx.compose.ui.text.toLowerCase
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.bsky.actor.PreferencesUnion
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
+import app.bsky.feed.GeneratorView
+import app.bsky.feed.GetFeedGeneratorsQueryParams
 import app.bsky.feed.GetTimelineQueryParams
 import app.bsky.feed.GetTimelineResponse
 import app.bsky.feed.Post
@@ -39,6 +42,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import sh.christian.ozone.BlueskyJson
 import sh.christian.ozone.XrpcBlueskyApi
+import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.AuthenticatedXrpcBlueskyApi
 import sh.christian.ozone.api.BlueskyAuthPlugin
 import sh.christian.ozone.api.Did
@@ -307,11 +311,15 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun fetchTimeline(cursor: String? = null): Result<GetTimelineResponse> {
+    suspend fun fetchTimeline(
+        algorithm: String,
+        cursor: String? = null
+    ): Result<GetTimelineResponse> {
         return runCatching {
             create().getOrThrow()
             val timeline = client!!.getTimeline(
                 GetTimelineQueryParams(
+                    algorithm = algorithm,
                     limit = 25,
                     cursor = cursor
                 )
@@ -325,31 +333,6 @@ class BlueskyConn(val context: Context) {
             }
 
             return Result.success(feed)
-        }
-    }
-
-    suspend fun post(content: String): Result<Unit> {
-        return runCatching {
-            create().getOrThrow()
-
-            val r = BlueskyJson.encodeAsJsonContent(
-                Post(
-                    text = content,
-                    createdAt = Clock.System.now(),
-                )
-            )
-
-            val postRes = client!!.createRecord(
-                CreateRecordRequest(
-                    repo = session!!.handle, // Use handle from the session
-                    collection = Nsid("app.bsky.feed.post"),
-                    record = r,
-                )
-            )
-            return when (postRes) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not create post: ${postRes.error?.message}"))
-                is AtpResponse.Success<*> -> Result.success(Unit)
-            }
         }
     }
 
@@ -440,6 +423,30 @@ class BlueskyConn(val context: Context) {
 
 
             return Result.success(uploadedBlobs)
+        }
+    }
+
+    suspend fun feeds(): Result<List<GeneratorView>> {
+        return runCatching {
+            create().getOrThrow()
+
+            val prefs = client!!.getPreferences().requireResponse()
+            val feedUris = (prefs.preferences.first {
+                when (it) {
+                    is PreferencesUnion.SavedFeedsPrefV2 -> true
+                    else -> false
+                }
+            } as PreferencesUnion.SavedFeedsPrefV2).value.items.filter {
+                it.type.value != "timeline"
+            }.map { AtUri(it.value) }
+
+            val resp = client!!.getFeedGenerators(
+                GetFeedGeneratorsQueryParams(
+                    feedUris
+                )
+            ).requireResponse()
+
+            return Result.success(resp.feeds)
         }
     }
 }

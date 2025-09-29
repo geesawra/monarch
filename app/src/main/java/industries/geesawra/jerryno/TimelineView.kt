@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -31,22 +32,27 @@ import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -54,6 +60,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -66,6 +73,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -73,8 +82,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -327,23 +338,32 @@ private fun InnerTimelineView(
     fobOnClick: () -> Unit // Changed to fobOnClick to avoid confusion with FAB acronym
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.HOME) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         rememberTopAppBarState()
     )
     val listState = rememberLazyListState()
+    val drawerState = rememberDrawerState(
+        initialValue = DrawerValue.Closed
+    )
+    val ctx = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        timelineViewModel.feeds()
+    }
+
+
+    LaunchedEffect(timelineViewModel.uiState.error) {
+        timelineViewModel.uiState.error?.let {
+            Toast.makeText(ctx, "Error: ${it}", Toast.LENGTH_LONG)
+                .show()
+        }
+    }
 
     ModalNavigationDrawer(
+        drawerState = drawerState,
         modifier = modifier,
         drawerContent = {
-            ModalDrawerSheet {
-                Text("Drawer title", modifier = Modifier.padding(16.dp))
-                HorizontalDivider()
-                NavigationDrawerItem(
-                    label = { Text(text = "Drawer Item") },
-                    selected = false,
-                    onClick = { /*TODO*/ }
-                )
-            }
+            FeedsDrawer(timelineViewModel, coroutineScope, drawerState)
         }
     ) {
         Scaffold(
@@ -352,23 +372,49 @@ private fun InnerTimelineView(
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
-                MediumTopAppBar(
+                LargeTopAppBar(
                     colors = TopAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background,
                         scrolledContainerColor = MaterialTheme.colorScheme.background,
                         navigationIconContentColor = MaterialTheme.colorScheme.onBackground, // Ensuring correct contrast
                         titleContentColor = MaterialTheme.colorScheme.onBackground,
-                        actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                        actionIconContentColor = MaterialTheme.colorScheme.onBackground,
+                        subtitleContentColor = MaterialTheme.colorScheme.onBackground
                     ),
                     title = {
-                        Text(text = "Jerry No")
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (timelineViewModel.uiState.feedAvatar != null) {
+                                AsyncImage(
+                                    model = timelineViewModel.uiState.feedAvatar,
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .shadow(10.dp, CircleShape)
+                                        .clip(CircleShape),
+                                    contentDescription = "Feed avatar",
+                                )
+                            }
+
+                            Text(text = timelineViewModel.uiState.feedName)
+                        }
                     },
                     scrollBehavior = scrollBehavior,
                     modifier = Modifier.clickable {
                         coroutineScope.launch {
                             listState.animateScrollToItem(0)
                         }
-                    }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            coroutineScope.launch {
+                                drawerState.open()
+                            }
+                        }) {
+                            Icon(Icons.Default.Tag, "Feeds")
+                        }
+                    },
                 )
             },
             floatingActionButton = {
@@ -404,5 +450,82 @@ private fun InnerTimelineView(
                 modifier = Modifier.padding(values)
             )
         }
+    }
+}
+
+@Composable
+fun FeedsDrawer(
+    timelineViewModel: TimelineViewModel,
+    coroutineScope: CoroutineScope,
+    drawerState: DrawerState
+) {
+    val selectFeed = { uri: String, displayName: String, avatar: String? ->
+        timelineViewModel.selectFeed(uri, displayName, avatar)
+        coroutineScope.launch {
+            drawerState.close()
+        }
+    }
+
+    ModalDrawerSheet {
+        Text(
+            "Feeds",
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        if (timelineViewModel.uiState.feeds.isEmpty()) {
+            CircularProgressIndicator()
+            return@ModalDrawerSheet
+        }
+
+        NavigationDrawerItem(
+            label = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Spacer(modifier = Modifier.size(20.dp))
+                    Text(text = "Following")
+                }
+            },
+            selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+            onClick = {
+                selectFeed("following", "Following", null)
+            }
+        )
+        HorizontalDivider()
+
+        timelineViewModel.uiState.feeds.forEach {
+            NavigationDrawerItem(
+                label = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (it.avatar != null) {
+                            AsyncImage(
+                                model = it.avatar?.uri,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape),
+                                contentDescription = "Feed avatar",
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.size(20.dp))
+                        }
+
+                        Text(text = it.displayName)
+                    }
+                },
+                selected = timelineViewModel.uiState.selectedFeed == it.uri.atUri,
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                onClick = {
+                    selectFeed(it.uri.atUri, it.displayName, it.avatar?.uri)
+                }
+            )
+            HorizontalDivider()
+        }
+
     }
 }

@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.bsky.feed.FeedViewPost
+import app.bsky.feed.GeneratorView
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -17,13 +18,17 @@ import kotlinx.coroutines.launch
 
 
 data class TimelineUiState(
+    val selectedFeed: String = "Following",
+    val feedName: String = "Following",
+    val feedAvatar: String? = null,
+    val feeds: List<GeneratorView> = listOf(),
     val skeets: List<FeedViewPost> = listOf(),
     val isFetchingMoreTimeline: Boolean = false,
     val cursor: String? = null,
     val authenticated: Boolean = false,
     val sessionChecked: Boolean = false,
-    val authError: String = "",
-    val postError: String? = null
+
+    val error: String? = null
 )
 
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
@@ -64,8 +69,13 @@ class TimelineViewModel @AssistedInject constructor(
         fetchJob?.cancel()
 
         fetchJob = viewModelScope.launch {
-            bskyConn.fetchTimeline(uiState.cursor).onSuccess {
-                Log.d("TimelineViewModel", "New cursor ${it.cursor}")
+            bskyConn.fetchTimeline({
+                if (uiState.selectedFeed == "Following") {
+                    ""
+                } else {
+                    uiState.selectedFeed
+                }
+            }(), uiState.cursor).onSuccess {
                 uiState = uiState.copy(
                     skeets = uiState.skeets + it.feed,
                     cursor = it.cursor,
@@ -85,8 +95,26 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
-        return bskyConn.post(content, images, video).onFailure {
-            uiState = uiState.copy(postError = it.message)
+        return bskyConn.post(content, images, video)
+    }
+
+    fun feeds() {
+        viewModelScope.launch {
+            bskyConn.feeds().onFailure {
+                uiState = uiState.copy(error = it.message)
+            }.onSuccess {
+                uiState = uiState.copy(feeds = it)
+            }
         }
+    }
+
+    fun selectFeed(uri: String, displayName: String, avatar: String?) {
+        uiState = uiState.copy(
+            selectedFeed = uri,
+            feedName = displayName,
+            feedAvatar = avatar,
+        )
+        reset()
+        fetchTimeline()
     }
 }

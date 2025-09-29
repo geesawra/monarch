@@ -69,6 +69,27 @@ fun TimelinePostActionsView(
         horizontalArrangement = Arrangement.End,
         modifier = modifier,
     ) {
+        val ctx = LocalContext.current
+        IconButton(
+            onClick = {
+                val sendIntent: Intent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, uri)
+                }
+                ctx.startActivity(
+                    Intent.createChooser(sendIntent, "Share Bluesky post")
+                )
+            }
+        ) {
+            Icon(
+                modifier = Modifier.size(15.dp),
+                imageVector = Icons.Default.Share,
+                contentDescription = "Share",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
         IconButton(
             onClick = {}
         ) {
@@ -106,27 +127,6 @@ fun TimelinePostActionsView(
                 Icons.Default.Repeat,
                 contentDescription = "Repost",
                 number = reposts,
-            )
-        }
-
-        val ctx = LocalContext.current
-        IconButton(
-            onClick = {
-                val sendIntent: Intent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, uri)
-                }
-                ctx.startActivity(
-                    Intent.createChooser(sendIntent, "Share Bluesky post")
-                )
-            }
-        ) {
-            Icon(
-                modifier = Modifier.size(15.dp),
-                imageVector = Icons.Default.Share,
-                contentDescription = "Share",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
