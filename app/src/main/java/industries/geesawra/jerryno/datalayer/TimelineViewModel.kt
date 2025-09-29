@@ -1,5 +1,6 @@
 package industries.geesawra.jerryno.datalayer
 
+import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +22,8 @@ data class TimelineUiState(
     val cursor: String? = null,
     val authenticated: Boolean = false,
     val sessionChecked: Boolean = false,
-    val authError: String = ""
+    val authError: String = "",
+    val postError: String? = null
 )
 
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
@@ -76,10 +78,11 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun post(content: String, then: suspend () -> Unit) {
+    fun post(content: String, images: List<Uri>? = null, video: Uri? = null) {
         viewModelScope.launch {
-            bskyConn.post(content)
-            then()
+            bskyConn.post(content, images, video).onFailure {
+                uiState = uiState.copy(postError = it.message)
+            }
         }
     }
 }

@@ -1,18 +1,23 @@
 package industries.geesawra.jerryno.datalayer
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toLowerCase
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.bsky.embed.Images
+import app.bsky.embed.ImagesImage
 import app.bsky.feed.GetTimelineQueryParams
 import app.bsky.feed.GetTimelineResponse
 import app.bsky.feed.Post
+import app.bsky.feed.PostEmbedUnion
 import com.atproto.identity.ResolveHandleQueryParams
 import com.atproto.identity.ResolveHandleResponse
 import com.atproto.repo.CreateRecordRequest
+import com.atproto.repo.UploadBlobResponse
 import com.atproto.server.CreateSessionRequest
 import com.atproto.server.CreateSessionResponse
 import com.atproto.server.GetSessionResponse
@@ -23,6 +28,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
 import kotlinx.coroutines.flow.Flow
@@ -38,6 +44,7 @@ import sh.christian.ozone.api.BlueskyAuthPlugin
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.Handle
 import sh.christian.ozone.api.Nsid
+import sh.christian.ozone.api.model.Blob
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import sh.christian.ozone.api.response.AtpResponse
 
@@ -130,15 +137,21 @@ class BlueskyConn(val context: Context) {
                     }
                 }
 
-                val rawDoc: String = httpClient.get {
+                val rawDoc = httpClient.get {
                     url {
                         protocol = URLProtocol.HTTPS
                         host = "plc.directory"
                         path(did)
                     }
-                }.body()
+                }
 
-                val solvedDoc: didDoc = BlueskyJson.decodeFromString(didDoc.serializer(), rawDoc)
+                if (rawDoc.status != HttpStatusCode.OK) {
+                    return Result.failure(Exception("PLC lookup HTTP status code ${rawDoc.status}"))
+                }
+
+                val body: String = rawDoc.body()
+
+                val solvedDoc: didDoc = BlueskyJson.decodeFromString(didDoc.serializer(), body)
 
                 for (ps in solvedDoc.service) {
                     if (ps.id == "#atproto_pds" && ps.type == "AtprotoPersonalDataServer") {
@@ -252,10 +265,11 @@ class BlueskyConn(val context: Context) {
                 defaultRequest {
                     url(pdsURL)
                 }
+
                 install(HttpTimeout) {
-                    requestTimeoutMillis = 15000
-                    connectTimeoutMillis = 15000
-                    socketTimeoutMillis = 15000
+                    requestTimeoutMillis = 30000
+                    connectTimeoutMillis = 30000
+                    socketTimeoutMillis = 30000
                 }
             }
 
@@ -279,6 +293,7 @@ class BlueskyConn(val context: Context) {
 
             // No session, try to refresh
             val rs = authClient.refreshSession()
+            Log.d("ASD", rs.toString())
             when (rs) {
                 is AtpResponse.Failure<*> -> return Result.failure(Exception("Could not refresh session, maybe login again?"))
                 is AtpResponse.Success<RefreshSessionResponse> -> {
@@ -313,32 +328,118 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun post(content: String) {
-        create().getOrThrow()
+    suspend fun post(content: String): Result<Unit> {
+        return runCatching {
+            create().getOrThrow()
 
-        val r = BlueskyJson.encodeAsJsonContent(
-            Post(
-                text = content,
-                createdAt = Clock.System.now(),
-//                embed = PostEmbedUnion.Images(
-//                    value = Images(
-//                        images = List<ImagesImage>(2, init = {
-//                            ImagesImage(
-//                                image = Blob()
-//                            )
-//                        })
-//                    )
-//                )
+            val r = BlueskyJson.encodeAsJsonContent(
+                Post(
+                    text = content,
+                    createdAt = Clock.System.now(),
+                )
             )
-        )
-        client!!.createRecord(
-            CreateRecordRequest(
-                repo = session!!.handle, // Use handle from the session
-                collection = Nsid("app.bsky.feed.post"),
-                record = r,
+
+            val postRes = client!!.createRecord(
+                CreateRecordRequest(
+                    repo = session!!.handle, // Use handle from the session
+                    collection = Nsid("app.bsky.feed.post"),
+                    record = r,
+                )
             )
-        )
+            return when (postRes) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not create post: ${postRes.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
     }
 
-//    suspend fun uploadImages(images: List<>)
+    suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
+        return runCatching {
+            create().getOrThrow()
+
+            val blobs = mutableListOf<Blob>()
+
+            if (images != null) {
+                blobs += uploadImages(images).getOrThrow()
+            }
+
+            if (video != null) {
+                blobs += uploadVideo(video).getOrThrow()
+            }
+
+            val r = BlueskyJson.encodeAsJsonContent(
+                Post(
+                    text = content,
+                    createdAt = Clock.System.now(),
+                    embed = PostEmbedUnion.Images(
+                        value = Images(
+                            images = blobs.map {
+                                ImagesImage(
+                                    image = it,
+                                    alt = "",
+                                )
+                            }
+                        )
+                    )
+                )
+            )
+
+            val postRes = client!!.createRecord(
+                CreateRecordRequest(
+                    repo = session!!.handle, // Use handle from the session
+                    collection = Nsid("app.bsky.feed.post"),
+                    record = r,
+                )
+            )
+            return when (postRes) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not create post: ${postRes.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun uploadImages(images: List<Uri>): Result<List<Blob>> {
+        return runCatching {
+            create().getOrThrow()
+
+            val uploadedBlobs = mutableListOf<Blob>()
+
+            images.forEach {
+                context.contentResolver.openInputStream(it)?.use { inputStream ->
+                    val byteArray = inputStream.readBytes()
+                    val blob = client!!.uploadBlob(byteArray)
+                    when (blob) {
+                        is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading image: ${blob.error}"))
+                        is AtpResponse.Success<UploadBlobResponse> -> {
+                            uploadedBlobs.add(blob.response.blob)
+                        }
+                    }
+                }
+            }
+
+            return Result.success(uploadedBlobs)
+        }
+    }
+
+    suspend fun uploadVideo(video: Uri): Result<List<Blob>> {
+        return runCatching {
+            create().getOrThrow()
+
+            val uploadedBlobs = mutableListOf<Blob>()
+
+            context.contentResolver.openInputStream(video)?.use { inputStream ->
+                val byteArray = inputStream.readBytes()
+                val blob = client!!.uploadBlob(byteArray)
+                when (blob) {
+                    is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading video: ${blob.error}"))
+                    is AtpResponse.Success<UploadBlobResponse> -> {
+                        uploadedBlobs.add(blob.response.blob)
+                    }
+                }
+            }
+
+
+            return Result.success(uploadedBlobs)
+        }
+    }
 }

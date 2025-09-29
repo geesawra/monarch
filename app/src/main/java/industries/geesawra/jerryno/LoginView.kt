@@ -89,10 +89,11 @@ fun LoginView(
                                 currentPDS = BlueskyConn.pdsForHandle(handle).getOrElse {
                                     Toast.makeText(
                                         ctx,
-                                        it.message ?: "Unknown error",
+                                        it.message ?: "Error: ${it.toString()}",
                                         Toast.LENGTH_LONG
                                     )
                                         .show()
+                                    lookingUpPDS = false
                                     return@launch
                                 }
                                 lookingUpPDS = false

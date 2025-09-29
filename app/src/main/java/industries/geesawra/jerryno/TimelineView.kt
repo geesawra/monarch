@@ -1,6 +1,7 @@
 package industries.geesawra.jerryno
 
 // import androidx.compose.foundation.layout.height // Will be removed for the sheet content Box
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -14,9 +15,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -101,6 +104,7 @@ fun TimelineView(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
+    val mediaSelected = remember { mutableStateOf(mapOf<Uri, String?>()) }
 
     LaunchedEffect(scaffoldState.bottomSheetState.isVisible) {
         if (scaffoldState.bottomSheetState.isVisible) {
@@ -108,11 +112,13 @@ fun TimelineView(
             keyboardController?.show()
         } else {
             keyboardController?.hide()
+            mediaSelected.value = mapOf()
         }
     }
 
+
     val pickMedia =
-        rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(4)) { uris ->
+        rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)) { uris ->
             if (uris.isEmpty()) {
                 return@rememberLauncherForActivityResult
             }
@@ -142,7 +148,11 @@ fun TimelineView(
                     "Can only post up to 1 video or 4 pictures",
                     Toast.LENGTH_SHORT
                 ).show()
+
+                return@rememberLauncherForActivityResult
             }
+
+            mediaSelected.value = urisMap
         }
 
 
@@ -160,7 +170,7 @@ fun TimelineView(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(350.dp),
+                        .fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -188,8 +198,8 @@ fun TimelineView(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                            .weight(1f), // TextField takes available space, crucial for resizing
+                            .weight(1f)
+                            .focusRequester(focusRequester),
                         label = {
                             if (wasEdited.value) {
                                 Text(
@@ -206,7 +216,31 @@ fun TimelineView(
                         isError = postText.length > maxChars
                     )
 
+                    Spacer(modifier = Modifier.padding(4.dp))
+
+                    if (mediaSelected.value.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .heightIn(max = 180.dp)
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        ) {
+                            PostImageGallery(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(8.dp),
+                                images = mediaSelected.value.keys.map {
+                                    Image(
+                                        url = it.toString(),
+                                        alt = ""
+                                    )
+                                },
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.padding(4.dp)) // Reduced spacer, was Modifier.height(8.dp)
+
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -220,6 +254,7 @@ fun TimelineView(
                         ) {
                             Icon(Icons.Default.Attachment, contentDescription = "Attach media")
                         }
+
                         Button(
                             onClick = {
                                 if (postText.isNotBlank() && postText.length <= maxChars) {

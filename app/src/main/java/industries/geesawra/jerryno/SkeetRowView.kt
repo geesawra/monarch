@@ -2,19 +2,16 @@ package industries.geesawra.jerryno
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -23,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -122,50 +118,22 @@ private fun SkeetContent(skeet: FeedViewPost) {
     }
 
     Card(
-        modifier = Modifier.padding(top = 8.dp)
+        modifier = Modifier
+            .heightIn(max = 180.dp)
+            .fillMaxWidth()
+            .padding(8.dp)
     ) {
         when (embed) {
             is PostViewEmbedUnion.ImagesView -> {
                 val img = embed.value.images
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed({
-                        when (img.size) {
-                            1 -> 1
-                            else -> 2
-                        }
-                    }()),
+                PostImageGallery(
                     modifier = Modifier
-                        .height(200.dp)
-                        .fillMaxWidth(),
-                    userScrollEnabled = false,
-                    content = {
-                        items(img.size) { index ->
-                            val img = img[index]
-
-                            val pv = {
-                                val v = 12.dp
-                                when (index % 2 == 0) {
-                                    true -> PaddingValues(v)
-                                    false -> PaddingValues(top = v, end = v, bottom = v)
-                                }
-                            }()
-
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(img.thumb.toString())
-                                    .crossfade(true)
-                                    .build(),
-                                contentScale = ContentScale.Crop,
-                                contentDescription = img.alt,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .padding(pv)
-                                    .clip(RoundedCornerShape(12.dp))
-                            )
-                        }
-                    }
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    images = img.map {
+                        Image(url = it.thumb.uri, alt = it.alt)
+                    },
                 )
             }
 
@@ -215,8 +183,29 @@ private fun SkeetHeader(skeet: FeedViewPost, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier
                 .padding(top = 4.dp),
+        )
 
+        skeet.post.author.labels.forEach {
+            it.neg?.let { it ->
+                if (!it) {
+                    return@forEach
+                }
+            }
+            if (it.`val`.startsWith("!")) {
+                return@forEach
+            }
+
+            FilterChip(
+                leadingIcon = {
+                },
+                enabled = true,
+                onClick = {},
+                selected = true,
+                label = {
+                    Text(text = it.`val`)
+                }
             )
+        }
 
         skeet.reply?.let {
             it
