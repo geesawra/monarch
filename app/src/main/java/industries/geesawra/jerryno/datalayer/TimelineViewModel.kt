@@ -16,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
+import sh.christian.ozone.api.RKey
 
 
 data class TimelineUiState(
@@ -29,8 +30,10 @@ data class TimelineUiState(
     val authenticated: Boolean = false,
     val sessionChecked: Boolean = false,
 
+    val cidInteractedWith: Map<Cid, RKey> = mapOf(),
+
     val loginError: String? = null,
-    val error: String? = null
+    val error: String? = null,
 )
 
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
@@ -47,12 +50,6 @@ class TimelineViewModel @AssistedInject constructor(
         private set
 
     private var fetchJob: Job? = null
-
-    fun create() {
-        viewModelScope.launch {
-            bskyConn.create()
-        }
-    }
 
     fun loadSession() {
         viewModelScope.launch {
@@ -137,6 +134,9 @@ class TimelineViewModel @AssistedInject constructor(
                     else -> uiState.copy(error = it.message)
                 }
             }.onSuccess {
+                uiState = uiState.copy(
+                    cidInteractedWith = uiState.cidInteractedWith.plus(cid to it)
+                )
                 then()
             }
         }
@@ -150,6 +150,41 @@ class TimelineViewModel @AssistedInject constructor(
                     else -> uiState.copy(error = it.message)
                 }
             }.onSuccess {
+                uiState = uiState.copy(
+                    cidInteractedWith = uiState.cidInteractedWith.plus(cid to it)
+                )
+                then()
+            }
+        }
+    }
+
+    fun deleteLike(cid: Cid, then: () -> Unit) {
+        viewModelScope.launch {
+            bskyConn.deleteLike(uiState.cidInteractedWith[cid]!!).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                uiState = uiState.copy(
+                    cidInteractedWith = uiState.cidInteractedWith.minus(cid)
+                )
+                then()
+            }
+        }
+    }
+
+    fun deleteRepost(cid: Cid, then: () -> Unit) {
+        viewModelScope.launch {
+            bskyConn.deleteRepost(uiState.cidInteractedWith[cid]!!).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                uiState = uiState.copy(
+                    cidInteractedWith = uiState.cidInteractedWith.minus(cid)
+                )
                 then()
             }
         }

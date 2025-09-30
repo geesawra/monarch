@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toLowerCase
+import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -23,12 +24,15 @@ import app.bsky.feed.Repost
 import com.atproto.identity.ResolveHandleQueryParams
 import com.atproto.identity.ResolveHandleResponse
 import com.atproto.repo.CreateRecordRequest
+import com.atproto.repo.CreateRecordResponse
+import com.atproto.repo.DeleteRecordRequest
 import com.atproto.repo.StrongRef
 import com.atproto.repo.UploadBlobResponse
 import com.atproto.server.CreateSessionRequest
 import com.atproto.server.CreateSessionResponse
 import com.atproto.server.GetSessionResponse
 import com.atproto.server.RefreshSessionResponse
+import industries.geesawra.jerryno.rkey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -54,6 +58,7 @@ import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.Handle
 import sh.christian.ozone.api.Nsid
+import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.Blob
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import sh.christian.ozone.api.response.AtpResponse
@@ -544,7 +549,7 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun like(uri: AtUri, cid: Cid): Result<Unit> {
+    suspend fun like(uri: AtUri, cid: Cid): Result<RKey> {
         return runCatching {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
@@ -568,12 +573,14 @@ class BlueskyConn(val context: Context) {
 
             return when (likeRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not like post: ${likeRes.error?.message}"))
-                is AtpResponse.Success<*> -> Result.success(Unit)
+                is AtpResponse.Success<CreateRecordResponse> -> Result.success(
+                    RKey(likeRes.response.uri.atUri.toUri().lastPathSegment!!)
+                )
             }
         }
     }
 
-    suspend fun repost(uri: AtUri, cid: Cid): Result<Unit> {
+    suspend fun repost(uri: AtUri, cid: Cid): Result<RKey> {
         return runCatching {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
@@ -597,8 +604,40 @@ class BlueskyConn(val context: Context) {
 
             return when (likeRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not repost: ${likeRes.error?.message}"))
+                is AtpResponse.Success<CreateRecordResponse> -> Result.success(
+                    likeRes.response.uri.rkey()
+                )
+            }
+        }
+    }
+
+    suspend fun deleteLike(rKey: RKey): Result<Unit> {
+        return deleteRecord(rKey, "app.bsky.feed.like")
+    }
+
+    suspend fun deleteRepost(rKey: RKey): Result<Unit> {
+        return deleteRecord(rKey, "app.bsky.feed.repost")
+    }
+
+    private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val delRes = client!!.deleteRecord(
+                DeleteRecordRequest(
+                    repo = session!!.handle,
+                    collection = Nsid(collection),
+                    rkey = rKey,
+                )
+            )
+
+            return when (delRes) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not delete record: ${delRes.error?.message}"))
                 is AtpResponse.Success<*> -> Result.success(Unit)
             }
+
         }
     }
 }

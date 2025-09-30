@@ -18,7 +18,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -29,16 +31,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
+import sh.christian.ozone.api.RKey
 
 
 @Composable
 private fun IconWithNumber(
     imageVector: ImageVector,
     contentDescription: String,
-    number: Long?,
+    number: MutableLongState,
     tint: Color
 ) {
     Row(
@@ -56,7 +60,7 @@ private fun IconWithNumber(
         )
         Text(
             modifier = Modifier.padding(start = 2.dp),
-            text = (number ?: 0).toString(),
+            text = number.longValue.toString(),
             color = tint,
             maxLines = 1,
             onTextLayout = { textLayout ->
@@ -66,6 +70,10 @@ private fun IconWithNumber(
             }
         )
     }
+}
+
+fun AtUri.rkey(): RKey {
+    return RKey(this.atUri.toUri().lastPathSegment!!)
 }
 
 @Composable
@@ -81,6 +89,10 @@ fun TimelinePostActionsView(
     uri: AtUri,
     cid: Cid,
 ) {
+    val likes = remember { mutableLongStateOf(likes ?: 0) }
+    val reposts = remember { mutableLongStateOf(reposts ?: 0) }
+    val replies = remember { mutableLongStateOf(replies ?: 0) }
+
 
     Row(
         horizontalArrangement = Arrangement.End,
@@ -112,12 +124,12 @@ fun TimelinePostActionsView(
         ) {
             IconWithNumber(
                 imageVector = {
-                    if (replies == null) {
+                    if (replies.longValue == 0.toLong()) {
                         Icons.AutoMirrored.Filled.Reply
                     }
 
-                    val r = replies!!
-                    if (r > 0) {
+                    val r = replies
+                    if (r.longValue > 0) {
                         Icons.AutoMirrored.Filled.ReplyAll
                     } else {
                         Icons.AutoMirrored.Filled.Reply
@@ -133,9 +145,16 @@ fun TimelinePostActionsView(
         var isLiked by rememberSaveable { mutableStateOf(liked) }
         IconButton(
             onClick = {
-                timelineViewModel.like(uri, cid) {
-                    isLiked = true
-                    likes?.inc()
+                when (isLiked) {
+                    false -> timelineViewModel.like(uri, cid) {
+                        isLiked = true
+                        likes.longValue++
+                    }
+
+                    true -> timelineViewModel.deleteLike(cid) {
+                        isLiked = false
+                        likes.longValue--
+                    }
                 }
             }
         ) {
@@ -153,10 +172,13 @@ fun TimelinePostActionsView(
                 when (isReposted) {
                     false -> timelineViewModel.repost(uri, cid) {
                         isReposted = true
-                        reposts?.inc()
+                        reposts.longValue++
                     }
 
-                    true -> {}
+                    true -> timelineViewModel.deleteRepost(cid) {
+                        isReposted = false
+                        reposts.longValue--
+                    }
                 }
 
             }
