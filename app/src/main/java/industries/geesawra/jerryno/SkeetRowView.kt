@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.MimeTypes
 import app.bsky.feed.FeedViewPost
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.Post
@@ -32,6 +33,10 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
+import io.sanghun.compose.video.RepeatMode
+import io.sanghun.compose.video.VideoPlayer
+import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
+import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 import kotlinx.serialization.json.decodeFromJsonElement
 import sh.christian.ozone.BlueskyJson
 
@@ -125,7 +130,7 @@ private fun SkeetContent(skeet: FeedViewPost) {
 
     Card(
         modifier = Modifier
-            .heightIn(max = 180.dp)
+            .heightIn(max = 250.dp)
             .fillMaxWidth()
             .padding(8.dp)
     ) {
@@ -144,9 +149,40 @@ private fun SkeetContent(skeet: FeedViewPost) {
             }
 
             is PostViewEmbedUnion.VideoView -> {
-                embed.value
-                Text("Videos TBD")
-            } // TODO: build this
+                VideoPlayer(
+                    mediaItems = listOf(
+                        VideoPlayerMediaItem.NetworkMediaItem(
+                            url = embed.value.playlist.uri,
+                            mimeType = MimeTypes.APPLICATION_M3U8,
+                        )
+                    ),
+                    handleLifecycle = false,
+                    autoPlay = false,
+                    usePlayerController = true,
+                    enablePip = false,
+                    handleAudioFocus = true,
+                    controllerConfig = VideoPlayerControllerConfig(
+                        showSpeedAndPitchOverlay = false,
+                        showSubtitleButton = false,
+                        showCurrentTimeAndTotalTime = true,
+                        showBufferingProgress = false,
+                        showForwardIncrementButton = true,
+                        showBackwardIncrementButton = true,
+                        showBackTrackButton = false,
+                        showNextTrackButton = false,
+                        showRepeatModeButton = true,
+                        controllerShowTimeMilliSeconds = 5_000,
+                        controllerAutoShow = true,
+                        showFullScreenButton = true,
+                    ),
+                    volume = 0.5f,  // volume 0.0f to 1.0f
+                    repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                )
+            }
+
             else -> {}
         }
     }

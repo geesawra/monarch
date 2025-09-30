@@ -11,8 +11,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 
 data class Image(
     val url: String,
@@ -43,7 +46,10 @@ fun PostImageGallery(
         // We take the first 4 images and give them each a weight
         images.take(4).forEachIndexed { idx, image ->
             AsyncImage(
-                model = image.url,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(image.url)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = image.alt,
                 contentScale = ContentScale.Crop, // Fills the space
                 modifier = Modifier

@@ -55,9 +55,11 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.0.1")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.1")
     implementation("io.github.fornewid:placeholder-material3:2.0.0")
-    implementation("androidx.media3:media3-exoplayer:1.8.0")
-    implementation("androidx.media3:media3-ui:1.8.0")
+    implementation("androidx.media3:media3-exoplayer:1.8.0") // [Required] androidx.media3 ExoPlayer dependency
+    implementation("androidx.media3:media3-session:1.8.0") // [Required] MediaSession Extension dependency
+    implementation("androidx.media3:media3-ui:1.8.0") // [Required] Base Player UI
     implementation("androidx.media3:media3-exoplayer-hls:1.8.0")
+    implementation("androidx.media3:media3-exoplayer-dash:1.8.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4")
     implementation("com.google.dagger:hilt-android:2.57.1")
