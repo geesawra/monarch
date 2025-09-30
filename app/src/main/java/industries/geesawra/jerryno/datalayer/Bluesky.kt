@@ -30,7 +30,6 @@ import com.atproto.repo.StrongRef
 import com.atproto.repo.UploadBlobResponse
 import com.atproto.server.CreateSessionRequest
 import com.atproto.server.CreateSessionResponse
-import com.atproto.server.GetSessionResponse
 import com.atproto.server.RefreshSessionResponse
 import industries.geesawra.jerryno.rkey
 import io.ktor.client.HttpClient
@@ -104,16 +103,6 @@ data class SessionData(
                 handle = session.handle,
                 did = session.did,
                 active = session.active,
-            )
-        }
-
-        fun fromGetSessionResponse(session: GetSessionResponse): SessionData {
-            return SessionData(
-                handle = session.handle,
-                did = session.did,
-                active = session.active,
-                accessJwt = "",
-                refreshJwt = ""
             )
         }
     }

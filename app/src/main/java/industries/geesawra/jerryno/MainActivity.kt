@@ -15,20 +15,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -51,7 +43,6 @@ class Application : Application()
 enum class TimelineScreen() {
     Login,
     Timeline,
-    Compose
 }
 
 @AndroidEntryPoint
@@ -154,42 +145,5 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-@Composable
-fun ExoPlayerView(uri: String, modifier: Modifier) {
-    // Get the current context
-    val context = LocalContext.current
-
-    // Initialize ExoPlayer
-    val exoPlayer = ExoPlayer.Builder(context).build()
-
-    // Create a MediaSource
-    val mediaSource = remember(uri) {
-        MediaItem.fromUri(uri)
-    }
-
-    // Set MediaSource to ExoPlayer
-    LaunchedEffect(mediaSource) {
-        exoPlayer.setMediaItem(mediaSource)
-        exoPlayer.prepare()
-    }
-
-    // Manage lifecycle events
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
-    // Use AndroidView to embed an Android View (PlayerView) into Compose
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-            }
-        },
-        modifier = modifier
-    )
 }
 
