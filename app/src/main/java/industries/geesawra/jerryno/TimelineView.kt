@@ -117,6 +117,7 @@ fun TimelineView(
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
     val mediaSelected = remember { mutableStateOf(mapOf<Uri, String?>()) }
+    val mediaSelectedIsVideo = remember { mutableStateOf(false) }
 
     LaunchedEffect(scaffoldState.bottomSheetState.isVisible) {
         if (scaffoldState.bottomSheetState.isVisible) {
@@ -162,6 +163,10 @@ fun TimelineView(
                 ).show()
 
                 return@rememberLauncherForActivityResult
+            }
+
+            if (urisMap.size == 1 && urisMap.values.first() == "video") {
+                mediaSelectedIsVideo.value = true
             }
 
             mediaSelected.value = urisMap
@@ -281,7 +286,11 @@ fun TimelineView(
                                         uploadingPost.value = true
                                         timelineViewModel.post(
                                             postText,
-                                            mediaSelected.value.keys.toList().ifEmpty { null }
+                                            if (!mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
+                                                .ifEmpty { null } else null,
+                                            if (mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
+                                                .firstOrNull()
+                                            else null,
                                         ).onSuccess {
                                             scaffoldState.bottomSheetState.hide()
                                             postText = ""
@@ -293,7 +302,7 @@ fun TimelineView(
                                             Toast.makeText(
                                                 context,
                                                 "Could not post: ${it.message}",
-                                                Toast.LENGTH_SHORT
+                                                Toast.LENGTH_LONG
                                             ).show()
                                             uploadingPost.value = false
                                             postButtonEnabled.value = true

@@ -411,6 +411,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
+        // TODO: videos need to be uploaded through a different API.
         return runCatching {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
