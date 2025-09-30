@@ -16,11 +16,14 @@ import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetFeedGeneratorsQueryParams
 import app.bsky.feed.GetTimelineQueryParams
 import app.bsky.feed.GetTimelineResponse
+import app.bsky.feed.Like
 import app.bsky.feed.Post
 import app.bsky.feed.PostEmbedUnion
+import app.bsky.feed.Repost
 import com.atproto.identity.ResolveHandleQueryParams
 import com.atproto.identity.ResolveHandleResponse
 import com.atproto.repo.CreateRecordRequest
+import com.atproto.repo.StrongRef
 import com.atproto.repo.UploadBlobResponse
 import com.atproto.server.CreateSessionRequest
 import com.atproto.server.CreateSessionResponse
@@ -47,6 +50,7 @@ import sh.christian.ozone.XrpcBlueskyApi
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.AuthenticatedXrpcBlueskyApi
 import sh.christian.ozone.api.BlueskyAuthPlugin
+import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.Handle
 import sh.christian.ozone.api.Nsid
@@ -58,6 +62,8 @@ enum class AuthData {
     PDSHost,
     SessionData,
 }
+
+class LoginException(message: String?) : Exception(message)
 
 @Serializable // Added annotation
 data class SessionData(
@@ -387,7 +393,10 @@ class BlueskyConn(val context: Context) {
         cursor: String? = null
     ): Result<GetTimelineResponse> {
         return runCatching {
-            create().getOrThrow()
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
             val timeline = client!!.getTimeline(
                 GetTimelineQueryParams(
                     algorithm = algorithm,
@@ -409,7 +418,9 @@ class BlueskyConn(val context: Context) {
 
     suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
         return runCatching {
-            create().getOrThrow()
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
 
             var postEmbed: PostEmbedUnion? = null
 
@@ -461,7 +472,9 @@ class BlueskyConn(val context: Context) {
 
     suspend fun uploadImages(images: List<Uri>): Result<List<Blob>> {
         return runCatching {
-            create().getOrThrow()
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
 
             val uploadedBlobs = mutableListOf<Blob>()
 
@@ -484,7 +497,9 @@ class BlueskyConn(val context: Context) {
 
     suspend fun uploadVideo(video: Uri): Result<Blob> {
         return runCatching {
-            create().getOrThrow()
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
 
             val uploadedBlobs = mutableListOf<Blob>()
 
@@ -506,8 +521,9 @@ class BlueskyConn(val context: Context) {
 
     suspend fun feeds(): Result<List<GeneratorView>> {
         return runCatching {
-            create().getOrThrow()
-
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
             val prefs = client!!.getPreferences().requireResponse()
             val feedUris = (prefs.preferences.first {
                 when (it) {
@@ -525,6 +541,64 @@ class BlueskyConn(val context: Context) {
             ).requireResponse()
 
             return Result.success(resp.feeds)
+        }
+    }
+
+    suspend fun like(uri: AtUri, cid: Cid): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val like = BlueskyJson.encodeAsJsonContent(
+                Like(
+                    subject = StrongRef(uri, cid),
+                    createdAt = Clock.System.now(),
+                )
+            )
+
+
+            val likeRes = client!!.createRecord(
+                CreateRecordRequest(
+                    repo = session!!.handle,
+                    collection = Nsid("app.bsky.feed.like"),
+                    record = like,
+                )
+            )
+
+            return when (likeRes) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not like post: ${likeRes.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun repost(uri: AtUri, cid: Cid): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val like = BlueskyJson.encodeAsJsonContent(
+                Repost(
+                    subject = StrongRef(uri, cid),
+                    createdAt = Clock.System.now(),
+                )
+            )
+
+
+            val likeRes = client!!.createRecord(
+                CreateRecordRequest(
+                    repo = session!!.handle,
+                    collection = Nsid("app.bsky.feed.repost"),
+                    record = like,
+                )
+            )
+
+            return when (likeRes) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not repost: ${likeRes.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
         }
     }
 }

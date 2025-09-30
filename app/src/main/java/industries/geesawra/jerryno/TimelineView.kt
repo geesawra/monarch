@@ -351,11 +351,18 @@ private fun InnerTimelineView(
     }
 
 
+    LaunchedEffect(timelineViewModel.uiState.loginError) {
+        timelineViewModel.uiState.loginError?.let {
+            Toast.makeText(ctx, "Authentication error: $it", Toast.LENGTH_LONG)
+                .show()
+            loginError()
+        }
+    }
+
     LaunchedEffect(timelineViewModel.uiState.error) {
         timelineViewModel.uiState.error?.let {
             Toast.makeText(ctx, "Error: $it", Toast.LENGTH_LONG)
                 .show()
-            loginError()
         }
     }
 

@@ -31,11 +31,12 @@ import app.bsky.feed.ReplyRefParentUnion
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import kotlinx.serialization.json.decodeFromJsonElement
 import sh.christian.ozone.BlueskyJson
 
 @Composable
-fun SkeetRowView(skeet: FeedViewPost) {
+fun SkeetRowView(viewModel: TimelineViewModel, skeet: FeedViewPost) {
     val likes = skeet.post.likeCount
     val reposts = skeet.post.repostCount
     val replies = skeet.post.replyCount
@@ -82,14 +83,19 @@ fun SkeetRowView(skeet: FeedViewPost) {
                 TimelinePostActionsView(
                     modifier = Modifier
                         .fillMaxWidth(),
+                    timelineViewModel = viewModel,
                     replies = replies,
                     likes = likes,
                     reposts = reposts,
-                    uri = "https://bsky.app/profile/${skeet.post.author.handle.handle}/post/${
+                    postUrl = "https://bsky.app/profile/${skeet.post.author.handle.handle}/post/${
                         skeet.post.uri.split(
                             "/"
                         ).last()
-                    }"
+                    }",
+                    uri = skeet.post.uri,
+                    cid = skeet.post.cid,
+                    reposted = skeet.post.viewer?.repost != null,
+                    liked = skeet.post.viewer?.like != null,
                 )
 
                 HorizontalDivider(

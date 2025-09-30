@@ -62,7 +62,7 @@ fun ShowSkeets(
             } else {
                 viewModel.uiState.skeets.distinctBy { it.post.cid }.forEach { skeet ->
                     item(key = skeet.post.cid.cid) {
-                        SkeetRowView(skeet)
+                        SkeetRowView(viewModel, skeet)
                     }
                 }
 

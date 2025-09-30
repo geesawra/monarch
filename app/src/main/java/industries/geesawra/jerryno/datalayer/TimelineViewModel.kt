@@ -1,7 +1,6 @@
 package industries.geesawra.jerryno.datalayer
 
 import android.net.Uri
-import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,6 +14,8 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import sh.christian.ozone.api.AtUri
+import sh.christian.ozone.api.Cid
 
 
 data class TimelineUiState(
@@ -28,6 +29,7 @@ data class TimelineUiState(
     val authenticated: Boolean = false,
     val sessionChecked: Boolean = false,
 
+    val loginError: String? = null,
     val error: String? = null
 )
 
@@ -82,8 +84,10 @@ class TimelineViewModel @AssistedInject constructor(
                     isFetchingMoreTimeline = false
                 )
             }.onFailure {
-                uiState = uiState.copy(isFetchingMoreTimeline = false)
-                Log.e("TimelineViewModel", "Failed to fetch timeline: ${it.message}")
+                uiState = uiState.copy(
+                    isFetchingMoreTimeline = false,
+                    error = "Failed to fetch timeline: ${it.message}"
+                )
             }
         }
     }
@@ -95,13 +99,20 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
-        return bskyConn.post(content, images, video)
+        return bskyConn.post(
+            content,
+            images,
+            video
+        ) // TODO: maybe refactor this to use uistate.Error?
     }
 
     fun feeds() {
         viewModelScope.launch {
             bskyConn.feeds().onFailure {
-                uiState = uiState.copy(error = it.message)
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
             }.onSuccess {
                 uiState = uiState.copy(feeds = it)
             }
@@ -116,5 +127,31 @@ class TimelineViewModel @AssistedInject constructor(
         )
         reset()
         fetchTimeline()
+    }
+
+    fun like(uri: AtUri, cid: Cid, then: () -> Unit) {
+        viewModelScope.launch {
+            bskyConn.like(uri, cid).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                then()
+            }
+        }
+    }
+
+    fun repost(uri: AtUri, cid: Cid, then: () -> Unit) {
+        viewModelScope.launch {
+            bskyConn.repost(uri, cid).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                then()
+            }
+        }
     }
 }
