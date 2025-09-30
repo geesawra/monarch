@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
                             TimelineView(
                                 timelineViewModel = timelineViewModel,
                                 coroutineScope = rememberCoroutineScope(),
-                                loginError = {
+                                onLoginError = {
                                     navController.navigate(TimelineScreen.Login.name)
                                 }
                             )

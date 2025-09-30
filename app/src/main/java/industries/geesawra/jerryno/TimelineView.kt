@@ -103,7 +103,7 @@ enum class TabBarDestinations(
 fun TimelineView(
     timelineViewModel: TimelineViewModel,
     coroutineScope: CoroutineScope,
-    loginError: () -> Unit,
+    onLoginError: () -> Unit,
 ) {
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
@@ -321,7 +321,7 @@ fun TimelineView(
                         scaffoldState.bottomSheetState.expand()
                     }
                 },
-                loginError = loginError
+                loginError = onLoginError
             )
         }
     )
