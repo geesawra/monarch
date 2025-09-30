@@ -27,7 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Attachment
+import androidx.compose.material.icons.filled.CameraRoll
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
@@ -102,7 +102,8 @@ enum class TabBarDestinations(
 @Composable
 fun TimelineView(
     timelineViewModel: TimelineViewModel,
-    coroutineScope: CoroutineScope
+    coroutineScope: CoroutineScope,
+    loginError: () -> Unit,
 ) {
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
@@ -264,7 +265,7 @@ fun TimelineView(
                                 pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                             }
                         ) {
-                            Icon(Icons.Default.Attachment, contentDescription = "Attach media")
+                            Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
                         }
 
                         if (uploadingPost.value) {
@@ -315,11 +316,13 @@ fun TimelineView(
                 modifier = Modifier.padding(paddingValues),
                 coroutineScope = coroutineScope,
                 timelineViewModel = timelineViewModel,
-            ) {
-                coroutineScope.launch {
-                    scaffoldState.bottomSheetState.expand()
-                }
-            }
+                fobOnClick = {
+                    coroutineScope.launch {
+                        scaffoldState.bottomSheetState.expand()
+                    }
+                },
+                loginError = loginError
+            )
         }
     )
 }
@@ -330,7 +333,8 @@ private fun InnerTimelineView(
     modifier: Modifier = Modifier,
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
-    fobOnClick: () -> Unit // Changed to fobOnClick to avoid confusion with FAB acronym
+    fobOnClick: () -> Unit,
+    loginError: () -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.HOME) }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
@@ -349,8 +353,9 @@ private fun InnerTimelineView(
 
     LaunchedEffect(timelineViewModel.uiState.error) {
         timelineViewModel.uiState.error?.let {
-            Toast.makeText(ctx, "Error: ${it}", Toast.LENGTH_LONG)
+            Toast.makeText(ctx, "Error: $it", Toast.LENGTH_LONG)
                 .show()
+            loginError()
         }
     }
 

@@ -11,6 +11,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -63,6 +65,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+
         setContent {
             JerryNoTheme {
                 val context = LocalContext.current
@@ -95,7 +98,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-
                     timelineViewModel.loadSession()
                     if (!timelineViewModel.uiState.sessionChecked) {
                         Box(
@@ -127,7 +129,10 @@ class MainActivity : ComponentActivity() {
                         composable(route = TimelineScreen.Timeline.name) {
                             TimelineView(
                                 timelineViewModel = timelineViewModel,
-                                coroutineScope = rememberCoroutineScope()
+                                coroutineScope = rememberCoroutineScope(),
+                                loginError = {
+                                    navController.navigate(TimelineScreen.Login.name)
+                                }
                             )
                         }
                         composable(route = TimelineScreen.Compose.name) {
@@ -154,7 +159,9 @@ class MainActivity : ComponentActivity() {
                                 color = MaterialTheme.colorScheme.background // Set login screen background
                             ) {
                                 Box(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     LoginView {

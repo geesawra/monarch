@@ -32,6 +32,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
@@ -192,6 +193,13 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    suspend fun cleanSessionData() {
+        context.dataStore.edit { settings ->
+            settings.remove(SESSION)
+            settings.remove(PDSHOST)
+        }
+    }
+
     suspend fun hasSession(): Boolean {
         val pdsURLFlow: Flow<String> = context.dataStore.data.map { settings ->
             settings[PDSHOST] ?: ""
@@ -207,6 +215,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun login(pdsURL: String, handle: String, password: String): Result<Unit> {
+        createMutex.lock()
         val httpClient = HttpClient(OkHttp) {
             defaultRequest {
                 url(pdsURL)
@@ -222,22 +231,120 @@ class BlueskyConn(val context: Context) {
 
         val s = client.createSession(CreateSessionRequest(handle, password))
         val sessionResponse: CreateSessionResponse = when (s) {
-            is AtpResponse.Failure<*> -> return Result.failure(
-                Exception(
-                    "Failed to create session: ${
-                        s.error?.message?.toLowerCase(
-                            Locale.current
-                        )
-                    }"
+            is AtpResponse.Failure<*> -> {
+                createMutex.unlock()
+                return Result.failure(
+                    Exception(
+                        "Failed to create session: ${
+                            s.error?.message?.toLowerCase(
+                                Locale.current
+                            )
+                        }"
+                    )
                 )
-            )
+            }
 
             is AtpResponse.Success<CreateSessionResponse> -> s.response
         }
 
         storeSessionData(pdsURL, SessionData.fromCreateSessionResponse(sessionResponse))
+        session = null
+        this.client = null
 
+        createMutex.unlock()
         return Result.success(Unit)
+    }
+
+    @Serializable
+    private data class atpError(
+        val error: String?,
+        val message: String?,
+    )
+
+    private suspend fun refreshIfNeeded(pdsURL: String, token: SessionData): Result<Unit> {
+        return runCatching {
+            val httpClient = HttpClient(OkHttp) {
+                defaultRequest {
+                    url(pdsURL)
+                }
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 15000
+                    connectTimeoutMillis = 15000
+                    socketTimeoutMillis = 15000
+                }
+            }
+
+            val gs = httpClient.get {
+                headers["Authorization"] = "Bearer " + token.accessJwt
+                url {
+                    protocol = URLProtocol.HTTPS
+                    path("/xrpc/com.atproto.server.getSession")
+                }
+            }
+
+            when (gs.status) {
+
+                HttpStatusCode.OK -> run {
+                    this.session = token
+                    val tokens =
+                        BlueskyAuthPlugin.Tokens(token.accessJwt, token.refreshJwt)
+                    this.client = AuthenticatedXrpcBlueskyApi(httpClient, tokens)
+                    return Result.success(Unit)
+                }
+
+                else -> run {
+                    val body: String = gs.body()
+
+                    val error: atpError =
+                        BlueskyJson.decodeFromString(
+                            atpError.serializer(),
+                            body
+                        )
+                    if (error.error == "ExpiredToken") {
+                        return@run
+                    }
+                    cleanSessionData()
+                    return Result.failure(Exception("Session checking failed, status code ${gs.status}: ${error.message}"))
+                }
+            }
+
+            val rs = httpClient.post {
+                headers["Authorization"] = "Bearer " + token.refreshJwt
+                url {
+                    protocol = URLProtocol.HTTPS
+                    path("/xrpc/com.atproto.server.refreshSession")
+                }
+            }
+
+            when (rs.status) {
+
+                HttpStatusCode.OK -> run {
+                    val body: String = gs.body()
+                    val rs: RefreshSessionResponse =
+                        BlueskyJson.decodeFromString(
+                            RefreshSessionResponse.serializer(),
+                            body
+                        )
+
+                    this.session = SessionData.fromRefreshSessionResponse(rs)
+                    storeSessionData(pdsURL, this.session!!)
+                    return Result.success(Unit)
+                }
+
+                else -> run {
+                    val body: String = rs.body()
+
+                    val error: atpError =
+                        BlueskyJson.decodeFromString(
+                            atpError.serializer(),
+                            body
+                        )
+                    cleanSessionData()
+                    return Result.failure(Exception("Login refresh failed, status code ${rs.status}: ${error.message}"))
+                }
+            }
+
+        }
     }
 
     suspend fun create(): Result<Unit> {
@@ -266,49 +373,12 @@ class BlueskyConn(val context: Context) {
 
             val sessionData = SessionData.decodeFromJson(sessionDataString)
 
-            val httpClient = HttpClient(OkHttp) {
-                defaultRequest {
-                    url(pdsURL)
-                }
-
-                install(HttpTimeout) {
-                    requestTimeoutMillis = 30000
-                    connectTimeoutMillis = 30000
-                    socketTimeoutMillis = 30000
-                }
+            refreshIfNeeded(pdsURL, sessionData).onFailure {
+                createMutex.unlock()
+                return Result.failure(it)
             }
 
-            val tokens =
-                BlueskyAuthPlugin.Tokens(sessionData.accessJwt, sessionData.refreshJwt)
-            val authClient = AuthenticatedXrpcBlueskyApi(httpClient, tokens)
-
-            val gs = authClient.getSession()
-            when (gs) {
-                is AtpResponse.Failure<*> -> run {
-                    return@run
-                }
-
-                is AtpResponse.Success<GetSessionResponse> -> {
-                    this.client = authClient
-                    this.session = SessionData.fromGetSessionResponse(gs.response)
-                    createMutex.unlock()
-                    return Result.success(Unit)
-                }
-            }
-
-            // No session, try to refresh
-            val rs = authClient.refreshSession()
-            Log.d("ASD", rs.toString())
-            when (rs) {
-                is AtpResponse.Failure<*> -> return Result.failure(Exception("Could not refresh session, maybe login again?"))
-                is AtpResponse.Success<RefreshSessionResponse> -> {
-                    this.client = authClient
-                    this.session = SessionData.fromRefreshSessionResponse(rs.response)
-                    storeSessionData(pdsURL, this.session!!)
-                    createMutex.unlock()
-                    return Result.success(Unit)
-                }
-            }
+            createMutex.unlock()
         }
     }
 
