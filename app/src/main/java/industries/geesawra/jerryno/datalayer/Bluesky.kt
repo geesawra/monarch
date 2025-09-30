@@ -330,7 +330,7 @@ class BlueskyConn(val context: Context) {
             when (rs.status) {
 
                 HttpStatusCode.OK -> run {
-                    val body: String = gs.body()
+                    val body: String = rs.body()
                     val rs: RefreshSessionResponse =
                         BlueskyJson.decodeFromString(
                             RefreshSessionResponse.serializer(),
