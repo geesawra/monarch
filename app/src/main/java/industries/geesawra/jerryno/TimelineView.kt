@@ -37,13 +37,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -55,8 +53,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -365,112 +365,130 @@ private fun InnerTimelineView(
                 .show()
         }
     }
+    val isRefreshing = remember { mutableStateOf(true) }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        modifier = modifier,
-        drawerContent = {
-            FeedsDrawer(timelineViewModel, coroutineScope, drawerState)
-        }
+    PullToRefreshBox(
+        isRefreshing = isRefreshing.value,
+        onRefresh = {
+            isRefreshing.value = true
+            timelineViewModel.reset()
+            timelineViewModel.fetchTimeline {
+                isRefreshing.value = false
+            }
+        },
     ) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            topBar = {
-                LargeTopAppBar(
-                    colors = TopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        scrolledContainerColor = MaterialTheme.colorScheme.background,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground, // Ensuring correct contrast
-                        titleContentColor = MaterialTheme.colorScheme.onBackground,
-                        actionIconContentColor = MaterialTheme.colorScheme.onBackground,
-                        subtitleContentColor = MaterialTheme.colorScheme.onBackground
-                    ),
-                    title = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (timelineViewModel.uiState.feedAvatar != null) {
-                                AsyncImage(
-                                    model = timelineViewModel.uiState.feedAvatar,
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .shadow(10.dp, CircleShape)
-                                        .clip(CircleShape),
-                                    contentDescription = "Feed avatar",
-                                )
-                            }
-
-                            Text(text = timelineViewModel.uiState.feedName)
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            modifier = modifier,
+            drawerContent = {
+                FeedsDrawer(
+                    { uri: String, displayName: String, avatar: String? ->
+                        isRefreshing.value = true
+                        timelineViewModel.selectFeed(uri, displayName, avatar) {
+                            isRefreshing.value = false
                         }
-                    },
-                    scrollBehavior = scrollBehavior,
-                    modifier = Modifier.clickable {
                         coroutineScope.launch {
-                            listState.animateScrollToItem(0)
+                            drawerState.close()
                         }
                     },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            coroutineScope.launch {
-                                drawerState.open()
-                            }
-                        }) {
-                            Icon(Icons.Default.Tag, "Feeds")
-                        }
-                    },
+
+                    timelineViewModel
                 )
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = fobOnClick
-                ) {
-                    Icon(Icons.Filled.Create, "Post")
-                }
-            },
-            bottomBar = {
-                NavigationBar {
-                    TabBarDestinations.entries.forEach {
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    it.icon,
-                                    contentDescription = stringResource(it.contentDescription)
-                                )
-                            },
-                            label = { Text(stringResource(it.label)) },
-                            selected = it == currentDestination,
-                            onClick = { currentDestination = it }
-                        )
+            }
+        ) {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                topBar = {
+                    TopAppBar(
+                        colors = TopAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                            scrolledContainerColor = MaterialTheme.colorScheme.background,
+                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground, // Ensuring correct contrast
+                            titleContentColor = MaterialTheme.colorScheme.onBackground,
+                            actionIconContentColor = MaterialTheme.colorScheme.onBackground,
+                            subtitleContentColor = MaterialTheme.colorScheme.onBackground
+                        ),
+                        title = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (timelineViewModel.uiState.feedAvatar != null) {
+                                    AsyncImage(
+                                        model = timelineViewModel.uiState.feedAvatar,
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .shadow(10.dp, CircleShape)
+                                            .clip(CircleShape),
+                                        contentDescription = "Feed avatar",
+                                    )
+                                }
+
+                                Text(text = timelineViewModel.uiState.feedName)
+                            }
+                        },
+                        scrollBehavior = scrollBehavior,
+                        modifier = Modifier.clickable {
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(0)
+                            }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                coroutineScope.launch {
+                                    drawerState.open()
+                                }
+                            }) {
+                                Icon(Icons.Default.Tag, "Feeds")
+                            }
+                        },
+                    )
+                },
+                floatingActionButton = {
+                    FloatingActionButton(
+                        onClick = fobOnClick
+                    ) {
+                        Icon(Icons.Filled.Create, "Post")
+                    }
+                },
+                bottomBar = {
+                    NavigationBar {
+                        TabBarDestinations.entries.forEach {
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        it.icon,
+                                        contentDescription = stringResource(it.contentDescription)
+                                    )
+                                },
+                                label = { Text(stringResource(it.label)) },
+                                selected = it == currentDestination,
+                                onClick = { currentDestination = it }
+                            )
+                        }
                     }
                 }
+            ) { values ->
+                ShowSkeets(
+                    viewModel = timelineViewModel,
+                    state = listState,
+                    modifier = Modifier.padding(values)
+                ) {
+                    isRefreshing.value = false
+                }
             }
-        ) { values ->
-            ShowSkeets(
-                viewModel = timelineViewModel,
-                state = listState,
-                modifier = Modifier.padding(values)
-            )
         }
     }
 }
 
 @Composable
 fun FeedsDrawer(
+    selectFeed: (uri: String, displayName: String, avatar: String?) -> Unit,
     timelineViewModel: TimelineViewModel,
-    coroutineScope: CoroutineScope,
-    drawerState: DrawerState
 ) {
-    val selectFeed = { uri: String, displayName: String, avatar: String? ->
-        timelineViewModel.selectFeed(uri, displayName, avatar)
-        coroutineScope.launch {
-            drawerState.close()
-        }
-    }
-
     ModalDrawerSheet {
         Text(
             "Feeds",

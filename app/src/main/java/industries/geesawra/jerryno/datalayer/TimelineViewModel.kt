@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.RKey
+import kotlin.coroutines.cancellation.CancellationException
 
 
 data class TimelineUiState(
@@ -63,7 +64,7 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
 
-    fun fetchTimeline() {
+    fun fetchTimeline(then: () -> Unit = {}) {
         uiState = uiState.copy(isFetchingMoreTimeline = true)
         fetchJob?.cancel()
 
@@ -80,7 +81,14 @@ class TimelineViewModel @AssistedInject constructor(
                     cursor = it.cursor,
                     isFetchingMoreTimeline = false
                 )
+                then()
             }.onFailure {
+                if (it is CancellationException) {
+                    return@onFailure
+                }
+
+                then()
+
                 uiState = uiState.copy(
                     isFetchingMoreTimeline = false,
                     error = "Failed to fetch timeline: ${it.message}"
@@ -116,14 +124,14 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun selectFeed(uri: String, displayName: String, avatar: String?) {
+    fun selectFeed(uri: String, displayName: String, avatar: String?, then: () -> Unit = {}) {
         uiState = uiState.copy(
             selectedFeed = uri,
             feedName = displayName,
             feedAvatar = avatar,
         )
         reset()
-        fetchTimeline()
+        fetchTimeline { then() }
     }
 
     fun like(uri: AtUri, cid: Cid, then: () -> Unit) {
