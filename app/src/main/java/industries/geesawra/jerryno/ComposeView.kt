@@ -78,6 +78,7 @@ fun ComposeView(
 
     LaunchedEffect(scaffoldState.bottomSheetState.isVisible) {
         if (scaffoldState.bottomSheetState.isVisible) {
+            keyboardController?.show()
             focusRequester.requestFocus()
         } else {
             keyboardController?.hide()
@@ -88,6 +89,7 @@ fun ComposeView(
 
         }
     }
+
 
     val pickMedia =
         rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)) { uris ->
