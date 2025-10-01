@@ -40,9 +40,9 @@ fun ShowSkeets(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        viewModel.uiState.skeets.distinctBy { it.post.cid }.forEach { skeet ->
-            item(key = skeet.post.cid.cid) {
-                SkeetRowView(viewModel, skeet)
+        viewModel.uiState.skeets.forEach { skeet ->
+            item(key = skeet.cid.cid) {
+                SkeetRowView(viewModel = viewModel, skeet = skeet)
             }
         }
 

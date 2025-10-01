@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.bsky.feed.FeedViewPost
 import app.bsky.feed.GeneratorView
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -25,7 +24,7 @@ data class TimelineUiState(
     val feedName: String = "Following",
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
-    val skeets: List<FeedViewPost> = listOf(),
+    val skeets: List<SkeetData> = listOf(),
     val isFetchingMoreTimeline: Boolean = false,
     val cursor: String? = null,
     val authenticated: Boolean = false,
@@ -75,9 +74,9 @@ class TimelineViewModel @AssistedInject constructor(
                 } else {
                     uiState.selectedFeed
                 }
-            }(), uiState.cursor).onSuccess {
+            }(), uiState.cursor).onSuccess { it ->
                 uiState = uiState.copy(
-                    skeets = uiState.skeets + it.feed,
+                    skeets = (uiState.skeets + it.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid },
                     cursor = it.cursor,
                     isFetchingMoreTimeline = false
                 )

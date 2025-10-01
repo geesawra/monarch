@@ -73,6 +73,7 @@ dependencies {
     implementation("androidx.paging:paging-compose:3.3.0-alpha05")
     implementation("me.saket.telephoto:zoomable:0.17.0")
     implementation("me.saket.telephoto:zoomable-image-coil3:0.17.0")
+    implementation("androidx.browser:browser:1.9.0")
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.androidx.material3)
     ksp("com.google.dagger:hilt-compiler:2.57.2")
