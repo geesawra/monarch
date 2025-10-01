@@ -8,18 +8,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,21 +84,30 @@ fun TimelineView(
     coroutineScope: CoroutineScope,
     onLoginError: () -> Unit,
 ) {
+    val scrollState = rememberScrollState()
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true // Keep true if you only want fully expanded or hidden
-        ),
+            skipPartiallyExpanded = true,
+        )
     )
 
-    val context = LocalContext.current
-
-
     BottomSheetScaffold(
-        modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout),
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.statusBars),
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
+        sheetDragHandle = {
+            BottomSheetDefaults.DragHandle(
+            )
+        },
         sheetContent = {
-            ComposeView(context, coroutineScope, timelineViewModel, scaffoldState)
+            ComposeView(
+                LocalContext.current,
+                coroutineScope,
+                timelineViewModel,
+                scaffoldState,
+                scrollState
+            )
         },
         content = { paddingValues ->
             InnerTimelineView(
@@ -159,9 +170,7 @@ private fun InnerTimelineView(
         onRefresh = {
             isRefreshing.value = true
             timelineViewModel.reset()
-            timelineViewModel.fetchTimeline {
-                isRefreshing.value = false
-            }
+            timelineViewModel.fetchTimeline { isRefreshing.value = false }
         },
     ) {
         ModalNavigationDrawer(
@@ -171,9 +180,11 @@ private fun InnerTimelineView(
                 FeedsDrawer(
                     { uri: String, displayName: String, avatar: String? ->
                         isRefreshing.value = true
-                        timelineViewModel.selectFeed(uri, displayName, avatar) {
-                            isRefreshing.value = false
-                        }
+                        timelineViewModel.selectFeed(
+                            uri,
+                            displayName,
+                            avatar
+                        ) { isRefreshing.value = false }
                         coroutineScope.launch {
                             drawerState.close()
                         }
@@ -263,9 +274,7 @@ private fun InnerTimelineView(
                     viewModel = timelineViewModel,
                     state = listState,
                     modifier = Modifier.padding(values)
-                ) {
-                    isRefreshing.value = false
-                }
+                ) { isRefreshing.value = false }
             }
         }
     }
@@ -300,16 +309,16 @@ fun FeedsDrawer(
             }
         )
 
-        timelineViewModel.uiState.feeds.forEach {
+        timelineViewModel.uiState.feeds.forEach { feed ->
             NavigationDrawerItem(
                 label = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (it.avatar != null) {
+                        if (feed.avatar != null) {
                             AsyncImage(
-                                model = it.avatar?.uri,
+                                model = feed.avatar?.uri,
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clip(CircleShape),
@@ -319,13 +328,13 @@ fun FeedsDrawer(
                             Spacer(modifier = Modifier.size(20.dp))
                         }
 
-                        Text(text = it.displayName)
+                        Text(text = feed.displayName)
                     }
                 },
-                selected = timelineViewModel.uiState.selectedFeed == it.uri.atUri,
+                selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
                 modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
                 onClick = {
-                    selectFeed(it.uri.atUri, it.displayName, it.avatar?.uri)
+                    selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
                 }
             )
         }

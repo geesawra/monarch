@@ -2,8 +2,15 @@ package industries.geesawra.jerryno
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize // Added import
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight // Added import
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height // Added import
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -30,37 +37,159 @@ fun PostImageGallery(
     val galleryVisible = remember { mutableStateOf<Int?>(null) }
 
     galleryVisible.value?.let {
-        GalleryViewer(
-            imageUrls = images,
-            initialPage = it
-        ) {
-            galleryVisible.value = null
+        // Ensure the index is valid for the original images list
+        if (it < images.size) {
+            GalleryViewer(
+                imageUrls = images, // Pass the full list to the viewer
+                initialPage = it    // 'it' is the index in the original images list
+            ) {
+                galleryVisible.value = null
+            }
         }
     }
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        // This automatically adds 4.dp of space between each image
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // We take the first 4 images and give them each a weight
-        images.take(4).forEachIndexed { idx, image ->
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(image.url)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = image.alt,
-                contentScale = ContentScale.Crop, // Fills the space
-                modifier = Modifier
-                    .clickable {
-                        galleryVisible.value = idx
-                    }
-                    // 1. Give each image an equal share of the width
-                    .weight(1f)
-                    // 3. Apply rounded corners
-                    .clip(RoundedCornerShape(12.dp))
-            )
+    val imagesToDisplay = images.take(4)
+
+    if (imagesToDisplay.isEmpty()) {
+        return
+    }
+
+    when (imagesToDisplay.size) {
+        1 -> {
+            Row(
+                modifier = modifier
+                    .fillMaxWidth()
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(imagesToDisplay[0].url)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = imagesToDisplay[0].alt,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f) // Added aspect ratio for defined height
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { galleryVisible.value = 0 } // Index in original list
+                )
+            }
+        }
+
+        2 -> {
+            Row(
+                modifier = modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GalleryImageCell(
+                    image = imagesToDisplay[0],
+                    originalIndex = 0,
+                    onImageClick = { galleryVisible.value = it })
+                GalleryImageCell(
+                    image = imagesToDisplay[1],
+                    originalIndex = 1,
+                    onImageClick = { galleryVisible.value = it })
+            }
+        }
+
+        3 -> {
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    GalleryImageCell(
+                        image = imagesToDisplay[0],
+                        originalIndex = 0,
+                        onImageClick = { galleryVisible.value = it })
+                    GalleryImageCell(
+                        image = imagesToDisplay[1],
+                        originalIndex = 1,
+                        onImageClick = { galleryVisible.value = it })
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min), // Apply IntrinsicSize.Min to the Row
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    GalleryImageCell(
+                        image = imagesToDisplay[2],
+                        originalIndex = 2,
+                        onImageClick = { galleryVisible.value = it })
+                    Spacer(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight() // Spacer fills the height of the intrinsically sized Row
+                    )
+                }
+            }
+        }
+
+        else -> { // Handles 4 images
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    GalleryImageCell(
+                        image = imagesToDisplay[0],
+                        originalIndex = 0,
+                        onImageClick = { galleryVisible.value = it })
+                    GalleryImageCell(
+                        image = imagesToDisplay[1],
+                        originalIndex = 1,
+                        onImageClick = { galleryVisible.value = it })
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    GalleryImageCell(
+                        image = imagesToDisplay[2],
+                        originalIndex = 2,
+                        onImageClick = { galleryVisible.value = it })
+                    GalleryImageCell(
+                        image = imagesToDisplay[3],
+                        originalIndex = 3,
+                        onImageClick = { galleryVisible.value = it })
+                }
+            }
         }
     }
 }
+
+@Composable
+private fun RowScope.GalleryImageCell(
+    image: Image,
+    originalIndex: Int, // Index in the original `images` list
+    onImageClick: (Int) -> Unit
+) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(image.url)
+            .crossfade(true)
+            .build(),
+        contentDescription = image.alt,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .weight(1f)
+            .aspectRatio(1f) // Changed from fillMaxSize() to make it square
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onImageClick(originalIndex) }
+    )
+}
+
+// Placeholder for GalleryViewer - ensure it's defined elsewhere
+/*
+@Composable
+fun GalleryViewer(imageUrls: List<Image>, initialPage: Int, onDismiss: () -> Unit) {
+    // ... your GalleryViewer implementation ...
+}
+*/

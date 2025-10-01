@@ -128,16 +128,16 @@ private fun SkeetContent(skeet: FeedViewPost) {
         return
     }
 
-    Card(
-        modifier = Modifier
-            .heightIn(max = 250.dp)
-            .fillMaxWidth()
-            .padding(8.dp)
-    ) {
-        when (embed) {
-            is PostViewEmbedUnion.ImagesView -> {
-                val img = embed.value.images
 
+    when (embed) {
+        is PostViewEmbedUnion.ImagesView -> {
+            val img = embed.value.images
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
                 PostImageGallery(
                     modifier = Modifier
                         .fillMaxSize()
@@ -147,8 +147,15 @@ private fun SkeetContent(skeet: FeedViewPost) {
                     },
                 )
             }
+        }
 
-            is PostViewEmbedUnion.VideoView -> {
+        is PostViewEmbedUnion.VideoView -> {
+            Card(
+                modifier = Modifier
+                    .heightIn(max = 500.dp)
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
                 VideoPlayer(
                     mediaItems = listOf(
                         VideoPlayerMediaItem.NetworkMediaItem(
@@ -182,10 +189,11 @@ private fun SkeetContent(skeet: FeedViewPost) {
                         .padding(8.dp),
                 )
             }
-
-            else -> {}
         }
+
+        else -> {}
     }
+
 }
 
 @Composable
