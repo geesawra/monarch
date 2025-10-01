@@ -1,18 +1,265 @@
 package industries.geesawra.jerryno
 
+import android.content.Context
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.CameraRoll
+import androidx.compose.material3.BottomSheetScaffoldState
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SheetState
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ComposeView(
-    modalSheetState: SheetState,
-    focusRequester: FocusRequester,
+    context: Context,
+    coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
-    onDismissRequest: () -> Unit,
+    scaffoldState: BottomSheetScaffoldState
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var postText by remember { mutableStateOf("") }
+    val maxChars = 300
+
+    val mediaSelected = remember { mutableStateOf(mapOf<Uri, String?>()) }
+    val mediaSelectedIsVideo = remember { mutableStateOf(false) }
+
+    LaunchedEffect(scaffoldState.bottomSheetState.isVisible) {
+        if (scaffoldState.bottomSheetState.isVisible) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } else {
+            keyboardController?.hide()
+            mediaSelected.value = mapOf()
+        }
+    }
+
+    val pickMedia =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)) { uris ->
+            if (uris.isEmpty()) {
+                return@rememberLauncherForActivityResult
+            }
+
+            val urisMap = uris.associateWith {
+                val mimeType: String? = context.contentResolver.getType(it)
+                mimeType?.let {
+                    if (mimeType.startsWith("image/")) {
+                        return@associateWith "image"
+                    } else if (mimeType.startsWith("video/")) {
+                        return@associateWith "video"
+                    }
+                }
+
+                return@associateWith null
+            }
+
+            if (urisMap.size > 1 && urisMap.values.find {
+                    it?.let {
+                        return@find (it == "video")
+                    }
+
+                    return@find false
+                } != null) {
+                Toast.makeText(
+                    context,
+                    "Can only post up to 1 video or 4 pictures",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                return@rememberLauncherForActivityResult
+            }
+
+            if (urisMap.size == 1 && urisMap.values.first() == "video") {
+                mediaSelectedIsVideo.value = true
+            }
+
+            mediaSelected.value = urisMap
+        }
+
+    val uploadingPost = remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(
+                WindowInsets.ime
+            )
+            .padding(16.dp) // General content padding
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(), // Removed .fillMaxHeight()
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row {
+                Text(
+                    "New Post",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            }
+
+            val charCount = remember { mutableIntStateOf(0) }
+            val wasEdited = remember { mutableStateOf(false) }
+
+            OutlinedTextField(
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        this.defaultKeyboardAction(ImeAction.Done)
+                        keyboardController?.hide()
+                    }
+                ),
+                value = postText,
+                onValueChange = {
+                    wasEdited.value = true
+                    postText = it
+                    charCount.intValue = it.length
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                label = {
+                    if (wasEdited.value) {
+                        Text(
+                            text = "${maxChars - charCount.intValue}",
+                            color = if (postText.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                        )
+                    } else {
+                        Text(
+                            text = "Less cringe this time, okay?",
+                        )
+                    }
+                },
+                isError = postText.length > maxChars
+            )
+
+            Spacer(modifier = Modifier.padding(4.dp))
+
+            if (mediaSelected.value.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .heightIn(max = 180.dp)
+                        .fillMaxWidth()
+                        .padding(8.dp) // This padding is for the Card itself, not the Box's content
+                ) {
+                    PostImageGallery(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp),
+                        images = mediaSelected.value.keys.map {
+                            Image(
+                                url = it.toString(),
+                                alt = ""
+                            )
+                        },
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.padding(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = {
+                        pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                    }
+                ) {
+                    Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
+                }
+
+                if (uploadingPost.value) {
+                    CircularProgressIndicator()
+                }
+
+                val postButtonEnabled = remember { mutableStateOf(true) }
+                Button(
+                    onClick = {
+                        if (postText.isNotBlank() && postText.length <= maxChars) {
+                            coroutineScope.launch {
+                                postButtonEnabled.value = false
+                                uploadingPost.value = true
+                                timelineViewModel.post(
+                                    postText,
+                                    if (!mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
+                                        .ifEmpty { null } else null,
+                                    if (mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
+                                        .firstOrNull()
+                                    else null,
+                                ).onSuccess {
+                                    scaffoldState.bottomSheetState.hide()
+                                    postText = ""
+                                    wasEdited.value = false
+                                    postButtonEnabled.value = true
+                                    uploadingPost.value = false
+                                }.onFailure {
+                                    postButtonEnabled.value = true
+                                    Toast.makeText(
+                                        context,
+                                        "Could not post: ${it.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    uploadingPost.value = false
+                                    postButtonEnabled.value = true
+                                }
+                            }
+                        }
+                    },
+                    enabled = (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars && postButtonEnabled.value
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("Skeet")
+                }
+            }
+        }
+    }
 
 }
