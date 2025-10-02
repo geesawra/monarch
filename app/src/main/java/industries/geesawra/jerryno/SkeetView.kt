@@ -50,7 +50,8 @@ fun SkeetView(
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel,
     skeet: SkeetData,
-    nested: Boolean = false
+    nested: Boolean = false,
+    disableEmbeds: Boolean = false
 ) {
     val likes = skeet.likes
     val reposts = skeet.reposts
@@ -92,7 +93,7 @@ fun SkeetView(
                     SkeetHeader(modifier = Modifier.padding(start = 16.dp), skeet = skeet)
                 }
 
-                SkeetContent(viewModel, skeet, nested)
+                SkeetContent(viewModel, skeet, nested, disableEmbeds)
 
                 if (!nested) {
                     TimelinePostActionsView(
@@ -123,7 +124,8 @@ fun SkeetView(
 private fun SkeetContent(
     timelineViewModel: TimelineViewModel,
     skeet: SkeetData,
-    nested: Boolean = false
+    nested: Boolean = false,
+    disableEmbeds: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -133,7 +135,7 @@ private fun SkeetContent(
         style = MaterialTheme.typography.bodyLarge,
     )
 
-    if (skeet.embed == null) {
+    if (skeet.embed == null || disableEmbeds) {
         return
     }
 
