@@ -48,14 +48,12 @@ import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 @Composable
 fun SkeetView(
     modifier: Modifier = Modifier,
-    viewModel: TimelineViewModel?,
+    viewModel: TimelineViewModel? = null,
+    onReplyTap: (SkeetData) -> Unit = {},
     skeet: SkeetData,
     nested: Boolean = false,
     disableEmbeds: Boolean = false
 ) {
-    val likes = skeet.likes
-    val reposts = skeet.reposts
-    val replies = skeet.replies
     val minSize = 55.dp
 
     Surface(
@@ -97,17 +95,11 @@ fun SkeetView(
 
                 if (!nested && !disableEmbeds) {
                     TimelinePostActionsView(
+                        onReplyTap = onReplyTap,
                         modifier = Modifier
                             .fillMaxWidth(),
                         timelineViewModel = viewModel,
-                        replies = replies,
-                        likes = likes,
-                        reposts = reposts,
-                        postUrl = skeet.shareURL(),
-                        uri = skeet.uri,
-                        cid = skeet.cid,
-                        reposted = skeet.didRepost,
-                        liked = skeet.didLike,
+                        skeet = skeet,
                     )
 
                     HorizontalDivider(
@@ -288,7 +280,12 @@ private fun RecordView(
     val rv = rv.record
     when (rv) {
         is RecordViewRecordUnion.ViewRecord -> {
-            SkeetView(modifier, null, SkeetData.fromRecordView(rv.value), nested = true)
+            SkeetView(
+                modifier = modifier,
+                viewModel = null,
+                skeet = SkeetData.fromRecordView(rv.value),
+                nested = true
+            )
         }
 
         else -> {}

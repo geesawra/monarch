@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import industries.geesawra.jerryno.datalayer.SkeetData
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 
 @Composable
@@ -25,6 +26,7 @@ fun ShowSkeets(
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel,
     state: LazyListState = rememberLazyListState(),
+    onReplyTap: (SkeetData) -> Unit = {},
     doneFirstRefresh: () -> Unit = {}
 ) {
     LaunchedEffect(key1 = viewModel.uiState.skeets.isEmpty()) {
@@ -42,7 +44,7 @@ fun ShowSkeets(
     ) {
         viewModel.uiState.skeets.forEach { skeet ->
             item(key = skeet.cid.cid) {
-                SkeetView(viewModel = viewModel, skeet = skeet)
+                SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
             }
         }
 

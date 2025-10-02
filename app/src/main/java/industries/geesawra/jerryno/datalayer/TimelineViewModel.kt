@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.bsky.feed.GeneratorView
+import app.bsky.feed.PostReplyRef
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -104,11 +105,17 @@ class TimelineViewModel @AssistedInject constructor(
         )
     }
 
-    suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
+    suspend fun post(
+        content: String,
+        images: List<Uri>? = null,
+        video: Uri? = null,
+        replyRef: PostReplyRef? = null
+    ): Result<Unit> {
         return bskyConn.post(
             content,
             images,
-            video
+            video,
+            replyRef,
         ) // TODO: maybe refactor this to use uistate.Error?
     }
 

@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,9 +54,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import industries.geesawra.jerryno.datalayer.SkeetData
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -65,12 +69,15 @@ fun ComposeView(
     context: Context,
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
+    inReplyTo: MutableState<SkeetData?>,
     scaffoldState: BottomSheetScaffoldState,
     scrollState: ScrollState
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     var postText by remember { mutableStateOf("") }
+    val charCount = remember { mutableIntStateOf(0) }
+    val wasEdited = remember { mutableStateOf(false) }
     val maxChars = 300
 
     val mediaSelected = remember { mutableStateOf(mapOf<Uri, String?>()) }
@@ -84,6 +91,8 @@ fun ComposeView(
             keyboardController?.hide()
             // Reset state when sheet is hidden
             postText = ""
+            charCount.intValue = 0
+            inReplyTo.value = null
             mediaSelected.value = mapOf()
             mediaSelectedIsVideo.value = false
 
@@ -158,8 +167,20 @@ fun ComposeView(
                     )
                 }
 
-                val charCount = remember { mutableIntStateOf(0) }
-                val wasEdited = remember { mutableStateOf(false) }
+                inReplyTo.value?.let {
+                    OutlinedCard(
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        SkeetView(
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .background(Color.Transparent),
+                            skeet = it,
+                            nested = true,
+                            disableEmbeds = true
+                        )
+                    }
+                }
 
                 OutlinedTextField(
                     keyboardActions = KeyboardActions(
@@ -204,7 +225,8 @@ fun ComposeView(
                     coroutineScope,
                     maxChars,
                     timelineViewModel,
-                    scaffoldState
+                    scaffoldState,
+                    inReplyTo.value
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -245,7 +267,8 @@ fun ActionRow(
     coroutineScope: CoroutineScope,
     maxChars: Int,
     timelineViewModel: TimelineViewModel,
-    scaffoldState: BottomSheetScaffoldState
+    scaffoldState: BottomSheetScaffoldState,
+    inReplyToData: SkeetData? = null
 ) {
 
     Row(
@@ -279,10 +302,11 @@ fun ActionRow(
                     coroutineScope.launch {
                         uploadingPost.value = true // Show progress immediately
                         timelineViewModel.post(
-                            postText,
-                            if (!mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
+                            content = postText,
+                            images = if (!mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
                                 .ifEmpty { null } else null,
-                            if (mediaSelectedIsVideo.value) mediaSelected.value.keys.firstOrNull() else null,
+                            video = if (mediaSelectedIsVideo.value) mediaSelected.value.keys.firstOrNull() else null,
+                            replyRef = inReplyToData?.replyRef(),
                         ).onSuccess {
                             coroutineScope.launch {
                                 scaffoldState.bottomSheetState.hide()

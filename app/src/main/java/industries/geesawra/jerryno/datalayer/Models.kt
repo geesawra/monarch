@@ -5,9 +5,12 @@ import app.bsky.embed.RecordViewRecordEmbedUnion
 import app.bsky.feed.FeedViewPost
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.Post
+import app.bsky.feed.PostReplyRef
 import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.ReplyRef
+import app.bsky.feed.ReplyRefRootUnion
 import com.atproto.label.Label
+import com.atproto.repo.StrongRef
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Handle
@@ -90,6 +93,24 @@ data class SkeetData(
                 reply = null
             )
         }
+    }
+
+    fun replyRef(): PostReplyRef {
+        val thisPostRef = StrongRef(this.uri, this.cid)
+
+        val maybeRoot = this.reply?.root
+        val rootRef = when (maybeRoot) {
+            is ReplyRefRootUnion.BlockedPost -> null
+            is ReplyRefRootUnion.NotFoundPost -> null
+            is ReplyRefRootUnion.PostView -> StrongRef(maybeRoot.value.uri, maybeRoot.value.cid)
+            is ReplyRefRootUnion.Unknown -> null
+            null -> null
+        }
+
+        return PostReplyRef(
+            parent = thisPostRef,
+            root = rootRef ?: thisPostRef
+        )
     }
 
     fun shareURL(): String {

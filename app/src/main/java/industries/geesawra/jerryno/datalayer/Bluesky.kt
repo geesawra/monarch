@@ -20,6 +20,7 @@ import app.bsky.feed.GetTimelineResponse
 import app.bsky.feed.Like
 import app.bsky.feed.Post
 import app.bsky.feed.PostEmbedUnion
+import app.bsky.feed.PostReplyRef
 import app.bsky.feed.Repost
 import com.atproto.identity.ResolveHandleQueryParams
 import com.atproto.identity.ResolveHandleResponse
@@ -410,7 +411,12 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun post(content: String, images: List<Uri>? = null, video: Uri? = null): Result<Unit> {
+    suspend fun post(
+        content: String,
+        images: List<Uri>? = null,
+        video: Uri? = null,
+        replyRef: PostReplyRef? = null
+    ): Result<Unit> {
         // TODO: videos need to be uploaded through a different API.
         return runCatching {
             create().onFailure {
@@ -447,7 +453,8 @@ class BlueskyConn(val context: Context) {
                 Post(
                     text = content,
                     createdAt = Clock.System.now(),
-                    embed = postEmbed
+                    embed = postEmbed,
+                    reply = replyRef
                 )
             )
 

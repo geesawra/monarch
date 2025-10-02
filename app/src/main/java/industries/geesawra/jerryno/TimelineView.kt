@@ -63,6 +63,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import industries.geesawra.jerryno.datalayer.SkeetData
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -91,22 +92,24 @@ fun TimelineView(
         )
     )
 
+    val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
+
     BottomSheetScaffold(
         modifier = Modifier
             .windowInsetsPadding(WindowInsets.statusBars),
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
         sheetDragHandle = {
-            BottomSheetDefaults.DragHandle(
-            )
+            BottomSheetDefaults.DragHandle()
         },
         sheetContent = {
             ComposeView(
-                LocalContext.current,
-                coroutineScope,
-                timelineViewModel,
-                scaffoldState,
-                scrollState
+                context = LocalContext.current,
+                coroutineScope = coroutineScope,
+                timelineViewModel = timelineViewModel,
+                scaffoldState = scaffoldState,
+                scrollState = scrollState,
+                inReplyTo = inReplyTo
             )
         },
         content = { paddingValues ->
@@ -115,6 +118,12 @@ fun TimelineView(
                 coroutineScope = coroutineScope,
                 timelineViewModel = timelineViewModel,
                 fobOnClick = {
+                    coroutineScope.launch {
+                        scaffoldState.bottomSheetState.expand()
+                    }
+                },
+                onReplyTap = {
+                    inReplyTo.value = it
                     coroutineScope.launch {
                         scaffoldState.bottomSheetState.expand()
                     }
@@ -131,6 +140,7 @@ private fun InnerTimelineView(
     modifier: Modifier = Modifier,
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
+    onReplyTap: (SkeetData) -> Unit = {},
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
 ) {
@@ -273,7 +283,8 @@ private fun InnerTimelineView(
                 ShowSkeets(
                     viewModel = timelineViewModel,
                     state = listState,
-                    modifier = Modifier.padding(values)
+                    modifier = Modifier.padding(values),
+                    onReplyTap = onReplyTap
                 ) { isRefreshing.value = false }
             }
         }

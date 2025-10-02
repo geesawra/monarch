@@ -32,9 +32,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import industries.geesawra.jerryno.datalayer.SkeetData
 import industries.geesawra.jerryno.datalayer.TimelineViewModel
 import sh.christian.ozone.api.AtUri
-import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.RKey
 
 
@@ -80,18 +80,12 @@ fun AtUri.rkey(): RKey {
 fun TimelinePostActionsView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel?,
-    reposted: Boolean,
-    liked: Boolean,
-    replies: Long?,
-    likes: Long?,
-    reposts: Long?,
-    postUrl: String,
-    uri: AtUri,
-    cid: Cid,
+    onReplyTap: (SkeetData) -> Unit = {},
+    skeet: SkeetData
 ) {
-    val likes = remember { mutableLongStateOf(likes ?: 0) }
-    val reposts = remember { mutableLongStateOf(reposts ?: 0) }
-    val replies = remember { mutableLongStateOf(replies ?: 0) }
+    val likes = remember { mutableLongStateOf(skeet.likes ?: 0) }
+    val reposts = remember { mutableLongStateOf(skeet.reposts ?: 0) }
+    val replies = remember { mutableLongStateOf(skeet.replies ?: 0) }
 
 
     Row(
@@ -104,7 +98,7 @@ fun TimelinePostActionsView(
                 val sendIntent: Intent = Intent().apply {
                     action = Intent.ACTION_SEND
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, postUrl)
+                    putExtra(Intent.EXTRA_TEXT, skeet.shareURL())
                 }
                 ctx.startActivity(
                     Intent.createChooser(sendIntent, "Share Bluesky post")
@@ -120,7 +114,9 @@ fun TimelinePostActionsView(
         }
 
         IconButton(
-            onClick = {}
+            onClick = {
+                onReplyTap(skeet)
+            }
         ) {
             IconWithNumber(
                 imageVector = {
@@ -142,16 +138,16 @@ fun TimelinePostActionsView(
             )
         }
 
-        var isLiked by rememberSaveable { mutableStateOf(liked) }
+        var isLiked by rememberSaveable { mutableStateOf(skeet.didLike) }
         IconButton(
             onClick = {
                 when (isLiked) {
-                    false -> timelineViewModel?.like(uri, cid) {
+                    false -> timelineViewModel?.like(skeet.uri, skeet.cid) {
                         isLiked = true
                         likes.longValue++
                     }
 
-                    true -> timelineViewModel?.deleteLike(cid) {
+                    true -> timelineViewModel?.deleteLike(skeet.cid) {
                         isLiked = false
                         likes.longValue--
                     }
@@ -166,16 +162,16 @@ fun TimelinePostActionsView(
             )
         }
 
-        var isReposted by rememberSaveable { mutableStateOf(reposted) }
+        var isReposted by rememberSaveable { mutableStateOf(skeet.didRepost) }
         IconButton(
             onClick = {
                 when (isReposted) {
-                    false -> timelineViewModel?.repost(uri, cid) {
+                    false -> timelineViewModel?.repost(skeet.uri, skeet.cid) {
                         isReposted = true
                         reposts.longValue++
                     }
 
-                    true -> timelineViewModel?.deleteRepost(cid) {
+                    true -> timelineViewModel?.deleteRepost(skeet.cid) {
                         isReposted = false
                         reposts.longValue--
                     }
