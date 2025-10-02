@@ -42,7 +42,7 @@ fun ShowSkeets(
     ) {
         viewModel.uiState.skeets.forEach { skeet ->
             item(key = skeet.cid.cid) {
-                SkeetRowView(viewModel = viewModel, skeet = skeet)
+                SkeetView(viewModel = viewModel, skeet = skeet)
             }
         }
 
