@@ -65,7 +65,9 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun fetchTimeline(then: () -> Unit = {}) {
         uiState = uiState.copy(isFetchingMoreTimeline = true)
-        fetchJob?.cancel()
+        runCatching {
+            fetchJob?.cancel()
+        }
 
         fetchJob = viewModelScope.launch {
             bskyConn.fetchTimeline({
