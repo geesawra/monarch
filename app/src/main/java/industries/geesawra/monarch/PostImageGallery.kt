@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno
+package industries.geesawra.monarch
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

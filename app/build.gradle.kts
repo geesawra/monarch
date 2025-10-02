@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "industries.geesawra.jerryno"
+    namespace = "industries.geesawra.monarch"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "industries.geesawra.jerryno"
+        applicationId = "industries.geesawra.monarch"
         minSdk = 36
         targetSdk = 36
         versionCode = 1

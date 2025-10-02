@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno
+package industries.geesawra.monarch
 
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.clickable
@@ -38,8 +38,8 @@ import app.bsky.feed.ReplyRefParentUnion
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import industries.geesawra.jerryno.datalayer.SkeetData
-import industries.geesawra.jerryno.datalayer.TimelineViewModel
+import industries.geesawra.monarch.datalayer.SkeetData
+import industries.geesawra.monarch.datalayer.TimelineViewModel
 import io.sanghun.compose.video.RepeatMode
 import io.sanghun.compose.video.VideoPlayer
 import io.sanghun.compose.video.controller.VideoPlayerControllerConfig

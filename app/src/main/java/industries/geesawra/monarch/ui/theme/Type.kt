@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno.ui.theme
+package industries.geesawra.monarch.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

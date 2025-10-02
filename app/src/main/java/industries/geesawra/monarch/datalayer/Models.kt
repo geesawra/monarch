@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno.datalayer
+package industries.geesawra.monarch.datalayer
 
 import app.bsky.embed.RecordViewRecord
 import app.bsky.embed.RecordViewRecordEmbedUnion

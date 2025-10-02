@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno
+package industries.geesawra.monarch
 
 import android.util.Log
 import android.widget.Toast
@@ -34,7 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import industries.geesawra.jerryno.datalayer.BlueskyConn
+import industries.geesawra.monarch.datalayer.BlueskyConn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno
+package industries.geesawra.monarch
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,8 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import industries.geesawra.jerryno.datalayer.SkeetData
-import industries.geesawra.jerryno.datalayer.TimelineViewModel
+import industries.geesawra.monarch.datalayer.SkeetData
+import industries.geesawra.monarch.datalayer.TimelineViewModel
 
 @Composable
 fun ShowSkeets(

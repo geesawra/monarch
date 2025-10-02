@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno
+package industries.geesawra.monarch
 
 import android.app.Application
 import android.os.Bundle
@@ -32,9 +32,9 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
-import industries.geesawra.jerryno.datalayer.BlueskyConn
-import industries.geesawra.jerryno.datalayer.TimelineViewModel
-import industries.geesawra.jerryno.ui.theme.JerryNoTheme
+import industries.geesawra.monarch.datalayer.BlueskyConn
+import industries.geesawra.monarch.datalayer.TimelineViewModel
+import industries.geesawra.monarch.ui.theme.MonarchTheme
 
 
 @HiltAndroidApp
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
 
 
         setContent {
-            JerryNoTheme {
+            MonarchTheme {
                 val context = LocalContext.current
                 SingletonImageLoader.setSafe {
                     ImageLoader.Builder(context)

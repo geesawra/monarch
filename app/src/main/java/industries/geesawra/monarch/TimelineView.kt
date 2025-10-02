@@ -1,4 +1,4 @@
-package industries.geesawra.jerryno
+package industries.geesawra.monarch
 
 // import androidx.compose.foundation.layout.height // Will be removed for the sheet content Box
 import android.widget.Toast
@@ -63,8 +63,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import industries.geesawra.jerryno.datalayer.SkeetData
-import industries.geesawra.jerryno.datalayer.TimelineViewModel
+import industries.geesawra.monarch.datalayer.SkeetData
+import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
