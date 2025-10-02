@@ -52,13 +52,20 @@ fun SkeetView(
     onReplyTap: (SkeetData) -> Unit = {},
     skeet: SkeetData,
     nested: Boolean = false,
-    disableEmbeds: Boolean = false
+    disableEmbeds: Boolean = false,
+    inThread: Boolean = false,
 ) {
     val minSize = 55.dp
 
+    val hasParent = skeet.parent() != null
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp)
+        modifier = if (!inThread && !hasParent) {
+            modifier.padding(start = 16.dp, end = 16.dp)
+        } else {
+            modifier.padding(top = 8.dp, start = 16.dp, end = 16.dp)
+        }
     ) {
         Row(
             verticalAlignment = Alignment.Top,
@@ -97,15 +104,14 @@ fun SkeetView(
                     TimelinePostActionsView(
                         onReplyTap = onReplyTap,
                         modifier = Modifier
+                            .height(50.dp)
                             .fillMaxWidth(),
                         timelineViewModel = viewModel,
                         skeet = skeet,
-                    )
-
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant
+                        inThread = inThread
                     )
                 }
+
             }
 
         }
@@ -267,6 +273,11 @@ private fun SkeetContent(
             }
         }
 
+        is PostViewEmbedUnion.RecordWithMediaView -> run {
+            // TODO: map this
+            // probably better to wrap this thing in a function that we can call recursively
+        }
+
         else -> {}
     }
 
@@ -294,7 +305,7 @@ private fun RecordView(
 
 @Composable
 private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
-    val authorName = skeet.authorName ?: skeet.authorHandle.handle
+    val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
 
     Column(modifier = modifier) {
         skeet.reason?.let {

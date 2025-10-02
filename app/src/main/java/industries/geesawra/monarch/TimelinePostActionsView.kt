@@ -3,8 +3,10 @@ package industries.geesawra.monarch
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.ReplyAll
@@ -13,10 +15,12 @@ import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.ThumbUpOffAlt
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.getValue
@@ -27,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -81,18 +86,30 @@ fun TimelinePostActionsView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel?,
     onReplyTap: (SkeetData) -> Unit = {},
-    skeet: SkeetData
+    skeet: SkeetData,
+    inThread: Boolean = false,
 ) {
     val likes = remember { mutableLongStateOf(skeet.likes ?: 0) }
     val reposts = remember { mutableLongStateOf(skeet.reposts ?: 0) }
     val replies = remember { mutableLongStateOf(skeet.replies ?: 0) }
-
 
     Row(
         horizontalArrangement = Arrangement.End,
         modifier = modifier,
     ) {
         val ctx = LocalContext.current
+
+        if (inThread) {
+            VerticalDivider(
+                thickness = 4.dp,
+                modifier = Modifier
+                    .padding(start = 25.dp, top = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+
+            Spacer(Modifier.weight(1f))
+        }
+
         IconButton(
             onClick = {
                 val sendIntent: Intent = Intent().apply {
@@ -183,8 +200,14 @@ fun TimelinePostActionsView(
                 if (isReposted) Icons.Default.RepeatOn else Icons.Default.Repeat,
                 contentDescription = "Repost",
                 number = reposts,
-                if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                if (isReposted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+
+    if (!inThread) {
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
     }
 }

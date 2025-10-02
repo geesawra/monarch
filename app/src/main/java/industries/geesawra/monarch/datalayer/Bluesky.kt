@@ -158,7 +158,7 @@ class BlueskyConn(val context: Context) {
 
                 val body: String = rawDoc.body()
 
-                val solvedDoc: didDoc = BlueskyJson.decodeFromString(didDoc.serializer(), body)
+                val solvedDoc: DIDDoc = BlueskyJson.decodeFromString(DIDDoc.serializer(), body)
 
                 for (ps in solvedDoc.service) {
                     if (ps.id == "#atproto_pds" && ps.type == "AtprotoPersonalDataServer") {
@@ -172,15 +172,15 @@ class BlueskyConn(val context: Context) {
     }
 
     @Serializable
-    private data class service(
+    private data class Service(
         val id: String,
         val type: String,
         val serviceEndpoint: String
     )
 
     @Serializable
-    private data class didDoc(
-        val service: List<service>
+    private data class DIDDoc(
+        val service: List<Service>
     )
 
     var client: AuthenticatedXrpcBlueskyApi? = null

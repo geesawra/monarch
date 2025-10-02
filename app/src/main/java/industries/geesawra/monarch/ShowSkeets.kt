@@ -43,7 +43,23 @@ fun ShowSkeets(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         viewModel.uiState.skeets.forEach { skeet ->
-            item(key = skeet.cid.cid) {
+            item(key = skeet.key()) {
+                skeet.root()?.let {
+                    SkeetView(
+                        viewModel = viewModel,
+                        skeet = it,
+                        onReplyTap = onReplyTap,
+                        inThread = true
+                    )
+                }
+                skeet.parent()?.let {
+                    SkeetView(
+                        viewModel = viewModel,
+                        skeet = it,
+                        onReplyTap = onReplyTap,
+                        inThread = true
+                    )
+                }
                 SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
             }
         }
