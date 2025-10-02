@@ -48,7 +48,7 @@ import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 @Composable
 fun SkeetView(
     modifier: Modifier = Modifier,
-    viewModel: TimelineViewModel,
+    viewModel: TimelineViewModel?,
     skeet: SkeetData,
     nested: Boolean = false,
     disableEmbeds: Boolean = false
@@ -93,9 +93,9 @@ fun SkeetView(
                     SkeetHeader(modifier = Modifier.padding(start = 16.dp), skeet = skeet)
                 }
 
-                SkeetContent(viewModel, skeet, nested, disableEmbeds)
+                SkeetContent(skeet, nested, disableEmbeds)
 
-                if (!nested) {
+                if (!nested && !disableEmbeds) {
                     TimelinePostActionsView(
                         modifier = Modifier
                             .fillMaxWidth(),
@@ -122,7 +122,6 @@ fun SkeetView(
 
 @Composable
 private fun SkeetContent(
-    timelineViewModel: TimelineViewModel,
     skeet: SkeetData,
     nested: Boolean = false,
     disableEmbeds: Boolean = false,
@@ -271,7 +270,6 @@ private fun SkeetContent(
             ) {
                 RecordView(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                    timelineViewModel,
                     embed.value
                 )
             }
@@ -285,13 +283,12 @@ private fun SkeetContent(
 @Composable
 private fun RecordView(
     modifier: Modifier = Modifier,
-    viewModel: TimelineViewModel,
     rv: RecordView
 ) {
     val rv = rv.record
     when (rv) {
         is RecordViewRecordUnion.ViewRecord -> {
-            SkeetView(modifier, viewModel, SkeetData.fromRecordView(rv.value), nested = true)
+            SkeetView(modifier, null, SkeetData.fromRecordView(rv.value), nested = true)
         }
 
         else -> {}

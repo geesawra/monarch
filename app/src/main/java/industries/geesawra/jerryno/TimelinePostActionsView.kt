@@ -79,7 +79,7 @@ fun AtUri.rkey(): RKey {
 @Composable
 fun TimelinePostActionsView(
     modifier: Modifier = Modifier,
-    timelineViewModel: TimelineViewModel,
+    timelineViewModel: TimelineViewModel?,
     reposted: Boolean,
     liked: Boolean,
     replies: Long?,
@@ -146,12 +146,12 @@ fun TimelinePostActionsView(
         IconButton(
             onClick = {
                 when (isLiked) {
-                    false -> timelineViewModel.like(uri, cid) {
+                    false -> timelineViewModel?.like(uri, cid) {
                         isLiked = true
                         likes.longValue++
                     }
 
-                    true -> timelineViewModel.deleteLike(cid) {
+                    true -> timelineViewModel?.deleteLike(cid) {
                         isLiked = false
                         likes.longValue--
                     }
@@ -170,12 +170,12 @@ fun TimelinePostActionsView(
         IconButton(
             onClick = {
                 when (isReposted) {
-                    false -> timelineViewModel.repost(uri, cid) {
+                    false -> timelineViewModel?.repost(uri, cid) {
                         isReposted = true
                         reposts.longValue++
                     }
 
-                    true -> timelineViewModel.deleteRepost(cid) {
+                    true -> timelineViewModel?.deleteRepost(cid) {
                         isReposted = false
                         reposts.longValue--
                     }
