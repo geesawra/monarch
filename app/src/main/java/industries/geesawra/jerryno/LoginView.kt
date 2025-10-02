@@ -4,6 +4,8 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -16,10 +18,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +35,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import industries.geesawra.jerryno.datalayer.BlueskyConn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.christian.ozone.api.Handle
 
@@ -39,7 +45,6 @@ fun LoginView(
     modifier: Modifier = Modifier,
     navigate: () -> Unit
 ) {
-    var handle by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordFocused by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -49,11 +54,44 @@ fun LoginView(
     val appPasswordRegex = "[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}".toRegex()
     var currentPDS by remember { mutableStateOf("") }
     var lookingUpPDS by remember { mutableStateOf(false) }
+    val handleTextFieldError = remember { mutableStateOf(false) }
+    val loggingIn = remember { mutableStateOf(false) }
+    var handle by remember { mutableStateOf("") }
+    handle.useDebounce { it, scope ->
+        val handle = it
+        if (handle.isEmpty()) {
+            return@useDebounce
+        }
+
+        if (!handle.isATHandle()) {
+            return@useDebounce
+        }
+
+        scope.launch {
+            lookingUpPDS = true
+            currentPDS = BlueskyConn.pdsForHandle(handle).onSuccess {
+                handleTextFieldError.value = false
+                Result.success("")
+            }.onFailure {
+                Toast.makeText(
+                    ctx,
+                    it.message ?: "Can't look up PDS: ${it.toString()}",
+                    Toast.LENGTH_LONG
+                ).show()
+                handleTextFieldError.value = true
+                it
+            }.getOrDefault("")
+            lookingUpPDS = false
+        }
+
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 8.dp, end = 8.dp),
+            .padding(start = 8.dp, end = 8.dp)
+            .imePadding()
+            .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -63,44 +101,11 @@ fun LoginView(
         )
         TextField(
             value = handle,
+            isError = handleTextFieldError.value,
             onValueChange = { handle = it },
             label = { Text("Handle (e.g., yourname.bsky.social)") },
             modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { focusState ->
-                    when (focusState.isFocused) {
-                        true -> {
-                            lookingUpPDS = false
-                            currentPDS = ""
-                        }
-
-                        false -> {
-                            if (handle.isEmpty()) {
-                                currentPDS = ""
-                                return@onFocusChanged
-                            }
-
-                            if (currentPDS != "") {
-                                return@onFocusChanged
-                            }
-
-                            scope.launch {
-                                lookingUpPDS = true
-                                currentPDS = BlueskyConn.pdsForHandle(handle).getOrElse {
-                                    Toast.makeText(
-                                        ctx,
-                                        it.message ?: "Error: ${it.toString()}",
-                                        Toast.LENGTH_LONG
-                                    )
-                                        .show()
-                                    lookingUpPDS = false
-                                    return@launch
-                                }
-                                lookingUpPDS = false
-                            }
-                        }
-                    }
-                },
+                .fillMaxWidth(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 capitalization = KeyboardCapitalization.None,
@@ -133,6 +138,7 @@ fun LoginView(
         Button(
             onClick = {
                 scope.launch {
+                    loggingIn.value = true
                     bc.login(currentPDS, handle, password).onSuccess {
                         navigate()
                     }.onFailure {
@@ -140,9 +146,10 @@ fun LoginView(
                         Toast.makeText(ctx, it.message ?: "Unknown login error", Toast.LENGTH_LONG)
                             .show()
                     }
+                    loggingIn.value = false
                 }
             },
-            enabled = (Handle.Regex.matches(handle.removePrefix("@"))) && password.isNotEmpty() && currentPDS.isNotEmpty(),
+            enabled = handle.isATHandle() && password.isNotEmpty() && currentPDS.isNotEmpty() && !loggingIn.value,
             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         ) {
             Text("Login")
@@ -173,4 +180,28 @@ fun LoginView(
             )
         }
     }
+}
+
+fun String.isATHandle(): Boolean {
+    return Handle.Regex.matches(this.removePrefix("@"))
+}
+
+@Composable
+fun <T> T.useDebounce(
+    delayMillis: Long = 300L,
+    coroutineScope: CoroutineScope = rememberCoroutineScope(),
+    onChange: (T, CoroutineScope) -> Unit
+): T {
+    val state by rememberUpdatedState(this)
+
+    DisposableEffect(state) {
+        val job = coroutineScope.launch {
+            delay(delayMillis)
+            onChange(state, coroutineScope)
+        }
+        onDispose {
+            job.cancel()
+        }
+    }
+    return state
 }
