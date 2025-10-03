@@ -1,0 +1,14 @@
+engine: nixery
+
+when:
+  - event: ["push", "pull_request"]
+    branch: ["main"]
+
+dependencies:
+  nixpkgs:
+    - hello
+
+steps:
+  - name: hello-world
+    command: |
+      hello
