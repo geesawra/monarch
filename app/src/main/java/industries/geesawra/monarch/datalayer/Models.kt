@@ -143,29 +143,33 @@ data class SkeetData(
         )
     }
 
-    fun parent(): SkeetData? {
+    fun parent(): Pair<SkeetData?, StrongRef?> {
         val rawParent = this.reply?.parent
         return when (rawParent) {
             is ReplyRefParentUnion.BlockedPost -> SkeetData(
                 authorName = "Blocked",
                 uri = rawParent.value.uri,
                 blocked = rawParent.value.blocked
-            )
+            ) to null
 
             is ReplyRefParentUnion.NotFoundPost -> SkeetData(
                 authorName = "Post not found",
                 uri = rawParent.value.uri,
                 notFound = rawParent.value.notFound
-            )
+            ) to null
 
-            is ReplyRefParentUnion.PostView -> fromPostView(rawParent.value)
+            is ReplyRefParentUnion.PostView -> {
+                val content: Post = (rawParent.value.record.decodeAs())
 
-            else -> null
+                fromPostView(rawParent.value) to content.reply?.parent
+            }
+
+            else -> null to null
         }
     }
 
     fun root(): SkeetData? {
-        val p = this.parent()
+        val (p, _) = this.parent()
 
         val rawRoot = this.reply?.root
         val r = when (rawRoot) {

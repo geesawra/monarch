@@ -2,14 +2,21 @@ package industries.geesawra.monarch
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -17,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -44,7 +52,9 @@ fun ShowSkeets(
     ) {
         viewModel.uiState.skeets.forEach { skeet ->
             item(key = skeet.key()) {
-                skeet.root()?.let {
+                val root = skeet.root()
+                val (parent, parentsParent) = skeet.parent()
+                root?.let {
                     SkeetView(
                         viewModel = viewModel,
                         skeet = it,
@@ -52,7 +62,37 @@ fun ShowSkeets(
                         inThread = true
                     )
                 }
-                skeet.parent()?.let {
+
+                parent?.let {
+                    if (parentsParent?.cid != root?.cid) {
+                        OutlinedCard(
+                            modifier = Modifier
+                                .height(50.dp)
+                                .padding(8.dp)
+                                .fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(start = 8.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "See more",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        VerticalDivider(
+                            thickness = 4.dp,
+                            modifier = Modifier
+                                .height(50.dp)
+                                .padding(start = (16 + 25).dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    }
+
                     SkeetView(
                         viewModel = viewModel,
                         skeet = it,
@@ -60,6 +100,8 @@ fun ShowSkeets(
                         inThread = true
                     )
                 }
+
+
                 SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
             }
         }

@@ -57,7 +57,8 @@ fun SkeetView(
 ) {
     val minSize = 55.dp
 
-    val hasParent = skeet.parent() != null
+    val (parent, _) = skeet.parent()
+    val hasParent = parent != null
 
     Surface(
         color = MaterialTheme.colorScheme.surface,

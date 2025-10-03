@@ -103,7 +103,7 @@ fun TimelinePostActionsView(
             VerticalDivider(
                 thickness = 4.dp,
                 modifier = Modifier
-                    .padding(start = 25.dp, top = 8.dp)
+                    .padding(start = 25.dp, top = 4.dp)
                     .clip(RoundedCornerShape(12.dp))
             )
 
