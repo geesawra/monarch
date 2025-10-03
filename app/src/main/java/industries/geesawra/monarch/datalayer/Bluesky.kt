@@ -473,6 +473,8 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun uploadImages(images: List<Uri>): Result<List<Blob>> {
+        val maxImageSize = 1000000
+
         return runCatching {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
@@ -480,9 +482,23 @@ class BlueskyConn(val context: Context) {
 
             val uploadedBlobs = mutableListOf<Blob>()
 
+            val compressor = ImageCompressor(context)
+
             images.forEach {
                 context.contentResolver.openInputStream(it)?.use { inputStream ->
-                    val byteArray = inputStream.readBytes()
+                    val byteArray = run {
+                        inputStream.mark(0)
+
+                        val c = compressor.compressImage(it, maxImageSize.toLong())
+
+                        c?.let {
+                            return@run c
+                        }
+
+                        inputStream.reset()
+                        return@run inputStream.readBytes()
+                    }
+
                     val blob = client!!.uploadBlob(byteArray)
                     when (blob) {
                         is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading image: ${blob.error}"))
