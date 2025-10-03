@@ -6,7 +6,7 @@ when:
 
 dependencies:
   nixpkgs:
-    - hello-go
+    - hello
 
 steps:
   - name: hello-world
