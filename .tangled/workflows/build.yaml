@@ -1,0 +1,12 @@
+when:
+  - event: ["push", "pull_request"]
+    branch: ["main"]
+
+dependencies:
+  nixpkgs:
+    - hello-go
+
+steps:
+  - name: hello!
+    command: |
+      hello
