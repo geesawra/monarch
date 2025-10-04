@@ -1,6 +1,8 @@
 package industries.geesawra.monarch
 
 import android.content.Intent
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,11 +24,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import kotlinx.coroutines.delay
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.RKey
 
@@ -85,7 +90,7 @@ fun AtUri.rkey(): RKey {
 fun TimelinePostActionsView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel?,
-    onReplyTap: (SkeetData) -> Unit = {},
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     skeet: SkeetData,
     inThread: Boolean = false,
 ) {
@@ -132,7 +137,7 @@ fun TimelinePostActionsView(
 
         IconButton(
             onClick = {
-                onReplyTap(skeet)
+                onReplyTap(skeet, false)
             }
         ) {
             IconWithNumber(
@@ -180,7 +185,7 @@ fun TimelinePostActionsView(
         }
 
         var isReposted by rememberSaveable { mutableStateOf(skeet.didRepost) }
-        IconButton(
+        LongPressIconButton(
             onClick = {
                 when (isReposted) {
                     false -> timelineViewModel?.repost(skeet.uri, skeet.cid) {
@@ -193,7 +198,9 @@ fun TimelinePostActionsView(
                         reposts.longValue--
                     }
                 }
-
+            },
+            onLongClick = {
+                onReplyTap(skeet, true)
             }
         ) {
             IconWithNumber(
@@ -209,5 +216,37 @@ fun TimelinePostActionsView(
         HorizontalDivider(
             color = MaterialTheme.colorScheme.outlineVariant
         )
+    }
+}
+
+@Composable
+fun LongPressIconButton(
+    modifier: Modifier = Modifier,
+    stepDelay: Long = 100L, // Minimum value is 1L milliseconds.
+    onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressedListener by rememberUpdatedState(onLongClick)
+
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            delay(stepDelay.coerceIn(1L, Long.MAX_VALUE))
+            pressedListener()
+        }
+    }
+
+    IconButton(
+        modifier = modifier,
+        onClick = if (isPressed) {
+            {}
+        } else {
+            onClick
+        },
+        interactionSource = interactionSource
+    ) {
+        content()
     }
 }

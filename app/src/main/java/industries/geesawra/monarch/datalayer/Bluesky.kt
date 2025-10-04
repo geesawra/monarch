@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.actor.PreferencesUnion
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
+import app.bsky.embed.Record
 import app.bsky.embed.Video
 import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetFeedGeneratorsQueryParams
@@ -432,7 +433,8 @@ class BlueskyConn(val context: Context) {
         content: String,
         images: List<Uri>? = null,
         video: Uri? = null,
-        replyRef: PostReplyRef? = null
+        replyRef: PostReplyRef? = null,
+        quotePostRef: StrongRef? = null
     ): Result<Unit> {
         // TODO: videos need to be uploaded through a different API.
         return runCatching {
@@ -442,28 +444,35 @@ class BlueskyConn(val context: Context) {
 
             var postEmbed: PostEmbedUnion? = null
 
-            if (images != null) {
-                val blobs = uploadImages(images).getOrThrow()
-                postEmbed = PostEmbedUnion.Images(
-                    value = Images(
-                        images = blobs.map {
-                            ImagesImage(
-                                image = it,
-                                alt = "",
-                            )
-                        }
-                    )
+            if (quotePostRef != null) { // TODO: handle image/video plus quote
+                postEmbed = PostEmbedUnion.Record(
+                    value = Record(quotePostRef)
                 )
-            }
+            } else {
 
-            if (video != null) {
-                val blob = uploadVideo(video).getOrThrow()
-                postEmbed = PostEmbedUnion.Video(
-                    value = Video(
-                        video = blob,
-                        alt = "",
+                if (images != null) {
+                    val blobs = uploadImages(images).getOrThrow()
+                    postEmbed = PostEmbedUnion.Images(
+                        value = Images(
+                            images = blobs.map {
+                                ImagesImage(
+                                    image = it,
+                                    alt = "",
+                                )
+                            }
+                        )
                     )
-                )
+                }
+
+                if (video != null) {
+                    val blob = uploadVideo(video).getOrThrow()
+                    postEmbed = PostEmbedUnion.Video(
+                        value = Video(
+                            video = blob,
+                            alt = "",
+                        )
+                    )
+                }
             }
 
             val r = BlueskyJson.encodeAsJsonContent(

@@ -34,7 +34,7 @@ fun ShowSkeets(
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel,
     state: LazyListState = rememberLazyListState(),
-    onReplyTap: (SkeetData) -> Unit = {},
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     doneFirstRefresh: () -> Unit = {}
 ) {
     LaunchedEffect(key1 = viewModel.uiState.skeets.isEmpty()) {

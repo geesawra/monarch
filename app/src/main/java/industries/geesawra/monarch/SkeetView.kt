@@ -49,7 +49,7 @@ import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 fun SkeetView(
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel? = null,
-    onReplyTap: (SkeetData) -> Unit = {},
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     skeet: SkeetData,
     nested: Boolean = false,
     disableEmbeds: Boolean = false,

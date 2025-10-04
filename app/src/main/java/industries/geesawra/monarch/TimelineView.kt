@@ -93,6 +93,7 @@ fun TimelineView(
     )
 
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
+    val isQuotePost = remember { mutableStateOf(false) }
 
     BottomSheetScaffold(
         modifier = Modifier
@@ -109,7 +110,8 @@ fun TimelineView(
                 timelineViewModel = timelineViewModel,
                 scaffoldState = scaffoldState,
                 scrollState = scrollState,
-                inReplyTo = inReplyTo
+                inReplyTo = inReplyTo,
+                isQuotePost = isQuotePost
             )
         },
         content = { paddingValues ->
@@ -122,8 +124,9 @@ fun TimelineView(
                         scaffoldState.bottomSheetState.expand()
                     }
                 },
-                onReplyTap = {
-                    inReplyTo.value = it
+                onReplyTap = { skeetData, quotePost ->
+                    inReplyTo.value = skeetData
+                    isQuotePost.value = quotePost
                     coroutineScope.launch {
                         scaffoldState.bottomSheetState.expand()
                     }
@@ -140,7 +143,7 @@ private fun InnerTimelineView(
     modifier: Modifier = Modifier,
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
-    onReplyTap: (SkeetData) -> Unit = {},
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
 ) {

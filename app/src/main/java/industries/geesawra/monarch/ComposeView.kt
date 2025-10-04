@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MimeTypes
+import com.atproto.repo.StrongRef
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import io.sanghun.compose.video.RepeatMode
@@ -80,6 +81,7 @@ fun ComposeView(
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
     inReplyTo: MutableState<SkeetData?>,
+    isQuotePost: MutableState<Boolean>,
     scaffoldState: BottomSheetScaffoldState,
     scrollState: ScrollState
 ) {
@@ -104,6 +106,7 @@ fun ComposeView(
             composeFieldState.clearText()
             charCount.intValue = 0
             inReplyTo.value = null
+            isQuotePost.value = false
             mediaSelected.value = mapOf()
             mediaSelectedIsVideo.value = false
 
@@ -253,7 +256,8 @@ fun ComposeView(
                     maxChars,
                     timelineViewModel,
                     scaffoldState,
-                    inReplyTo.value
+                    inReplyTo.value,
+                    isQuotePost.value
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -331,7 +335,8 @@ fun ActionRow(
     maxChars: Int,
     timelineViewModel: TimelineViewModel,
     scaffoldState: BottomSheetScaffoldState,
-    inReplyToData: SkeetData? = null
+    inReplyToData: SkeetData? = null,
+    isQuotePost: Boolean = false,
 ) {
 
     Row(
@@ -369,7 +374,23 @@ fun ActionRow(
                             images = if (!mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
                                 .ifEmpty { null } else null,
                             video = if (mediaSelectedIsVideo.value) mediaSelected.value.keys.firstOrNull() else null,
-                            replyRef = inReplyToData?.replyRef(),
+                            replyRef = if (!isQuotePost) {
+                                inReplyToData?.replyRef()
+                            } else {
+                                null
+                            },
+                            quotePostRef = if (isQuotePost) {
+                                val cid = inReplyToData?.cid
+                                val uri = inReplyToData?.uri
+
+                                if (cid == null || uri == null) {
+                                    null
+                                } else {
+                                    StrongRef(uri, cid)
+                                }
+                            } else {
+                                null
+                            }
                         ).onSuccess {
                             coroutineScope.launch {
                                 scaffoldState.bottomSheetState.hide()
