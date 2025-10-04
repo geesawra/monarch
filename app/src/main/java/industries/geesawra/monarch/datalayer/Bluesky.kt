@@ -24,6 +24,7 @@ import app.bsky.feed.PostReplyRef
 import app.bsky.feed.Repost
 import app.bsky.video.GetJobStatusQueryParams
 import app.bsky.video.GetJobStatusResponse
+import app.bsky.video.JobStatus
 import app.bsky.video.State
 import app.bsky.video.UploadVideoResponse
 import com.atproto.identity.ResolveHandleQueryParams
@@ -43,12 +44,16 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
+import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -56,6 +61,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import sh.christian.ozone.BlueskyJson
 import sh.christian.ozone.XrpcBlueskyApi
 import sh.christian.ozone.api.AtUri
@@ -532,16 +538,18 @@ class BlueskyConn(val context: Context) {
 
             val uploadedBlobs = mutableListOf<Blob>()
 
+            val did = Did("did:web:" + pdsURL!!.toUri().host!!)
+
             val uploadVideoTicket = client!!.getServiceAuth(
                 GetServiceAuthQueryParams(
-                    aud = Did("did:web:" + pdsURL!!.toUri().host!!),
+                    aud = did,
                     exp = Clock.System.now().plus(Duration.parse("30m")).epochSeconds,
                     lxm = Nsid("com.atproto.repo.uploadBlob"),
                 )
             )
 
             val serviceAuth = when (uploadVideoTicket) {
-                is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading video: ${uploadVideoTicket.error}"))
+                is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed requesting upload ticket: ${uploadVideoTicket.error}"))
                 is AtpResponse.Success<GetServiceAuthResponse> -> uploadVideoTicket.response.token
             }
 
@@ -554,9 +562,20 @@ class BlueskyConn(val context: Context) {
                     connectTimeoutMillis = 15000
                     socketTimeoutMillis = 15000
                 }
+                install(ContentNegotiation) {
+                    register(
+                        ContentType.Any, KotlinxSerializationConverter(
+                            Json {
+                                prettyPrint = true
+                                isLenient = true
+                                ignoreUnknownKeys = true
+                            }
+                        )
+                    )
+                }
             }
 
-            val client = AuthenticatedXrpcBlueskyApi(
+            val videoBskyAppClient = AuthenticatedXrpcBlueskyApi(
                 httpClient,
                 BlueskyAuthPlugin.Tokens(serviceAuth, serviceAuth)
             )
@@ -564,11 +583,35 @@ class BlueskyConn(val context: Context) {
             val uploadRes = context.contentResolver.openInputStream(video)?.use { inputStream ->
                 val byteArray = inputStream.readBytes()
 
-                val videoUploadTicket = client.uploadVideo(byteArray)
-                when (videoUploadTicket) {
-                    is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading video: ${videoUploadTicket.error}"))
-                    is AtpResponse.Success<UploadVideoResponse> -> {
-                        return@use videoUploadTicket.response.jobStatus
+                val rs = httpClient.post {
+                    headers["Authorization"] = "Bearer $serviceAuth"
+                    headers["Content-Type"] = "video/mp4"
+                    headers["Content-Length"] = byteArray.size.toString()
+                    url {
+                        protocol = URLProtocol.HTTPS
+                        path("/xrpc/app.bsky.video.uploadVideo")
+                        parameters.append("did", session!!.did.did)
+                        parameters.append(
+                            "name",
+                            "video_upload_${Clock.System.now().toEpochMilliseconds()}"
+                        )
+                    }
+                    setBody(byteArray)
+                }
+
+
+                when (rs.status) {
+                    HttpStatusCode.OK -> {
+                        return@use rs.body<UploadVideoResponse>().jobStatus
+                    }
+
+                    HttpStatusCode.Conflict -> {
+                        // already uploaded once
+                        return@use rs.body<JobStatus>()
+                    }
+
+                    else -> {
+                        return Result.failure(Exception("Failed uploading video: status code ${rs.status}"))
                     }
                 }
             }
@@ -576,11 +619,11 @@ class BlueskyConn(val context: Context) {
             while (true) {
                 try {
                     val response =
-                        client.getJobStatus(GetJobStatusQueryParams(uploadRes!!.jobId))
+                        videoBskyAppClient.getJobStatus(GetJobStatusQueryParams(uploadRes!!.jobId))
 
                     val resp = when (response) {
                         is AtpResponse.Failure<*> -> return Result.failure(
-                            Exception("Failed uploading video: ${response.error}")
+                            Exception("Failed video processing job status check: ${response.error}")
                         )
 
                         is AtpResponse.Success<GetJobStatusResponse> -> response.response.jobStatus
@@ -592,12 +635,8 @@ class BlueskyConn(val context: Context) {
                     }
 
                     when (resp.state) {
-                        State.JOBSTATECOMPLETED -> {
-                            uploadedBlobs.add(resp.blob!!)
-                            break
-                        }
-
-                        State.JOBSTATEFAILED -> return Result.failure(Exception("Failed uploading video, ${resp.error}: ${resp.message}"))
+                        State.JOBSTATECOMPLETED -> {} // ignore, as we check blobk anyway
+                        State.JOBSTATEFAILED -> return Result.failure(Exception("Video processing failed, ${resp.error}: ${resp.message}"))
                         is State.Unknown -> delay(1000)
                     }
                 } catch (e: Exception) {
