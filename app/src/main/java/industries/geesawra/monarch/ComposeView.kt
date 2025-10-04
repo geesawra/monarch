@@ -63,8 +63,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.MimeTypes
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import io.sanghun.compose.video.RepeatMode
+import io.sanghun.compose.video.VideoPlayer
+import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
+import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -259,14 +264,50 @@ fun ComposeView(
                             .fillMaxWidth()
                             .padding(vertical = 8.dp)
                     ) {
-                        PostImageGallery(
-                            modifier = Modifier
-                                .fillMaxWidth() // Gallery should fill card width
-                                .padding(8.dp),
-                            images = mediaSelected.value.keys.map { uri ->
-                                Image(url = uri.toString(), alt = "Selected media")
-                            },
-                        )
+                        when (mediaSelectedIsVideo.value) {
+                            false -> PostImageGallery(
+                                modifier = Modifier
+                                    .fillMaxWidth() // Gallery should fill card width
+                                    .padding(8.dp),
+                                images = mediaSelected.value.keys.map { uri ->
+                                    Image(url = uri.toString(), alt = "Selected media")
+                                },
+                            )
+
+                            true -> VideoPlayer(
+                                mediaItems = listOf(
+                                    VideoPlayerMediaItem.NetworkMediaItem(
+                                        url = mediaSelected.value.keys.first().toString(),
+                                        mimeType = MimeTypes.APPLICATION_M3U8,
+                                    )
+                                ),
+                                handleLifecycle = false,
+                                autoPlay = false,
+                                usePlayerController = true,
+                                enablePip = false,
+                                handleAudioFocus = true,
+                                controllerConfig = VideoPlayerControllerConfig(
+                                    showSpeedAndPitchOverlay = false,
+                                    showSubtitleButton = false,
+                                    showCurrentTimeAndTotalTime = true,
+                                    showBufferingProgress = false,
+                                    showForwardIncrementButton = true,
+                                    showBackwardIncrementButton = true,
+                                    showBackTrackButton = false,
+                                    showNextTrackButton = false,
+                                    showRepeatModeButton = true,
+                                    controllerShowTimeMilliSeconds = 5_000,
+                                    controllerAutoShow = true,
+                                    showFullScreenButton = true,
+                                ),
+                                volume = 0.5f,  // volume 0.0f to 1.0f
+                                repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .heightIn(max = 500.dp)
+                                    .padding(8.dp),
+                            )
+                        }
                     }
                 }
 
