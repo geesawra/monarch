@@ -6,8 +6,9 @@ when:
 
 dependencies:
   nixpkgs:
-    # - gnused
-    # - fastlane
+    - gnugrep
+    - gnused
+    - fastlane
     - jdk24
 
 environment:
@@ -18,8 +19,7 @@ environment:
 steps:
   - name: build-release-apk
     command: |
-      #export JDK_PATH=$(nix eval nixpkgs#jdk24.outPath --extra-experimental-features nix-command --extra-experimental-features flakes | sed 's|"||g')
-      #export PATH=$JDK_PATH/bin:$PATH
-      #export JAVA_HOME=$JDK_PATH
-      #fastlane release_bin
+      # grab the java home
+      JDK=/nix/store/$(ls /nix/store | grep openjdk-24)
+      source $JDK/nix-support/setup-hook
       ./gradlew assembleRelease
