@@ -11,4 +11,6 @@ dependencies:
 
 steps:
   - name: build-release-apk
-    command: fastlane release_bin
+    command: |
+      echo "Here we are"
+      fastlane release_bin
