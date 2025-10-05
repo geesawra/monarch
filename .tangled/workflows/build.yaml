@@ -10,5 +10,5 @@ dependencies:
     - jdk24
 
 steps:
-  - name: build-release
+  - name: build-release-apk
     command: fastlane release_bin
