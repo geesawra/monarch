@@ -31,7 +31,7 @@ data class SkeetData(
     val authorHandle: Handle? = null,
     val authorLabels: List<Label> = listOf(),
     val content: String = "",
-    val embed: PostViewEmbedUnion? = null,
+    var embed: PostViewEmbedUnion? = null,
     val reason: FeedViewPostReasonUnion? = null,
     val reply: ReplyRef? = null,
     val createdAt: Timestamp? = null,
@@ -124,7 +124,7 @@ data class SkeetData(
             )
         }
     }
-
+    
     fun replyRef(): PostReplyRef {
         val thisPostRef = StrongRef(this.uri, this.cid)
 

@@ -1,5 +1,7 @@
 package industries.geesawra.monarch
 
+import android.content.Context
+import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,8 +32,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.media3.common.MimeTypes
+import app.bsky.embed.ExternalViewExternal
+import app.bsky.embed.ImagesViewImage
 import app.bsky.embed.RecordView
 import app.bsky.embed.RecordViewRecordUnion
+import app.bsky.embed.RecordWithMediaView
+import app.bsky.embed.RecordWithMediaViewMediaUnion
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.ReplyRefParentUnion
@@ -137,126 +143,22 @@ private fun SkeetContent(
         return
     }
 
-    val embed = skeet.embed
+    Embeds(context, nested, skeet.embed)
+}
 
+@Composable
+fun Embeds(context: Context, nested: Boolean, embed: PostViewEmbedUnion?) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
-            val img = embed.value.images
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 8.dp),
-            ) {
-                PostImageGallery(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp),
-                    images = img.map {
-                        Image(url = it.thumb.uri, alt = it.alt)
-                    },
-                )
-            }
+            ImageView(embed.value.images)
         }
 
         is PostViewEmbedUnion.VideoView -> {
-            Card(
-                modifier = Modifier
-                    .heightIn(max = 500.dp)
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 8.dp),
-            ) {
-                VideoPlayer(
-                    mediaItems = listOf(
-                        VideoPlayerMediaItem.NetworkMediaItem(
-                            url = embed.value.playlist.uri,
-                            mimeType = MimeTypes.APPLICATION_M3U8,
-                        )
-                    ),
-                    handleLifecycle = false,
-                    autoPlay = false,
-                    usePlayerController = true,
-                    enablePip = false,
-                    handleAudioFocus = true,
-                    controllerConfig = VideoPlayerControllerConfig(
-                        showSpeedAndPitchOverlay = false,
-                        showSubtitleButton = false,
-                        showCurrentTimeAndTotalTime = true,
-                        showBufferingProgress = false,
-                        showForwardIncrementButton = true,
-                        showBackwardIncrementButton = true,
-                        showBackTrackButton = false,
-                        showNextTrackButton = false,
-                        showRepeatModeButton = true,
-                        controllerShowTimeMilliSeconds = 5_000,
-                        controllerAutoShow = true,
-                        showFullScreenButton = true,
-                    ),
-                    volume = 0.5f,  // volume 0.0f to 1.0f
-                    repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp),
-                )
-            }
+            VideoView(embed.value.playlist.uri.toUri())
         }
 
         is PostViewEmbedUnion.ExternalView -> {
-            val ev = embed.value.external
-
-            OutlinedCard(
-                modifier = Modifier
-                    .padding(top = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable {
-                            val customTabsIntent = CustomTabsIntent.Builder()
-                                .setShowTitle(true)
-                                .setUrlBarHidingEnabled(true)
-                                .build()
-                            customTabsIntent.launchUrl(context, ev.uri.uri.toUri())
-                        }
-                ) {
-                    ev.thumb?.let {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(it.uri)
-                                .crossfade(true)
-                                .build(),
-                            contentScale = ContentScale.Crop,
-                            alignment = Alignment.Center,
-                            contentDescription = "External link thumbnail",
-                            modifier = Modifier
-                                .height(180.dp)
-                                .fillMaxWidth()
-                        )
-
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                        )
-                    }
-                    Text(
-                        text = ev.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 8.dp, bottom = 4.dp, start = 8.dp, end = 8.dp),
-                        maxLines = 3
-                    )
-                    Text(
-                        text = ev.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = 8.dp, start = 8.dp, end = 8.dp),
-                        maxLines = 8
-                    )
-                }
-
-            }
+            ExternalView(context, embed.value.external)
         }
 
         is PostViewEmbedUnion.RecordView -> run {
@@ -275,13 +177,136 @@ private fun SkeetContent(
         }
 
         is PostViewEmbedUnion.RecordWithMediaView -> run {
-            // TODO: map this
-            // probably better to wrap this thing in a function that we can call recursively
+            OutlinedCard(
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                RecordWithMediaView(
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                    embed.value
+                )
+            }
         }
 
         else -> {}
     }
+}
 
+@Composable
+private fun ImageView(img: List<ImagesViewImage>) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 8.dp),
+    ) {
+        PostImageGallery(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            images = img.map {
+                Image(url = it.thumb.uri, alt = it.alt)
+            },
+        )
+    }
+}
+
+@Composable
+private fun VideoView(uri: Uri) {
+    Card(
+        modifier = Modifier
+            .heightIn(max = 500.dp)
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 8.dp),
+    ) {
+        VideoPlayer(
+            mediaItems = listOf(
+                VideoPlayerMediaItem.NetworkMediaItem(
+                    url = uri.toString(),
+                    mimeType = MimeTypes.APPLICATION_M3U8,
+                )
+            ),
+            handleLifecycle = false,
+            autoPlay = false,
+            usePlayerController = true,
+            enablePip = false,
+            handleAudioFocus = true,
+            controllerConfig = VideoPlayerControllerConfig(
+                showSpeedAndPitchOverlay = false,
+                showSubtitleButton = false,
+                showCurrentTimeAndTotalTime = true,
+                showBufferingProgress = false,
+                showForwardIncrementButton = true,
+                showBackwardIncrementButton = true,
+                showBackTrackButton = false,
+                showNextTrackButton = false,
+                showRepeatModeButton = true,
+                controllerShowTimeMilliSeconds = 5_000,
+                controllerAutoShow = true,
+                showFullScreenButton = true,
+            ),
+            volume = 0.5f,  // volume 0.0f to 1.0f
+            repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+        )
+    }
+}
+
+@Composable
+private fun ExternalView(context: Context, ev: ExternalViewExternal) {
+    OutlinedCard(
+        modifier = Modifier
+            .padding(top = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable {
+                    val customTabsIntent = CustomTabsIntent.Builder()
+                        .setShowTitle(true)
+                        .setUrlBarHidingEnabled(true)
+                        .build()
+                    customTabsIntent.launchUrl(context, ev.uri.uri.toUri())
+                }
+        ) {
+            ev.thumb?.let {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(it.uri)
+                        .crossfade(true)
+                        .build(),
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.Center,
+                    contentDescription = "External link thumbnail",
+                    modifier = Modifier
+                        .height(180.dp)
+                        .fillMaxWidth()
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            }
+            Text(
+                text = ev.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 8.dp, bottom = 4.dp, start = 8.dp, end = 8.dp),
+                maxLines = 3
+            )
+            Text(
+                text = ev.description,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 8.dp, start = 8.dp, end = 8.dp),
+                maxLines = 8
+            )
+        }
+
+    }
 }
 
 @Composable
@@ -301,6 +326,43 @@ private fun RecordView(
         }
 
         else -> {}
+    }
+}
+
+@Composable
+private fun RecordWithMediaView(
+    modifier: Modifier = Modifier,
+    rv: RecordWithMediaView
+) {
+    val media = rv.media
+    val embed = when (media) {
+        is RecordWithMediaViewMediaUnion.ExternalView -> PostViewEmbedUnion.ExternalView(media.value)
+        is RecordWithMediaViewMediaUnion.ImagesView -> PostViewEmbedUnion.ImagesView(media.value)
+        is RecordWithMediaViewMediaUnion.Unknown -> PostViewEmbedUnion.Unknown(media.value)
+        is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
+    }
+
+    val rv = rv.record.record
+    val record = when (rv) {
+        is RecordViewRecordUnion.FeedGeneratorView -> null
+        is RecordViewRecordUnion.GraphListView -> null
+        is RecordViewRecordUnion.GraphStarterPackViewBasic -> null
+        is RecordViewRecordUnion.LabelerLabelerView -> null
+        is RecordViewRecordUnion.Unknown -> null
+        is RecordViewRecordUnion.ViewBlocked -> null
+        is RecordViewRecordUnion.ViewDetached -> null
+        is RecordViewRecordUnion.ViewNotFound -> null
+        is RecordViewRecordUnion.ViewRecord -> SkeetData.fromRecordView(rv.value)
+    }
+
+    record?.let {
+        record.embed = embed
+        SkeetView(
+            modifier = modifier,
+            viewModel = null,
+            skeet = record,
+            nested = true
+        )
     }
 }
 
