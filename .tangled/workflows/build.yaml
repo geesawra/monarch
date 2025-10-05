@@ -8,6 +8,7 @@ dependencies:
   nixpkgs:
     - gnugrep
     - gnused
+    - findutils
     - fastlane
     - jdk24
 
