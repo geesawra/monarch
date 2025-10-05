@@ -6,9 +6,9 @@ when:
 
 dependencies:
   nixpkgs:
-    - hello
+    - fastlane
+    - jdk24
 
 steps:
-  - name: hello-world
-    command: |
-      hello
+  - name: build-release
+    command: fastlane release_bin
