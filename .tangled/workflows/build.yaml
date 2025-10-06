@@ -24,6 +24,7 @@ steps:
       JDK=/nix/store/$(ls /nix/store | grep openjdk-24)
       source $JDK/nix-support/setup-hook
       source install-android-sdk.sh
-      fastlane release_bin
       npm i -D wrangler@latest
+      
+      fastlane release_bin
       npx wrangler r2 object put monarch-releases/monarch-release.apk --remote true --file=app/build/outputs/apk/release/app-release.apk
