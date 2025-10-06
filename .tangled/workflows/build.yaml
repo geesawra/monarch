@@ -11,6 +11,8 @@ dependencies:
     - curl
     - unzip
     - findutils
+    - zlib
+    - gcc-unwrapped
     - fastlane
     - jdk24
 
