@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip"
 ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"

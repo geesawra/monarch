@@ -12,6 +12,7 @@ dependencies:
     - unzip
     - findutils
     - zlib
+    - glibc
     - gcc-unwrapped
     - fastlane
     - jdk24
@@ -24,12 +25,7 @@ environment:
 steps:
   - name: build-release-apk
     command: |
-      # grab the java home
       JDK=/nix/store/$(ls /nix/store | grep openjdk-24)
-
-      chmod +x install-android-sdk.sh
       source $JDK/nix-support/setup-hook
       source install-android-sdk.sh
-      
-      ./gradlew assembleRelease
-      cat /tangled/workspace/build/reports/problems/problems-report.html
+      fastlane release_bin
