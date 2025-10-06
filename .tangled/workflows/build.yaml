@@ -32,3 +32,4 @@ steps:
       source install-android-sdk.sh
       
       ./gradlew assembleRelease
+      cat /tangled/workspace/build/reports/problems/problems-report.html
