@@ -26,4 +26,4 @@ steps:
       source install-android-sdk.sh
       fastlane release_bin
       npm i -D wrangler@latest
-      npx wrangler r2 object put monarch-releases/monarch-release.apk --file=app/build/outputs/apk/release/app-release.apk
+      npx wrangler r2 object put monarch-releases/monarch-release.apk --remote true --file=app/build/outputs/apk/release/app-release.apk
