@@ -22,5 +22,9 @@ steps:
     command: |
       # grab the java home
       JDK=/nix/store/$(ls /nix/store | grep openjdk-24)
+
+      chmod +x install-android-sdk.sh
       source $JDK/nix-support/setup-hook
+      source install-android-sdk.sh
+      
       ./gradlew assembleRelease
