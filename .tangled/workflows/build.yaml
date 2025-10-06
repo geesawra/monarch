@@ -16,7 +16,7 @@ dependencies:
     - gcc-unwrapped
     - fastlane
     - jdk24
-    - wrangler
+    - nodejs
       
 steps:
   - name: build-release-apk
@@ -25,4 +25,5 @@ steps:
       source $JDK/nix-support/setup-hook
       source install-android-sdk.sh
       fastlane release_bin
-      wrangler r2 object put monarch-releases/monarch-release.apk --file=app/build/outputs/apk/release/app-release.apk
+      npm i -D wrangler@latest
+      npx wrangler r2 object put monarch-releases/monarch-release.apk --file=app/build/outputs/apk/release/app-release.apk
