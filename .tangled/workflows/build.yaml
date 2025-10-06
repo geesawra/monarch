@@ -16,6 +16,7 @@ dependencies:
     - gcc-unwrapped
     - fastlane
     - jdk24
+    - wrangler
 
 environment:
   LC_ALL: "en_US.UTF-8"
@@ -29,3 +30,4 @@ steps:
       source $JDK/nix-support/setup-hook
       source install-android-sdk.sh
       fastlane release_bin
+      wrangler r2 object put monarch-releases/monarch-release.apk --file=app/build/outputs/apk/release/app-release.apk
