@@ -28,6 +28,6 @@ steps:
       npm i -D wrangler@latest
       
       fastlane release_bin
-      bash ./generate-root.sh
-      npx wrangler r2 object put monarch-releases/monarch-release-$(date +%s).apk --remote true --file=app/build/outputs/apk/release/app-release.apk
+      source ./generate-root.sh
+      npx wrangler r2 object put monarch-releases/$MONARCH_APK_FILENAME --remote true --file=MONARCH_APK_PATH
       npx wrangler r2 object put monarch-releases/index.html --remote true --file=./index.html
