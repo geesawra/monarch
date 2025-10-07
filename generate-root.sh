@@ -3,6 +3,9 @@
 # Get the current UNIX timestamp
 TIMESTAMP=$(date +%s)
 
+# Move APK file to its new home
+mv monarch-release.apk monarch-release-$TIMESTAMP.apk
+
 # Define the output filename
 OUTPUT_FILE="index.html"
 
@@ -17,7 +20,7 @@ cat > $OUTPUT_FILE <<EOF
 </head>
 <body>
     <!-- File generated at UNIX timestamp: $TIMESTAMP -->
-    <a href="/monarch-release.apk">Download Monarch APK</a>
+    <a href="/monarch-release-$TIMESTAMP.apk">monarch-release-$TIMESTAMP.apk</a>
 </body>
 </html>
 EOF
