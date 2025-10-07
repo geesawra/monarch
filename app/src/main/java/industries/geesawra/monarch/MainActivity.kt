@@ -40,9 +40,9 @@ import industries.geesawra.monarch.ui.theme.MonarchTheme
 @HiltAndroidApp
 class Application : Application()
 
-enum class TimelineScreen() {
+enum class ViewList() {
     Login,
-    Timeline,
+    Main,
 }
 
 @AndroidEntryPoint
@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val initialRoute =
-                        if (timelineViewModel.uiState.authenticated) TimelineScreen.Timeline.name else TimelineScreen.Login.name
+                        if (timelineViewModel.uiState.authenticated) ViewList.Main.name else ViewList.Login.name
 
                     NavHost(
                         navController = navController,
@@ -114,16 +114,16 @@ class MainActivity : ComponentActivity() {
                             EnterTransition.None
                         },
                     ) {
-                        composable(route = TimelineScreen.Timeline.name) {
-                            TimelineView(
+                        composable(route = ViewList.Main.name) {
+                            MainView(
                                 timelineViewModel = timelineViewModel,
                                 coroutineScope = rememberCoroutineScope(),
                                 onLoginError = {
-                                    navController.navigate(TimelineScreen.Login.name)
+                                    navController.navigate(ViewList.Login.name)
                                 }
                             )
                         }
-                        composable(route = TimelineScreen.Login.name) {
+                        composable(route = ViewList.Login.name) {
                             Surface(
                                 modifier = Modifier.fillMaxSize(),
                                 color = MaterialTheme.colorScheme.background // Set login screen background
@@ -135,7 +135,7 @@ class MainActivity : ComponentActivity() {
                                     contentAlignment = Alignment.Center
                                 ) {
                                     LoginView {
-                                        navController.navigate(TimelineScreen.Timeline.name)
+                                        navController.navigate(ViewList.Main.name)
                                     }
                                 }
                             }

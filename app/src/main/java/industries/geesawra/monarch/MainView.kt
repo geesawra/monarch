@@ -72,14 +72,14 @@ enum class TabBarDestinations(
     val icon: ImageVector,
     @param:StringRes val contentDescription: Int
 ) {
-    HOME(R.string.timeline, Icons.Filled.Home, R.string.timeline),
+    TIMELINE(R.string.timeline, Icons.Filled.Home, R.string.timeline),
     NOTIFICATIONS(R.string.notifications, Icons.Filled.Notifications, R.string.notifications)
 }
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimelineView(
+fun MainView(
     timelineViewModel: TimelineViewModel,
     coroutineScope: CoroutineScope,
     onLoginError: () -> Unit,
@@ -146,7 +146,7 @@ private fun InnerTimelineView(
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
 ) {
-    var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.HOME) }
+    var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         rememberTopAppBarState()
     )
@@ -283,7 +283,7 @@ private fun InnerTimelineView(
                 }
             ) { values ->
                 when (currentDestination) {
-                    TabBarDestinations.HOME -> ShowSkeets(
+                    TabBarDestinations.TIMELINE -> ShowSkeets(
                         viewModel = timelineViewModel,
                         state = listState,
                         modifier = Modifier.padding(values),
