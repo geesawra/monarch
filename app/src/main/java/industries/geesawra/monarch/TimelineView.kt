@@ -1,6 +1,5 @@
 package industries.geesawra.monarch
 
-// import androidx.compose.foundation.layout.height // Will be removed for the sheet content Box
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
@@ -283,12 +282,18 @@ private fun InnerTimelineView(
                     }
                 }
             ) { values ->
-                ShowSkeets(
-                    viewModel = timelineViewModel,
-                    state = listState,
-                    modifier = Modifier.padding(values),
-                    onReplyTap = onReplyTap
-                ) { isRefreshing.value = false }
+                when (currentDestination) {
+                    TabBarDestinations.HOME -> ShowSkeets(
+                        viewModel = timelineViewModel,
+                        state = listState,
+                        modifier = Modifier.padding(values),
+                        onReplyTap = onReplyTap
+                    ) { isRefreshing.value = false }
+
+                    TabBarDestinations.NOTIFICATIONS -> NotificationsView(
+                        modifier = Modifier.padding(values)
+                    )
+                }
             }
         }
     }
