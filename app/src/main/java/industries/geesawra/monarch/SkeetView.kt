@@ -61,6 +61,16 @@ fun SkeetView(
     disableEmbeds: Boolean = false,
     inThread: Boolean = false,
 ) {
+    if (skeet.blocked) {
+        ConditionalCard("Blocked :(")
+        return
+    }
+
+    if (skeet.notFound) {
+        ConditionalCard("Post not found")
+        return
+    }
+
     val minSize = 55.dp
 
     val (parent, _) = skeet.parent()
@@ -349,9 +359,9 @@ private fun RecordWithMediaView(
         is RecordViewRecordUnion.GraphStarterPackViewBasic -> null
         is RecordViewRecordUnion.LabelerLabelerView -> null
         is RecordViewRecordUnion.Unknown -> null
-        is RecordViewRecordUnion.ViewBlocked -> null
         is RecordViewRecordUnion.ViewDetached -> null
-        is RecordViewRecordUnion.ViewNotFound -> null
+        is RecordViewRecordUnion.ViewBlocked -> SkeetData(blocked = true)
+        is RecordViewRecordUnion.ViewNotFound -> SkeetData(notFound = true)
         is RecordViewRecordUnion.ViewRecord -> SkeetData.fromRecordView(rv.value)
     }
 

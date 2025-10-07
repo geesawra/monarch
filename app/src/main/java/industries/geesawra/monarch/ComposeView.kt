@@ -208,7 +208,7 @@ fun ComposeView(
                                 .background(Color.Transparent),
                             skeet = it,
                             nested = true,
-                            disableEmbeds = true
+                            disableEmbeds = false
                         )
                     }
                 }
