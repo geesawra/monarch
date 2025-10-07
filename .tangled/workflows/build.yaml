@@ -15,13 +15,14 @@ dependencies:
     - glibc
     - gcc-unwrapped
     - fastlane
-    - jdk24
+    - jdk21_headless
     - nodejs
       
 steps:
   - name: build-release-apk
     command: |
-      JDK=/nix/store/$(ls /nix/store | grep openjdk-24)
+      set -e
+      JDK=/nix/store/$(ls /nix/store | grep openjdk-headless-21)
       source $JDK/nix-support/setup-hook
       source install-android-sdk.sh
       npm i -D wrangler@latest
