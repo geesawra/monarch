@@ -1,12 +1,91 @@
 package industries.geesawra.monarch
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import industries.geesawra.monarch.datalayer.TimelineViewModel
 
 @Composable
 fun NotificationsView(
-    modifier: Modifier = Modifier
+    viewModel: TimelineViewModel,
+    state: LazyListState,
+    modifier: Modifier = Modifier,
+    doneRefresh: () -> Unit = {},
 ) {
-    Column(modifier = modifier) {}
+    LaunchedEffect(key1 = viewModel.uiState.notifications.isEmpty()) {
+        if (viewModel.uiState.notifications.isEmpty()) {
+            viewModel.fetchNotifications {
+                doneRefresh()
+            }
+        }
+    }
+
+    LazyColumn(
+        state = state,
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        viewModel.uiState.notifications.forEach { notif ->
+            item() {// TODO: group notification by (cid, uri) and kind
+                Text(
+                    notif.record.toString()
+                )
+            }
+        }
+
+        if (viewModel.uiState.isFetchingMoreNotifications && viewModel.uiState.notifications.isNotEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .width(64.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    val endOfListReached by remember {
+        derivedStateOf {
+            val layoutInfo = state.layoutInfo
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            if (layoutInfo.totalItemsCount == 0) {
+                false
+            } else {
+                val lastVisibleItem = visibleItemsInfo.lastOrNull()
+                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
+            }
+        }
+    }
+
+    LaunchedEffect(endOfListReached) {
+        if (endOfListReached && viewModel.uiState.notifications.isNotEmpty()) {
+            viewModel.fetchNotifications()
+        }
+    }
 }

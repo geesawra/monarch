@@ -23,6 +23,8 @@ import app.bsky.feed.Post
 import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.Repost
+import app.bsky.notification.ListNotificationsQueryParams
+import app.bsky.notification.ListNotificationsResponse
 import app.bsky.video.GetJobStatusQueryParams
 import app.bsky.video.GetJobStatusResponse
 import app.bsky.video.JobStatus
@@ -61,6 +63,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.christian.ozone.BlueskyJson
@@ -436,7 +439,6 @@ class BlueskyConn(val context: Context) {
         replyRef: PostReplyRef? = null,
         quotePostRef: StrongRef? = null
     ): Result<Unit> {
-        // TODO: videos need to be uploaded through a different API.
         return runCatching {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
@@ -681,6 +683,27 @@ class BlueskyConn(val context: Context) {
             ).requireResponse()
 
             return Result.success(resp.feeds)
+        }
+    }
+
+    suspend fun notifications(
+        cursor: String? = null,
+        lastCalled: Instant? = null
+    ): Result<ListNotificationsResponse> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.listNotifications(
+                ListNotificationsQueryParams(
+                    cursor = cursor,
+                )
+            )
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch notifications: ${ret.error}"))
+                is AtpResponse.Success<ListNotificationsResponse> -> Result.success(ret.response)
+            }
         }
     }
 

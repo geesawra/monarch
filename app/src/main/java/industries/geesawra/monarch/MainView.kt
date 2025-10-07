@@ -150,7 +150,8 @@ private fun InnerTimelineView(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         rememberTopAppBarState()
     )
-    val listState = rememberLazyListState()
+    val timelineState = rememberLazyListState()
+    val notificationsState = rememberLazyListState()
     val drawerState = rememberDrawerState(
         initialValue = DrawerValue.Closed
     )
@@ -181,8 +182,17 @@ private fun InnerTimelineView(
         isRefreshing = isRefreshing.value,
         onRefresh = {
             isRefreshing.value = true
-            timelineViewModel.reset()
-            timelineViewModel.fetchTimeline { isRefreshing.value = false }
+            when (currentDestination) {
+                TabBarDestinations.TIMELINE -> {
+                    timelineViewModel.reset()
+                    timelineViewModel.fetchTimeline { isRefreshing.value = false }
+                }
+
+                TabBarDestinations.NOTIFICATIONS -> {
+                    timelineViewModel.reset()
+                    timelineViewModel.fetchNotifications { isRefreshing.value = false }
+                }
+            }
         },
     ) {
         ModalNavigationDrawer(
@@ -201,7 +211,6 @@ private fun InnerTimelineView(
                             drawerState.close()
                         }
                     },
-
                     timelineViewModel
                 )
             }
@@ -222,46 +231,72 @@ private fun InnerTimelineView(
                             subtitleContentColor = MaterialTheme.colorScheme.onBackground
                         ),
                         title = {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (timelineViewModel.uiState.feedAvatar != null) {
-                                    AsyncImage(
-                                        model = timelineViewModel.uiState.feedAvatar,
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .shadow(10.dp, CircleShape)
-                                            .clip(CircleShape),
-                                        contentDescription = "Feed avatar",
-                                    )
+                            when (currentDestination) {
+                                TabBarDestinations.TIMELINE -> Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (timelineViewModel.uiState.feedAvatar != null) {
+                                        AsyncImage(
+                                            model = timelineViewModel.uiState.feedAvatar,
+                                            modifier = Modifier
+                                                .size(42.dp)
+                                                .shadow(10.dp, CircleShape)
+                                                .clip(CircleShape),
+                                            contentDescription = "Feed avatar",
+                                        )
+                                    }
+
+                                    Text(text = timelineViewModel.uiState.feedName)
                                 }
 
-                                Text(text = timelineViewModel.uiState.feedName)
+                                TabBarDestinations.NOTIFICATIONS -> Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = "Notifications")
+                                }
                             }
                         },
                         scrollBehavior = scrollBehavior,
                         modifier = Modifier.clickable {
                             coroutineScope.launch {
-                                listState.animateScrollToItem(0)
+                                when (currentDestination) {
+                                    TabBarDestinations.TIMELINE -> timelineState.animateScrollToItem(
+                                        0
+                                    )
+
+                                    TabBarDestinations.NOTIFICATIONS -> notificationsState.animateScrollToItem(
+                                        0
+                                    )
+
+                                }
                             }
                         },
                         navigationIcon = {
-                            IconButton(onClick = {
-                                coroutineScope.launch {
-                                    drawerState.open()
+                            when (currentDestination) {
+                                TabBarDestinations.TIMELINE -> IconButton(onClick = {
+                                    coroutineScope.launch {
+                                        drawerState.open()
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Tag, "Feeds")
                                 }
-                            }) {
-                                Icon(Icons.Default.Tag, "Feeds")
+
+                                TabBarDestinations.NOTIFICATIONS -> {}
                             }
                         },
                     )
                 },
                 floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = fobOnClick
-                    ) {
-                        Icon(Icons.Filled.Create, "Post")
+                    when (currentDestination) {
+                        TabBarDestinations.TIMELINE -> FloatingActionButton(
+                            onClick = fobOnClick
+                        ) {
+                            Icon(Icons.Filled.Create, "Post")
+                        }
+
+                        TabBarDestinations.NOTIFICATIONS -> {}
                     }
                 },
                 bottomBar = {
@@ -285,14 +320,18 @@ private fun InnerTimelineView(
                 when (currentDestination) {
                     TabBarDestinations.TIMELINE -> ShowSkeets(
                         viewModel = timelineViewModel,
-                        state = listState,
+                        state = timelineState,
                         modifier = Modifier.padding(values),
                         onReplyTap = onReplyTap
                     ) { isRefreshing.value = false }
 
                     TabBarDestinations.NOTIFICATIONS -> NotificationsView(
+                        viewModel = timelineViewModel,
+                        state = notificationsState,
                         modifier = Modifier.padding(values)
-                    )
+                    ) {
+                        isRefreshing.value = false
+                    }
                 }
             }
         }

@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.bsky.feed.GeneratorView
 import app.bsky.feed.PostReplyRef
+import app.bsky.notification.ListNotificationsNotification
 import com.atproto.repo.StrongRef
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -15,6 +16,8 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.RKey
@@ -27,10 +30,15 @@ data class TimelineUiState(
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
     val skeets: List<SkeetData> = listOf(),
+    val notifications: List<ListNotificationsNotification> = listOf(),
     val isFetchingMoreTimeline: Boolean = false,
-    val cursor: String? = null,
+    val isFetchingMoreNotifications: Boolean = false,
     val authenticated: Boolean = false,
     val sessionChecked: Boolean = false,
+
+    val timelineCursor: String? = null,
+    val notificationsCursor: String? = null,
+    val lastDownloadedNotifs: Instant? = null,
 
     val cidInteractedWith: Map<Cid, RKey> = mapOf(),
 
@@ -51,7 +59,8 @@ class TimelineViewModel @AssistedInject constructor(
     var uiState by mutableStateOf(TimelineUiState())
         private set
 
-    private var fetchJob: Job? = null
+    private var timelineFetchJob: Job? = null
+    private var notificationsFetchJob: Job? = null
 
     fun loadSession() {
         viewModelScope.launch {
@@ -68,20 +77,20 @@ class TimelineViewModel @AssistedInject constructor(
     fun fetchTimeline(then: () -> Unit = {}) {
         uiState = uiState.copy(isFetchingMoreTimeline = true)
         runCatching {
-            fetchJob?.cancel()
+            timelineFetchJob?.cancel()
         }
 
-        fetchJob = viewModelScope.launch {
+        timelineFetchJob = viewModelScope.launch {
             bskyConn.fetchTimeline({
                 if (uiState.selectedFeed == "Following") {
                     ""
                 } else {
                     uiState.selectedFeed
                 }
-            }(), uiState.cursor).onSuccess { it ->
+            }(), uiState.timelineCursor).onSuccess { it ->
                 uiState = uiState.copy(
                     skeets = (uiState.skeets + it.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid },
-                    cursor = it.cursor,
+                    timelineCursor = it.cursor,
                     isFetchingMoreTimeline = false
                 )
                 then()
@@ -100,9 +109,44 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    fun fetchNotifications(then: () -> Unit = {}) {
+        uiState = uiState.copy(isFetchingMoreNotifications = true)
+        runCatching {
+            notificationsFetchJob?.cancel()
+        }
+
+        notificationsFetchJob = viewModelScope.launch {
+            bskyConn.notifications(uiState.notificationsCursor, Clock.System.now())
+                .onSuccess { it ->
+                    uiState = uiState.copy(
+                        notifications = it.notifications,
+                        notificationsCursor = it.cursor,
+                        isFetchingMoreNotifications = false,
+                        lastDownloadedNotifs = Clock.System.now()
+                    )
+                    then()
+                }.onFailure {
+                    if (it is CancellationException) {
+                        return@onFailure
+                    }
+
+                    then()
+
+                    uiState = uiState.copy(
+                        isFetchingMoreNotifications = false,
+                        error = "Failed to fetch notifications: ${it.message}"
+                    )
+                }
+        }
+    }
+
     fun reset() {
         uiState = uiState.copy(
-            skeets = listOf(), isFetchingMoreTimeline = false, cursor = null,
+            skeets = listOf(),
+            isFetchingMoreTimeline = false,
+            timelineCursor = null,
+            notificationsCursor = null,
+            notifications = listOf()
         )
     }
 
