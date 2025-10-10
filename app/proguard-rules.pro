@@ -21,3 +21,6 @@
 #-renamesourcefileattribute SourceFile
 -keep class io.ktor.** { *; }
 -dontwarn io.ktor.**
+# Please add these rules to your existing keep rules in order to suppress warnings.
+# This is generated automatically by the Android Gradle plugin.
+-dontwarn libcore.icu.NativePluralRules
