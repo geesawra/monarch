@@ -62,12 +62,12 @@ fun SkeetView(
     inThread: Boolean = false,
 ) {
     if (skeet.blocked) {
-        ConditionalCard("Blocked :(")
+        ConditionalCard("Blocked :(", wrapWithCard = !nested)
         return
     }
 
     if (skeet.notFound) {
-        ConditionalCard("Post not found")
+        ConditionalCard("Post not found", wrapWithCard = !nested)
         return
     }
 

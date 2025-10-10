@@ -14,17 +14,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun ConditionalCard(text: String) {
-    OutlinedCard(
-        modifier = Modifier
-            .height(80.dp)
-            .padding(8.dp)
-            .fillMaxWidth()
-    ) {
+fun ConditionalCard(text: String, wrapWithCard: Boolean = true) {
+    if (wrapWithCard) {
+        OutlinedCard(
+            modifier = Modifier
+                .height(80.dp)
+                .padding(8.dp)
+                .fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = text,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    } else {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 16.dp),
+                .height(60.dp)
+                .padding(start = 16.dp)
+                .fillMaxSize(),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
