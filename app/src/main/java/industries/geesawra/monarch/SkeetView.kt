@@ -220,7 +220,7 @@ private fun ImageView(img: List<ImagesViewImage>) {
 }
 
 @Composable
-private fun VideoView(uri: Uri) {
+fun VideoView(uri: Uri) {
     Card(
         modifier = Modifier
             .heightIn(max = 500.dp)

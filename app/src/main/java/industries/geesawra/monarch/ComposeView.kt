@@ -63,14 +63,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
-import androidx.media3.common.MimeTypes
 import com.atproto.repo.StrongRef
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
-import io.sanghun.compose.video.RepeatMode
-import io.sanghun.compose.video.VideoPlayer
-import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
-import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -93,7 +88,7 @@ fun ComposeView(
     val composeFieldState = rememberTextFieldState(
         ""
     )
-    val mediaSelected = remember { mutableStateOf(mapOf<Uri, String?>()) }
+    val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
 
     LaunchedEffect(scaffoldState.bottomSheetState.isVisible) {
@@ -107,7 +102,7 @@ fun ComposeView(
             charCount.intValue = 0
             inReplyTo.value = null
             isQuotePost.value = false
-            mediaSelected.value = mapOf()
+            mediaSelected.value = listOf()
             mediaSelectedIsVideo.value = false
 
         }
@@ -120,7 +115,7 @@ fun ComposeView(
                 true -> transferableContent.consume {
                     val uri = it.uri
                     val mimeType: String? = context.contentResolver.getType(uri)
-                    mediaSelected.value = mapOf(Pair(uri, mimeType))
+                    mediaSelected.value = listOf(uri)
                     true
                 }
 
@@ -169,7 +164,7 @@ fun ComposeView(
             }
 
             mediaSelectedIsVideo.value = containsVideo && urisMap.size == 1
-            mediaSelected.value = urisMap.filterValues { it != null }
+            mediaSelected.value = urisMap.filterValues { it != null }.keys.toList()
         }
 
     val uploadingPost = remember { mutableStateOf(false) }
@@ -271,46 +266,29 @@ fun ComposeView(
                         when (mediaSelectedIsVideo.value) {
                             false -> PostImageGallery(
                                 modifier = Modifier
-                                    .fillMaxWidth() // Gallery should fill card width
+                                    .fillMaxWidth()
                                     .padding(8.dp),
-                                images = mediaSelected.value.keys.map { uri ->
+                                images = mediaSelected.value.map { uri ->
                                     Image(url = uri.toString(), alt = "Selected media")
                                 },
+                                onCrossClick = {
+                                    val toDelUri = mediaSelected.value[it]
+                                    mediaSelected.value =
+                                        mediaSelected.value.filter { uri ->
+                                            uri != toDelUri
+                                        }
+                                }
                             )
 
-                            true -> VideoPlayer(
-                                mediaItems = listOf(
-                                    VideoPlayerMediaItem.NetworkMediaItem(
-                                        url = mediaSelected.value.keys.first().toString(),
-                                        mimeType = MimeTypes.APPLICATION_M3U8,
-                                    )
-                                ),
-                                handleLifecycle = false,
-                                autoPlay = false,
-                                usePlayerController = true,
-                                enablePip = false,
-                                handleAudioFocus = true,
-                                controllerConfig = VideoPlayerControllerConfig(
-                                    showSpeedAndPitchOverlay = false,
-                                    showSubtitleButton = false,
-                                    showCurrentTimeAndTotalTime = true,
-                                    showBufferingProgress = false,
-                                    showForwardIncrementButton = true,
-                                    showBackwardIncrementButton = true,
-                                    showBackTrackButton = false,
-                                    showNextTrackButton = false,
-                                    showRepeatModeButton = true,
-                                    controllerShowTimeMilliSeconds = 5_000,
-                                    controllerAutoShow = true,
-                                    showFullScreenButton = true,
-                                ),
-                                volume = 0.5f,  // volume 0.0f to 1.0f
-                                repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .heightIn(max = 500.dp)
-                                    .padding(8.dp),
-                            )
+                            true -> DeletableMediaView(
+                                originalIndex = 0,
+                                onCrossClick = {
+                                    mediaSelected.value = listOf()
+                                },
+                                onMediaClick = { }
+                            ) {
+                                VideoView(uri = mediaSelected.value.first())
+                            }
                         }
                     }
                 }
@@ -329,7 +307,7 @@ fun ActionRow(
     uploadingPost: MutableState<Boolean>,
     pickMedia: ManagedActivityResultLauncher<PickVisualMediaRequest, List<@JvmSuppressWildcards Uri>>,
     postText: String,
-    mediaSelected: MutableState<Map<Uri, String?>>,
+    mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
     coroutineScope: CoroutineScope,
     maxChars: Int,
@@ -371,9 +349,9 @@ fun ActionRow(
                         uploadingPost.value = true // Show progress immediately
                         timelineViewModel.post(
                             content = postText,
-                            images = if (!mediaSelectedIsVideo.value) mediaSelected.value.keys.toList()
+                            images = if (!mediaSelectedIsVideo.value) mediaSelected.value
                                 .ifEmpty { null } else null,
-                            video = if (mediaSelectedIsVideo.value) mediaSelected.value.keys.firstOrNull() else null,
+                            video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
                             replyRef = if (!isQuotePost) {
                                 inReplyToData?.replyRef()
                             } else {
