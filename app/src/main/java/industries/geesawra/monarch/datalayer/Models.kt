@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package industries.geesawra.monarch.datalayer
 
 import app.bsky.embed.RecordViewRecord
@@ -13,10 +15,12 @@ import app.bsky.feed.ReplyRefParentUnion
 import app.bsky.feed.ReplyRefRootUnion
 import com.atproto.label.Label
 import com.atproto.repo.StrongRef
+import kotlinx.datetime.toStdlibInstant
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Handle
-import sh.christian.ozone.api.model.Timestamp
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 data class SkeetData(
     val likes: Long? = null,
@@ -34,7 +38,7 @@ data class SkeetData(
     var embed: PostViewEmbedUnion? = null,
     val reason: FeedViewPostReasonUnion? = null,
     val reply: ReplyRef? = null,
-    val createdAt: Timestamp? = null,
+    val createdAt: Instant? = null,
 
     val blocked: Boolean = false,
     val notFound: Boolean = false,
@@ -59,7 +63,7 @@ data class SkeetData(
                 embed = post.post.embed,
                 reason = post.reason,
                 reply = post.reply,
-                createdAt = content.createdAt
+                createdAt = content.createdAt.toStdlibInstant()
             )
         }
 
@@ -80,7 +84,7 @@ data class SkeetData(
                 authorLabels = post.author.labels,
                 content = content.text,
                 embed = post.embed,
-                createdAt = content.createdAt
+                createdAt = content.createdAt.toStdlibInstant()
             )
         }
 
@@ -120,11 +124,11 @@ data class SkeetData(
                 embed = embed,
                 reason = null,
                 reply = null,
-                createdAt = content.createdAt
+                createdAt = content.createdAt.toStdlibInstant()
             )
         }
     }
-    
+
     fun replyRef(): PostReplyRef {
         val thisPostRef = StrongRef(this.uri, this.cid)
 

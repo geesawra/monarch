@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package industries.geesawra.monarch.datalayer
 
 import android.content.Context
@@ -62,8 +64,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlinx.datetime.toDeprecatedInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.christian.ozone.BlueskyJson
@@ -79,7 +80,10 @@ import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.Blob
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import sh.christian.ozone.api.response.AtpResponse
+import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 enum class AuthData {
     PDSHost,
@@ -480,7 +484,7 @@ class BlueskyConn(val context: Context) {
             val r = BlueskyJson.encodeAsJsonContent(
                 Post(
                     text = content,
-                    createdAt = Clock.System.now(),
+                    createdAt = Clock.System.now().toDeprecatedInstant(),
                     embed = postEmbed,
                     reply = replyRef
                 )
@@ -716,7 +720,7 @@ class BlueskyConn(val context: Context) {
             val like = BlueskyJson.encodeAsJsonContent(
                 Like(
                     subject = StrongRef(uri, cid),
-                    createdAt = Clock.System.now(),
+                    createdAt = Clock.System.now().toDeprecatedInstant(),
                 )
             )
 
@@ -747,7 +751,7 @@ class BlueskyConn(val context: Context) {
             val like = BlueskyJson.encodeAsJsonContent(
                 Repost(
                     subject = StrongRef(uri, cid),
-                    createdAt = Clock.System.now(),
+                    createdAt = Clock.System.now().toDeprecatedInstant(),
                 )
             )
 

@@ -77,6 +77,8 @@ dependencies {
     implementation("androidx.media3:media3-transformer:1.8.0")
     implementation("androidx.media3:media3-effect:1.8.0")
     implementation("androidx.media3:media3-common:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+    implementation("nl.jacobras:Human-Readable:1.12.0")
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.androidx.material3)
     ksp("com.google.dagger:hilt-compiler:2.57.2")

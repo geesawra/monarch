@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package industries.geesawra.monarch
 
 import android.content.Context
@@ -29,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.media3.common.MimeTypes
@@ -50,6 +53,8 @@ import io.sanghun.compose.video.RepeatMode
 import io.sanghun.compose.video.VideoPlayer
 import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
 import io.sanghun.compose.video.uri.VideoPlayerMediaItem
+import nl.jacobras.humanreadable.HumanReadable
+import kotlin.time.ExperimentalTime
 
 @Composable
 fun SkeetView(
@@ -411,8 +416,6 @@ private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
             text = "@" + skeet.authorHandle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier
-                .padding(top = 4.dp),
         )
 
         skeet.authorLabels.forEach {
@@ -454,6 +457,16 @@ private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
 
                 else -> {}
             }
+        }
+
+        skeet.createdAt?.let {
+            Text(
+                text = HumanReadable.timeAgo(it),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
