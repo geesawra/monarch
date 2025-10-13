@@ -66,6 +66,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -413,7 +415,10 @@ fun FeedsDrawer(
                     ) {
                         if (feed.avatar != null) {
                             AsyncImage(
-                                model = feed.avatar?.uri,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(feed.avatar?.uri)
+                                    .crossfade(true)
+                                    .build(),
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clip(CircleShape),
