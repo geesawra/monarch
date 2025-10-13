@@ -26,9 +26,7 @@ import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.JsonContent
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 
 data class TimelineUiState(
@@ -45,7 +43,6 @@ data class TimelineUiState(
 
     val timelineCursor: String? = null,
     val notificationsCursor: String? = null,
-    val lastDownloadedNotifs: Instant? = null,
 
     val cidInteractedWith: Map<Cid, RKey> = mapOf(),
 
@@ -147,7 +144,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
 
         notificationsFetchJob = viewModelScope.launch {
-            val rawNotifs = bskyConn.notifications(uiState.notificationsCursor, Clock.System.now())
+            val rawNotifs = bskyConn.notifications(uiState.notificationsCursor)
                 .onFailure {
                     if (it is CancellationException) {
                         return@onFailure
@@ -204,7 +201,6 @@ class TimelineViewModel @AssistedInject constructor(
                 notifications = uiState.notifications + notifs,
                 notificationsCursor = rawNotifs.cursor,
                 isFetchingMoreNotifications = false,
-                lastDownloadedNotifs = Clock.System.now()
             )
             then()
         }

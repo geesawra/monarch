@@ -91,7 +91,6 @@ import sh.christian.ozone.api.response.AtpResponse
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 enum class AuthData {
     PDSHost,
@@ -740,7 +739,6 @@ class BlueskyConn(val context: Context) {
 
     suspend fun notifications(
         cursor: String? = null,
-        lastCalled: Instant? = null
     ): Result<ListNotificationsResponse> {
         return runCatching {
             create().onFailure {
