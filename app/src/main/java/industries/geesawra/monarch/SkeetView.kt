@@ -192,6 +192,19 @@ fun Embeds(context: Context, nested: Boolean, embed: PostViewEmbedUnion?) {
         }
 
         is PostViewEmbedUnion.RecordWithMediaView -> run {
+            val media = embed.value.media
+            val mediaValue = when (media) {
+                is RecordWithMediaViewMediaUnion.ExternalView -> PostViewEmbedUnion.ExternalView(
+                    media.value
+                )
+
+                is RecordWithMediaViewMediaUnion.ImagesView -> PostViewEmbedUnion.ImagesView(media.value)
+                is RecordWithMediaViewMediaUnion.Unknown -> PostViewEmbedUnion.Unknown(media.value)
+                is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
+            }
+
+            Embeds(context, false, mediaValue)
+
             OutlinedCard(
                 modifier = Modifier.padding(top = 8.dp)
             ) {
@@ -349,14 +362,6 @@ private fun RecordWithMediaView(
     modifier: Modifier = Modifier,
     rv: RecordWithMediaView
 ) {
-    val media = rv.media
-    val embed = when (media) {
-        is RecordWithMediaViewMediaUnion.ExternalView -> PostViewEmbedUnion.ExternalView(media.value)
-        is RecordWithMediaViewMediaUnion.ImagesView -> PostViewEmbedUnion.ImagesView(media.value)
-        is RecordWithMediaViewMediaUnion.Unknown -> PostViewEmbedUnion.Unknown(media.value)
-        is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
-    }
-
     val rv = rv.record.record
     val record = when (rv) {
         is RecordViewRecordUnion.FeedGeneratorView -> null
@@ -371,7 +376,6 @@ private fun RecordWithMediaView(
     }
 
     record?.let {
-        record.embed = embed
         SkeetView(
             modifier = modifier,
             viewModel = null,
