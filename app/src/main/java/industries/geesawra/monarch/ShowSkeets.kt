@@ -60,7 +60,7 @@ fun ShowSkeets(
                 }
 
                 parent?.let {
-                    if (parentsParent?.cid != root?.cid) {
+                    if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
                         ConditionalCard("See more")
 
                         VerticalDivider(
