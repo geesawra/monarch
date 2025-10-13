@@ -244,7 +244,7 @@ class TimelineViewModel @AssistedInject constructor(
             }
         }
     }
-
+    
     fun selectFeed(uri: String, displayName: String, avatar: String?, then: () -> Unit = {}) {
         uiState = uiState.copy(
             selectedFeed = uri,

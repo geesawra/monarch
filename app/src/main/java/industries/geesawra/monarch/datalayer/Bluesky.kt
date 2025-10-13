@@ -28,6 +28,9 @@ import app.bsky.feed.Post
 import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.Repost
+import app.bsky.labeler.GetServicesQueryParams
+import app.bsky.labeler.GetServicesResponse
+import app.bsky.labeler.GetServicesResponseViewUnion
 import app.bsky.notification.ListNotificationsQueryParams
 import app.bsky.notification.ListNotificationsResponse
 import app.bsky.video.GetJobStatusQueryParams
@@ -292,11 +295,18 @@ class BlueskyConn(val context: Context) {
         val message: String?,
     )
 
-    private suspend fun refreshIfNeeded(pdsURL: String, token: SessionData): Result<Unit> {
+    private suspend fun refreshIfNeeded(
+        pdsURL: String,
+        token: SessionData,
+        labelers: List<String>? = listOf()
+    ): Result<Unit> {
         return runCatching {
             val httpClient = HttpClient(OkHttp) {
                 defaultRequest {
                     url(pdsURL)
+                    labelers?.let {
+                        headers["atproto-accept-labelers"] = labelers.joinToString()
+                    }
                 }
                 install(HttpTimeout) {
                     requestTimeoutMillis = 15000
@@ -314,7 +324,6 @@ class BlueskyConn(val context: Context) {
             }
 
             when (gs.status) {
-
                 HttpStatusCode.OK -> run {
                     this.session = token
                     val tokens =
@@ -410,6 +419,13 @@ class BlueskyConn(val context: Context) {
             }
 
             this.pdsURL = pdsURL
+
+            val labelers = this.subscribedLabelers().getOrThrow().keys.mapNotNull { it?.did }
+
+            refreshIfNeeded(pdsURL, sessionData, labelers).onFailure {
+                createMutex.unlock()
+                return Result.failure(it)
+            }
 
             createMutex.unlock()
         }
@@ -734,6 +750,53 @@ class BlueskyConn(val context: Context) {
             ).requireResponse()
 
             return Result.success(resp.feeds)
+        }
+    }
+
+    suspend fun subscribedLabelers(): Result<Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>> {
+        return runCatching {
+            val prefs = client!!.getPreferences().requireResponse()
+            val labelers = (prefs.preferences.first {
+                when (it) {
+                    is PreferencesUnion.LabelersPref -> true
+                    else -> false
+                }
+            } as PreferencesUnion.LabelersPref).value.labelers.map { it.did }.toMutableList()
+
+            val otherOnes = (prefs.preferences.filter {
+                when (it) {
+                    is PreferencesUnion.ContentLabelPref -> true
+                    else -> false
+                }
+            }.map { it as PreferencesUnion.ContentLabelPref }).forEach {
+                it.value.labelerDid?.let { did ->
+                    labelers += did
+                }
+            }
+
+            val res = client!!.getServices(
+                GetServicesQueryParams(
+                    detailed = true,
+                    dids = labelers
+                )
+            )
+
+            val asd = when (res) {
+                is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed to fetch subscribed labelers: ${res.error}"))
+                is AtpResponse.Success<GetServicesResponse> -> {
+                    res
+                }
+            }
+
+            val kek = asd.response.views.associate {
+                when (it) {
+                    is GetServicesResponseViewUnion.LabelerView -> it.value.uri.did() to null
+                    is GetServicesResponseViewUnion.LabelerViewDetailed -> it.value.uri.did() to it
+                    is GetServicesResponseViewUnion.Unknown -> null to null
+                }
+            }.filter { it.value != null && it.key != null }
+
+            return Result.success(kek)
         }
     }
 

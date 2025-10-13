@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -32,9 +33,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.media3.common.MimeTypes
 import app.bsky.embed.ExternalViewExternal
@@ -393,6 +396,7 @@ private fun RecordWithMediaView(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
     val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
@@ -430,27 +434,33 @@ private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
         )
 
-        skeet.authorLabels.forEach {
-            it.neg?.let { it ->
-                if (!it) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(top = 4.dp)
+        ) {
+            skeet.authorLabels.forEach {
+                it.neg?.let { it ->
+                    if (!it) {
+                        return@forEach
+                    }
+                }
+                if (it.`val`.startsWith("!")) {
                     return@forEach
                 }
-            }
-            if (it.`val`.startsWith("!")) {
-                return@forEach
-            }
 
-            FilterChip(
-                leadingIcon = {
-                },
-                enabled = true,
-                onClick = {},
-                selected = true,
-                label = {
-                    Text(text = it.`val`)
+                Card(
+                    modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
+                    shape = CircleShape
+                ) {
+                    Text(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        text = it.`val`,
+                        style = TextStyle(fontSize = 12.sp),
+                    )
                 }
-            )
+            }
         }
+
 
         skeet.reply?.let {
             it
