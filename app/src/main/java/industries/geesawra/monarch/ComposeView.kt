@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraRoll
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.atproto.repo.StrongRef
@@ -81,6 +84,7 @@ fun ComposeView(
     scrollState: ScrollState
 ) {
     val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val charCount = remember { mutableIntStateOf(0) }
     val wasEdited = remember { mutableStateOf(false) }
@@ -91,20 +95,23 @@ fun ComposeView(
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
 
-    LaunchedEffect(scaffoldState.bottomSheetState.isVisible) {
-        if (scaffoldState.bottomSheetState.isVisible) {
-            keyboardController?.show()
-            focusRequester.requestFocus()
-        } else {
-            keyboardController?.hide()
-            // Reset state when sheet is hidden
-            composeFieldState.clearText()
-            charCount.intValue = 0
-            inReplyTo.value = null
-            isQuotePost.value = false
-            mediaSelected.value = listOf()
-            mediaSelectedIsVideo.value = false
+    LaunchedEffect(scaffoldState.bottomSheetState.currentValue) {
+        when (scaffoldState.bottomSheetState.currentValue) {
+            SheetValue.Hidden -> {
+                composeFieldState.clearText()
+                keyboardController?.hide()
+                focusManager.clearFocus()
+                charCount.intValue = 0
+                inReplyTo.value = null
+                isQuotePost.value = false
+                mediaSelected.value = listOf()
+                mediaSelectedIsVideo.value = false
+            }
 
+            SheetValue.PartiallyExpanded, SheetValue.Expanded -> {
+                keyboardController?.hide()
+                focusManager.clearFocus()
+            }
         }
     }
 
@@ -183,14 +190,18 @@ fun ComposeView(
             Column(
                 modifier = Modifier
                     .fillMaxWidth(), // Takes full width of the Inner Box
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.End
             ) {
                 Row {
-                    Text(
-                        "New Post",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                scaffoldState.bottomSheetState.hide()
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close compose view")
+                    }
                 }
 
                 inReplyTo.value?.let {

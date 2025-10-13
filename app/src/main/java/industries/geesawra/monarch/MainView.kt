@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -99,9 +98,8 @@ fun MainView(
             .windowInsetsPadding(WindowInsets.statusBars),
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
-        sheetDragHandle = {
-            BottomSheetDefaults.DragHandle()
-        },
+        sheetDragHandle = {},
+        sheetSwipeEnabled = false,
         sheetContent = {
             ComposeView(
                 context = LocalContext.current,
