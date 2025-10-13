@@ -310,28 +310,33 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
                         .height(180.dp)
                         .fillMaxWidth()
                 )
-
+            }
+            if (ev.title.isNotEmpty()) {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
+                
+                Text(
+                    text = ev.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 8.dp, bottom = 4.dp, start = 8.dp, end = 8.dp),
+                    maxLines = 3
+                )
             }
-            Text(
-                text = ev.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 8.dp, bottom = 4.dp, start = 8.dp, end = 8.dp),
-                maxLines = 3
-            )
-            Text(
-                text = ev.description,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 8.dp, start = 8.dp, end = 8.dp),
-                maxLines = 8
-            )
+
+            if (ev.description.isNotEmpty()) {
+                Text(
+                    text = ev.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 8.dp, start = 8.dp, end = 8.dp),
+                    maxLines = 8
+                )
+            }
         }
 
     }
