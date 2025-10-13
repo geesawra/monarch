@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package industries.geesawra.monarch
 
 import android.widget.Toast
@@ -68,6 +70,7 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.time.ExperimentalTime
 
 enum class TabBarDestinations(
     @param:StringRes val label: Int,
@@ -361,7 +364,8 @@ private fun InnerTimelineView(
                     TabBarDestinations.NOTIFICATIONS -> NotificationsView(
                         viewModel = timelineViewModel,
                         state = notificationsState,
-                        modifier = Modifier.padding(values)
+                        modifier = Modifier.padding(values),
+                        onReplyTap = onReplyTap
                     ) {
                         isRefreshing.value = false
                     }

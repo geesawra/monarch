@@ -45,6 +45,8 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.delay
 import sh.christian.ozone.api.AtUri
+import sh.christian.ozone.api.Did
+import sh.christian.ozone.api.Nsid
 import sh.christian.ozone.api.RKey
 
 
@@ -84,6 +86,14 @@ private fun IconWithNumber(
 
 fun AtUri.rkey(): RKey {
     return RKey(this.atUri.toUri().lastPathSegment!!)
+}
+
+fun AtUri.did(): Did {
+    return Did(this.atUri.toUri().host.toString())
+}
+
+fun AtUri.collection(): Nsid {
+    return Nsid(this.atUri.toUri().pathSegments[0])
 }
 
 @Composable

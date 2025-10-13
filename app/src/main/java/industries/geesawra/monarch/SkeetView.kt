@@ -5,6 +5,7 @@ package industries.geesawra.monarch
 import android.content.Context
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +61,7 @@ import kotlin.time.ExperimentalTime
 @Composable
 fun SkeetView(
     modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.surface,
     viewModel: TimelineViewModel? = null,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     skeet: SkeetData,
@@ -82,12 +85,12 @@ fun SkeetView(
     val hasParent = parent != null
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = color,
         modifier = if (!inThread && !hasParent) {
             modifier.padding(start = 16.dp, end = 16.dp)
         } else {
             modifier.padding(top = 8.dp, start = 16.dp, end = 16.dp)
-        }
+        }.background(color)
     ) {
         Row(
             verticalAlignment = Alignment.Top,
@@ -315,7 +318,7 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
-                
+
                 Text(
                     text = ev.title,
                     style = MaterialTheme.typography.titleSmall,

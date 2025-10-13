@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -18,13 +17,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import industries.geesawra.monarch.datalayer.Notification
+import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import kotlin.time.ExperimentalTime
 
+@ExperimentalTime
 @Composable
 fun NotificationsView(
     viewModel: TimelineViewModel,
     state: LazyListState,
     modifier: Modifier = Modifier,
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     doneRefresh: () -> Unit = {},
 ) {
     LaunchedEffect(key1 = viewModel.uiState.notifications.isEmpty()) {
@@ -41,9 +45,11 @@ fun NotificationsView(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         viewModel.uiState.notifications.forEach { notif ->
-            item() {// TODO: group notification by (cid, uri) and kind
-                Text(
-                    notif.record.toString()
+            item() {
+                RenderNotification(
+                    viewModel = viewModel,
+                    notification = notif,
+                    onReplyTap = onReplyTap
                 )
             }
         }
@@ -87,5 +93,67 @@ fun NotificationsView(
         if (endOfListReached && viewModel.uiState.notifications.isNotEmpty()) {
             viewModel.fetchNotifications()
         }
+    }
+}
+
+@ExperimentalTime
+@Composable
+private fun RenderNotification(
+    viewModel: TimelineViewModel,
+    notification: Notification,
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+) {
+    when (notification) {
+        is Notification.Follow -> SkeetView(
+            skeet = SkeetData(
+                authorName = (notification.follow.displayName
+                    ?: notification.follow.handle).toString() + " followed you!",
+                authorAvatarURL = notification.follow.avatar.toString(),
+            ),
+            nested = true
+        )
+
+        is Notification.Like -> SkeetView(
+            skeet = SkeetData(
+                authorName = (notification.author.displayName
+                    ?: notification.author.handle).toString() + " liked your post",
+                authorAvatarURL = notification.author.avatar.toString()
+            ),
+            nested = true
+        )
+
+
+//        is Notification.Mention -> TODO()
+        is Notification.Quote -> SkeetView(
+            viewModel = viewModel,
+            skeet = SkeetData.fromPost(
+                notification.parent,
+                notification.quote,
+                notification.author
+            ),
+            onReplyTap = onReplyTap,
+        )
+
+        is Notification.Reply -> SkeetView(
+            viewModel = viewModel,
+            skeet = SkeetData.fromPost(
+                notification.parent,
+                notification.reply,
+                notification.author
+            ),
+            onReplyTap = onReplyTap,
+        )
+
+        is Notification.Repost -> SkeetView(
+            skeet = SkeetData(
+                authorName = (notification.author.displayName
+                    ?: notification.author.handle).toString() + " reposted your post",
+                authorAvatarURL = notification.author.avatar.toString()
+            ),
+            nested = true
+        )
+
+        else -> {}
+
     }
 }

@@ -8,9 +8,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.bsky.actor.ProfileViewDetailed
 import app.bsky.feed.GeneratorView
+import app.bsky.feed.Like
 import app.bsky.feed.PostReplyRef
-import app.bsky.notification.ListNotificationsNotification
+import app.bsky.notification.ListNotificationsReason
 import com.atproto.repo.StrongRef
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -20,7 +22,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
+import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.RKey
+import sh.christian.ozone.api.model.JsonContent
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -33,7 +37,7 @@ data class TimelineUiState(
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
     val skeets: List<SkeetData> = listOf(),
-    val notifications: List<ListNotificationsNotification> = listOf(),
+    val notifications: List<Notification> = listOf(),
     val isFetchingMoreTimeline: Boolean = false,
     val isFetchingMoreNotifications: Boolean = false,
     val authenticated: Boolean = false,
@@ -76,6 +80,27 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    suspend fun fetchRecord(uri: AtUri): Result<JsonContent> {
+        val ret = bskyConn.fetchRecord(uri).onFailure {
+            uiState = when (it) {
+                is LoginException -> uiState.copy(loginError = it.message)
+                else -> uiState.copy(error = it.message)
+            }
+        }.getOrThrow()
+
+        return Result.success(ret)
+    }
+
+    suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> {
+        val ret = bskyConn.fetchActor(did).onFailure {
+            uiState = when (it) {
+                is LoginException -> uiState.copy(loginError = it.message)
+                else -> uiState.copy(error = it.message)
+            }
+        }.getOrThrow()
+
+        return Result.success(ret)
+    }
 
     fun fetchTimeline(then: () -> Unit = {}) {
         uiState = uiState.copy(isFetchingMoreTimeline = true)
@@ -91,8 +116,11 @@ class TimelineViewModel @AssistedInject constructor(
                     uiState.selectedFeed
                 }
             }(), uiState.timelineCursor).onSuccess { it ->
+                val newData =
+                    (uiState.skeets + it.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid }
+
                 uiState = uiState.copy(
-                    skeets = (uiState.skeets + it.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid },
+                    skeets = newData,
                     timelineCursor = it.cursor,
                     isFetchingMoreTimeline = false
                 )
@@ -119,16 +147,8 @@ class TimelineViewModel @AssistedInject constructor(
         }
 
         notificationsFetchJob = viewModelScope.launch {
-            bskyConn.notifications(uiState.notificationsCursor, Clock.System.now())
-                .onSuccess { it ->
-                    uiState = uiState.copy(
-                        notifications = it.notifications,
-                        notificationsCursor = it.cursor,
-                        isFetchingMoreNotifications = false,
-                        lastDownloadedNotifs = Clock.System.now()
-                    )
-                    then()
-                }.onFailure {
+            val rawNotifs = bskyConn.notifications(uiState.notificationsCursor, Clock.System.now())
+                .onFailure {
                     if (it is CancellationException) {
                         return@onFailure
                     }
@@ -139,7 +159,54 @@ class TimelineViewModel @AssistedInject constructor(
                         isFetchingMoreNotifications = false,
                         error = "Failed to fetch notifications: ${it.message}"
                     )
+                }.getOrThrow()
+
+            val notifs: List<Notification> = rawNotifs.notifications.mapNotNull {
+                when (it.reason) {
+                    ListNotificationsReason.Follow -> {
+                        Notification.Follow(it.author)
+                    }
+
+                    ListNotificationsReason.Like -> {
+                        val l: Like = it.record.decodeAs()
+                        val lp = fetchRecord(l.subject.uri).getOrThrow()
+                        Notification.Like(lp.decodeAs(), it.author)
+                    }
+
+                    ListNotificationsReason.Mention -> {
+                        val p: app.bsky.feed.Post = it.record.decodeAs()
+                        Notification.Mention(p, it.author)
+                    }
+
+                    ListNotificationsReason.Quote -> {
+                        val p: app.bsky.feed.Post = it.record.decodeAs()
+                        Notification.Quote(Pair(it.cid, it.uri), p, it.author)
+                    }
+
+                    ListNotificationsReason.Reply -> {
+                        val p: app.bsky.feed.Post = it.record.decodeAs()
+                        Notification.Reply(Pair(it.cid, it.uri), p, it.author)
+                    }
+
+                    ListNotificationsReason.Repost -> {
+                        val p: app.bsky.feed.Repost = it.record.decodeAs()
+                        val pp = fetchRecord(p.subject.uri).getOrThrow()
+                        Notification.Repost(pp.decodeAs(), it.author)
+                    }
+
+                    else -> {
+                        null
+                    }
                 }
+            }
+
+            uiState = uiState.copy(
+                notifications = uiState.notifications + notifs,
+                notificationsCursor = rawNotifs.cursor,
+                isFetchingMoreNotifications = false,
+                lastDownloadedNotifs = Clock.System.now()
+            )
+            then()
         }
     }
 

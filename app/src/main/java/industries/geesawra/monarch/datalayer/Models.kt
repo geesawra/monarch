@@ -2,6 +2,7 @@
 
 package industries.geesawra.monarch.datalayer
 
+import app.bsky.actor.ProfileView
 import app.bsky.embed.RecordViewRecord
 import app.bsky.embed.RecordViewRecordEmbedUnion
 import app.bsky.feed.FeedViewPost
@@ -87,6 +88,63 @@ data class SkeetData(
                 createdAt = content.createdAt.toStdlibInstant()
             )
         }
+
+        fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileView): SkeetData {
+            return SkeetData(
+                cid = parent.first,
+                uri = parent.second,
+                authorAvatarURL = author.avatar?.uri,
+                authorName = author.displayName,
+                authorHandle = author.handle,
+                authorLabels = author.labels,
+                content = post.text,
+//                embed = when (post.embed) {
+//                    is PostEmbedUnion.External -> PostViewEmbedUnion.ExternalView(
+//                        ExternalView(
+//                            ExternalViewExternal(
+//                                uri = (post.embed as PostEmbedUnion.External).value.external.uri,
+//                                title = (post.embed as PostEmbedUnion.External).value.external.title,
+//                                description = (post.embed as PostEmbedUnion.External).value.external.description,
+////                                thumb = (post.embed as PostEmbedUnion.External).value.external.thumb.toUri(), // TODO fix this
+//                            )
+//                        )
+//                    )
+//
+//                    is PostEmbedUnion.Images -> PostViewEmbedUnion.ImagesView(
+//                        ImagesView((post.embed as PostEmbedUnion.Images).value.images.map {
+//                            ImagesViewImage(
+//                                fullsize = it.image,
+//                                alt = TODO(),
+//                                aspectRatio = TODO(),
+//                            )
+//                        })
+//                    )
+//
+//                    is PostEmbedUnion.Record -> PostViewEmbedUnion.RecordView(
+//                        RecordView(post.embed.value.record)
+//                    )
+//
+//                    is PostEmbedUnion.RecordWithMedia -> PostViewEmbedUnion.RecordWithMediaView(
+//                        RecordWithMediaView(
+//                            post.embed.value.record,
+//                            post.embed.value.media
+//                        )
+//                    )
+//
+//                    is PostEmbedUnion.Unknown -> PostViewEmbedUnion.Unknown(post.embed.value)
+//                    is PostEmbedUnion.Video -> PostViewEmbedUnion.VideoView(
+//                        VideoView(
+//                            cid = post.embed.value.cid, thumb = post.embed.value.thumb
+//                        )
+//                    )
+//
+//                    null -> null
+//                },
+                // TODO: fix embeds
+                createdAt = post.createdAt.toStdlibInstant()
+            )
+        }
+
 
         fun fromRecordView(post: RecordViewRecord): SkeetData {
             val content: Post = (post.value.decodeAs())
@@ -199,9 +257,6 @@ data class SkeetData(
         return r
     }
 
-    // TODO: detect if thread is made of more than the posts we have,
-    // if so, show a (more) button to load the thread.
-
     fun key(): String {
         return this.uri.split("/").last()
     }
@@ -215,4 +270,16 @@ data class SkeetData(
 
         return u
     }
+}
+
+sealed class Notification {
+    data class Like(val post: Post, val author: ProfileView) : Notification()
+    data class Repost(val repost: Post, val author: ProfileView) : Notification()
+    data class Reply(val parent: Pair<Cid, AtUri>, val reply: Post, val author: ProfileView) :
+        Notification()
+
+    data class Follow(val follow: ProfileView) : Notification()
+    data class Mention(val mention: Post, val author: ProfileView) : Notification()
+    data class Quote(val parent: Pair<Cid, AtUri>, val quote: Post, val author: ProfileView) :
+        Notification()
 }

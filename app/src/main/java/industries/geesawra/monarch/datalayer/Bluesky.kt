@@ -11,7 +11,10 @@ import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.bsky.actor.GetProfileQueryParams
+import app.bsky.actor.GetProfileResponse
 import app.bsky.actor.PreferencesUnion
+import app.bsky.actor.ProfileViewDetailed
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
 import app.bsky.embed.Record
@@ -37,6 +40,8 @@ import com.atproto.identity.ResolveHandleResponse
 import com.atproto.repo.CreateRecordRequest
 import com.atproto.repo.CreateRecordResponse
 import com.atproto.repo.DeleteRecordRequest
+import com.atproto.repo.GetRecordQueryParams
+import com.atproto.repo.GetRecordResponse
 import com.atproto.repo.StrongRef
 import com.atproto.repo.UploadBlobResponse
 import com.atproto.server.CreateSessionRequest
@@ -44,6 +49,8 @@ import com.atproto.server.CreateSessionResponse
 import com.atproto.server.GetServiceAuthQueryParams
 import com.atproto.server.GetServiceAuthResponse
 import com.atproto.server.RefreshSessionResponse
+import industries.geesawra.monarch.collection
+import industries.geesawra.monarch.did
 import industries.geesawra.monarch.rkey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -78,6 +85,7 @@ import sh.christian.ozone.api.Handle
 import sh.christian.ozone.api.Nsid
 import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.Blob
+import sh.christian.ozone.api.model.JsonContent
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import sh.christian.ozone.api.response.AtpResponse
 import kotlin.time.Clock
@@ -500,6 +508,46 @@ class BlueskyConn(val context: Context) {
             return when (postRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not create post: ${postRes.error?.message}"))
                 is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun fetchRecord(uri: AtUri): Result<JsonContent> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.getRecord(
+                GetRecordQueryParams(
+                    repo = uri.did(),
+                    collection = uri.collection(),
+                    rkey = uri.rkey()
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed fetching record: ${ret.error}"))
+                is AtpResponse.Success<GetRecordResponse> -> Result.success(ret.response.value)
+            }
+        }
+    }
+
+    suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.getProfile(
+                GetProfileQueryParams(
+                    actor = did
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed fetching record: ${ret.error}"))
+                is AtpResponse.Success<GetProfileResponse> -> Result.success(ret.response)
             }
         }
     }
