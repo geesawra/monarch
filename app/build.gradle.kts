@@ -20,6 +20,30 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (!providers.gradleProperty("RELEASE_KEY_PASSWORD").isPresent) {
+                return@create
+            }
+            
+            keyAlias = "release"
+            keyPassword = when (providers.gradleProperty("RELEASE_KEY_PASSWORD").isPresent) {
+                true -> providers.gradleProperty("RELEASE_KEY_PASSWORD").get()
+                false -> ""
+            }
+            storeFile = file(
+                when (providers.gradleProperty("RELEASE_STORE_FILE").isPresent) {
+                    true -> providers.gradleProperty("RELEASE_STORE_FILE").toString()
+                    false -> ""
+                }
+            )
+            storePassword = when (providers.gradleProperty("RELEASE_STORE_PASSWORD").isPresent) {
+                true -> providers.gradleProperty("RELEASE_STORE_PASSWORD").get()
+                false -> ""
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -27,7 +51,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

@@ -6,6 +6,7 @@ when:
 
 dependencies:
   nixpkgs:
+    - age
     - gnugrep
     - gnused
     - curl
@@ -26,6 +27,8 @@ steps:
       source $JDK/nix-support/setup-hook
       source install-android-sdk.sh
       npm i -D wrangler@latest
+      echo $AGE_KEY > age-key.txt
+      age --decrypt -i age-key.txt -o keystore.jks keystore.jks.age
       
       fastlane release_bin
       source ./generate-root.sh app/build/outputs/apk/release/app-release.apk
