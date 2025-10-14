@@ -23,6 +23,8 @@ steps:
   - name: build-release-apk
     command: |
       set -e
+      echo OOOO $KEYSTORE_PASSWORD
+      exit 1
       JDK=/nix/store/$(ls /nix/store | grep openjdk-headless-21)
       source $JDK/nix-support/setup-hook
       source install-android-sdk.sh
