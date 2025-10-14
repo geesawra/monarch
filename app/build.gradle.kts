@@ -25,7 +25,6 @@ android {
             if (!providers.environmentVariable("KEYSTORE_PASSWORD").isPresent) {
                 return@create
             }
-
             keyAlias = "release"
             keyPassword = providers.environmentVariable("KEYSTORE_PASSWORD").toString()
             storeFile = file(project.projectDir.absolutePath + "/keystore.jks")
