@@ -26,9 +26,9 @@ android {
                 return@create
             }
             keyAlias = "release"
-            keyPassword = providers.environmentVariable("KEYSTORE_PASSWORD").toString()
+            keyPassword = providers.environmentVariable("KEYSTORE_PASSWORD").get()
             storeFile = file(project.projectDir.absolutePath + "/keystore.jks")
-            storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").toString()
+            storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").get()
         }
     }
 
