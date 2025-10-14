@@ -1,8 +1,8 @@
 engine: nixery
 
 when:
-  - event: ["push", "pull_request"]
-    branch: ["main"]
+  - event: [ "push", "pull_request" ]
+    branch: [ "main" ]
 
 dependencies:
   nixpkgs:
@@ -18,7 +18,7 @@ dependencies:
     - fastlane
     - jdk21_headless
     - nodejs
-      
+
 steps:
   - name: build-release-apk
     command: |
@@ -28,7 +28,7 @@ steps:
       source install-android-sdk.sh
       npm i -D wrangler@latest
       echo $AGE_KEY > age-key.txt
-      age --decrypt -i age-key.txt -o keystore.jks keystore.jks.age
+      age --decrypt -i age-key.txt -o app/keystore.jks keystore.jks.age
       
       fastlane release_bin
       source ./generate-root.sh app/build/outputs/apk/release/app-release.apk
