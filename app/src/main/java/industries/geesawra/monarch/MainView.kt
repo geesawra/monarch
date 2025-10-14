@@ -4,7 +4,9 @@ package industries.geesawra.monarch
 
 import android.widget.Toast
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AirlineStops
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
@@ -265,20 +268,6 @@ private fun InnerTimelineView(
                             }
                         },
                         scrollBehavior = scrollBehavior,
-                        modifier = Modifier.clickable {
-                            coroutineScope.launch {
-                                when (currentDestination) {
-                                    TabBarDestinations.TIMELINE -> timelineState.animateScrollToItem(
-                                        0
-                                    )
-
-                                    TabBarDestinations.NOTIFICATIONS -> notificationsState.animateScrollToItem(
-                                        0
-                                    )
-
-                                }
-                            }
-                        },
                         navigationIcon = {
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> IconButton(onClick = {
@@ -299,9 +288,16 @@ private fun InnerTimelineView(
                         TabBarDestinations.TIMELINE -> {
                             Column(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                if (timelineState.canScrollBackward) {
+                                AnimatedVisibility(
+                                    visible = timelineState.canScrollBackward,
+                                    enter = slideInVertically(),
+                                    exit = slideOutVertically()
+                                ) {
                                     FloatingActionButton(
+                                        modifier = Modifier
+                                            .size(40.dp),
                                         onClick = {
                                             coroutineScope.launch {
                                                 timelineState.animateScrollToItem(0)
@@ -309,7 +305,7 @@ private fun InnerTimelineView(
                                         },
                                         shape = FloatingActionButtonDefaults.smallShape,
                                     ) {
-                                        Icon(Icons.Default.AirlineStops, "Scroll to top")
+                                        Icon(Icons.Default.ArrowUpward, "Scroll to top")
                                     }
                                 }
 
