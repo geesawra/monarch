@@ -22,25 +22,14 @@ android {
 
     signingConfigs {
         create("release") {
-            if (!providers.gradleProperty("RELEASE_KEY_PASSWORD").isPresent) {
+            if (!providers.environmentVariable("KEYSTORE_PASSWORD").isPresent) {
                 return@create
             }
-            
+
             keyAlias = "release"
-            keyPassword = when (providers.gradleProperty("RELEASE_KEY_PASSWORD").isPresent) {
-                true -> providers.gradleProperty("RELEASE_KEY_PASSWORD").get()
-                false -> ""
-            }
-            storeFile = file(
-                when (providers.gradleProperty("RELEASE_STORE_FILE").isPresent) {
-                    true -> providers.gradleProperty("RELEASE_STORE_FILE").toString()
-                    false -> ""
-                }
-            )
-            storePassword = when (providers.gradleProperty("RELEASE_STORE_PASSWORD").isPresent) {
-                true -> providers.gradleProperty("RELEASE_STORE_PASSWORD").get()
-                false -> ""
-            }
+            keyPassword = providers.environmentVariable("KEYSTORE_PASSWORD").toString()
+            storeFile = file(project.projectDir.absolutePath + "/keystore.jks")
+            storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").toString()
         }
     }
 
