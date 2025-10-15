@@ -117,27 +117,25 @@ class TimelineViewModel @AssistedInject constructor(
 
         timelineFetchJob = viewModelScope.launch {
             bskyConn.fetchTimeline(
-                {
-                    if (uiState.selectedFeed == "Following") {
-                        ""
-                    } else {
-                        uiState.selectedFeed
-                    }
-                }(), if (fresh) {
+                if (uiState.selectedFeed == "Following") {
+                    ""
+                } else {
+                    uiState.selectedFeed
+                }, if (fresh) {
                     null
                 } else {
                     uiState.timelineCursor
                 }
-            ).onSuccess { it ->
-                if (fresh) {
-                    uiState = uiState.copy(skeets = listOf())
+            ).onSuccess { response ->
+                val newSkeets = if (fresh) {
+                    response.feed.map { SkeetData.fromFeedViewPost(it) }.distinctBy { it.cid }
+                } else {
+                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid }
                 }
-                val newData =
-                    (uiState.skeets + it.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid }
 
                 uiState = uiState.copy(
-                    skeets = newData,
-                    timelineCursor = it.cursor,
+                    skeets = newSkeets,
+                    timelineCursor = response.cursor,
                     isFetchingMoreTimeline = false
                 )
                 then()

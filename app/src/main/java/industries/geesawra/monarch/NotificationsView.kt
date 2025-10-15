@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -29,13 +28,13 @@ fun NotificationsView(
     viewModel: TimelineViewModel,
     state: LazyListState,
     modifier: Modifier = Modifier,
-    isScrollEnabled: MutableState<Boolean>,
+    isScrollEnabled: Boolean,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
 ) {
     LazyColumn(
         state = state,
         modifier = modifier.fillMaxSize(),
-        userScrollEnabled = isScrollEnabled.value,
+        userScrollEnabled = isScrollEnabled,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         viewModel.uiState.notifications.forEach { notif ->

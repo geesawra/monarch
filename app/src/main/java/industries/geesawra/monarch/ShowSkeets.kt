@@ -15,7 +15,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -30,13 +29,13 @@ import industries.geesawra.monarch.datalayer.TimelineViewModel
 fun ShowSkeets(
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel,
-    isScrollEnabled: MutableState<Boolean>,
+    isScrollEnabled: Boolean,
     state: LazyListState = rememberLazyListState(),
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
 ) {
     LazyColumn(
         state = state,
-        userScrollEnabled = isScrollEnabled.value,
+        userScrollEnabled = isScrollEnabled,
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
