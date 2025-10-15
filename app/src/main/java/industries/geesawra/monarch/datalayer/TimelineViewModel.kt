@@ -235,23 +235,6 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun resetTimeline() {
-        uiState = uiState.copy(
-            skeets = listOf(),
-            isFetchingMoreTimeline = false,
-            timelineCursor = null,
-        )
-    }
-
-    fun resetNotifications() {
-        uiState = uiState.copy(
-            notifications = listOf(),
-            isFetchingMoreNotifications = false,
-            notificationsCursor = null,
-        )
-    }
-
-
     suspend fun post(
         content: String,
         images: List<Uri>? = null,
@@ -287,8 +270,8 @@ class TimelineViewModel @AssistedInject constructor(
             feedName = displayName,
             feedAvatar = avatar,
         )
-        resetTimeline()
-        fetchTimeline { then() }
+
+        fetchTimeline(fresh = true) { then() }
     }
 
     fun like(uri: AtUri, cid: Cid, then: () -> Unit) {
