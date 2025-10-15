@@ -74,18 +74,21 @@ data class SkeetData(
             )
 
             sd.replyToNotFollowing = {
-                val (parent, _) = sd.parent()
-                val root = sd.root()
+                when (sd.reason) {
+                    is FeedViewPostReasonUnion.ReasonPin -> false
+                    is FeedViewPostReasonUnion.ReasonRepost -> false
+                    is FeedViewPostReasonUnion.Unknown -> false
+                    else -> {
+                        val (parent, _) = sd.parent()
+                        val root = sd.root()
 
-                if (parent == null) {
-                    false // simple posts, reposts etc should always go through
+                        val parentFollowing = parent?.following ?: false
+                        val rootFollowing = root?.following ?: false
+
+                        val res = parentFollowing && rootFollowing
+                        !res
+                    }
                 }
-
-                val parentFollowing = parent?.following ?: false
-                val rootFollowing = root?.following ?: false
-
-                val res = parentFollowing && rootFollowing
-                !res
             }()
 
             return sd
