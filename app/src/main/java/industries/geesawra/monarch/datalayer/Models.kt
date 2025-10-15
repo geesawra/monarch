@@ -3,6 +3,7 @@
 package industries.geesawra.monarch.datalayer
 
 import app.bsky.actor.ProfileView
+import app.bsky.actor.ProfileViewBasic
 import app.bsky.embed.RecordViewRecord
 import app.bsky.embed.RecordViewRecordEmbedUnion
 import app.bsky.feed.FeedViewPost
@@ -43,12 +44,15 @@ data class SkeetData(
 
     val blocked: Boolean = false,
     val notFound: Boolean = false,
+    val following: Boolean = false,
+    val follower: Boolean = false,
+    var replyToNotFollowing: Boolean = false,
 ) {
     companion object {
         fun fromFeedViewPost(post: FeedViewPost): SkeetData {
             val content: Post = (post.post.record.decodeAs())
 
-            return SkeetData(
+            val sd = SkeetData(
                 likes = post.post.likeCount,
                 reposts = post.post.repostCount,
                 replies = post.post.replyCount,
@@ -64,11 +68,26 @@ data class SkeetData(
                 embed = post.post.embed,
                 reason = post.reason,
                 reply = post.reply,
-                createdAt = content.createdAt.toStdlibInstant()
+                createdAt = content.createdAt.toStdlibInstant(),
+                following = post.post.author.viewer?.following != null,
+                follower = post.post.author.viewer?.followedBy != null,
             )
+
+            sd.replyToNotFollowing = {
+                val (parent, _) = sd.parent()
+                val root = sd.root()
+
+                val parentFollowing = parent?.following ?: false
+                val rootFollowing = root?.following ?: false
+
+                val res = parentFollowing && rootFollowing
+                !res
+            }()
+
+            return sd
         }
 
-        fun fromPostView(post: PostView): SkeetData {
+        fun fromPostView(post: PostView, author: ProfileViewBasic): SkeetData {
             val content: Post = (post.record.decodeAs())
 
             return SkeetData(
@@ -85,7 +104,9 @@ data class SkeetData(
                 authorLabels = post.author.labels,
                 content = content.text,
                 embed = post.embed,
-                createdAt = content.createdAt.toStdlibInstant()
+                createdAt = content.createdAt.toStdlibInstant(),
+                following = author.viewer?.following != null,
+                follower = author.viewer?.followedBy != null,
             )
         }
 
@@ -120,6 +141,7 @@ data class SkeetData(
 //                        })
 //                    )
 //
+
 //                    is PostEmbedUnion.Record -> PostViewEmbedUnion.RecordView(
 //                        RecordView(post.embed.value.record)
 //                    )
@@ -222,8 +244,9 @@ data class SkeetData(
 
             is ReplyRefParentUnion.PostView -> {
                 val content: Post = (rawParent.value.record.decodeAs())
-
-                fromPostView(rawParent.value) to content.reply?.parent
+                fromPostView(
+                    rawParent.value, rawParent.value.author
+                ) to content.reply?.parent
             }
 
             else -> null to null
@@ -245,7 +268,7 @@ data class SkeetData(
                 notFound = rawRoot.value.notFound
             )
 
-            is ReplyRefRootUnion.PostView -> fromPostView(rawRoot.value)
+            is ReplyRefRootUnion.PostView -> fromPostView(rawRoot.value, rawRoot.value.author)
 
             else -> null
         }

@@ -39,7 +39,9 @@ fun ShowSkeets(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        viewModel.uiState.skeets.forEach { skeet ->
+        viewModel.uiState.skeets.filter {
+            !it.replyToNotFollowing
+        }.forEach { skeet ->
             item(key = skeet.key()) {
                 val root = skeet.root()
                 val (parent, parentsParent) = skeet.parent()
