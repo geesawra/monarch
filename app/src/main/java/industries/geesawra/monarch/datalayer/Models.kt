@@ -77,6 +77,10 @@ data class SkeetData(
                 val (parent, _) = sd.parent()
                 val root = sd.root()
 
+                if (parent == null) {
+                    false // simple posts, reposts etc should always go through
+                }
+
                 val parentFollowing = parent?.following ?: false
                 val rootFollowing = root?.following ?: false
 
