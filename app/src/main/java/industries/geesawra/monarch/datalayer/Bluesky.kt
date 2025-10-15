@@ -19,8 +19,11 @@ import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
 import app.bsky.embed.Record
 import app.bsky.embed.Video
+import app.bsky.feed.FeedViewPost
 import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetFeedGeneratorsQueryParams
+import app.bsky.feed.GetFeedQueryParams
+import app.bsky.feed.GetFeedResponse
 import app.bsky.feed.GetTimelineQueryParams
 import app.bsky.feed.GetTimelineResponse
 import app.bsky.feed.Like
@@ -141,6 +144,10 @@ data class SessionData(
     }
 }
 
+data class Timeline(
+    public val cursor: String? = null,
+    public val feed: List<FeedViewPost>,
+)
 
 class BlueskyConn(val context: Context) {
     companion object {
@@ -450,10 +457,34 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    suspend fun fetchFeed(feed: String, cursor: String? = null): Result<Timeline> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val timeline = client!!.getFeed(
+                GetFeedQueryParams(
+                    feed = AtUri(feed),
+                    limit = 25,
+                    cursor = cursor
+                )
+            )
+            val feed = when (timeline) {
+                is AtpResponse.Failure<*> -> {
+                    return Result.failure(Exception("Failed to fetch timeline: ${timeline.error}"))
+                }
+
+                is AtpResponse.Success<GetFeedResponse> -> timeline.response
+            }
+
+            return Result.success(Timeline(feed.cursor, feed.feed))
+        }
+    }
+
     suspend fun fetchTimeline(
-        algorithm: String,
         cursor: String? = null
-    ): Result<GetTimelineResponse> {
+    ): Result<Timeline> {
         return runCatching {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
@@ -461,7 +492,6 @@ class BlueskyConn(val context: Context) {
 
             val timeline = client!!.getTimeline(
                 GetTimelineQueryParams(
-                    algorithm = algorithm,
                     limit = 25,
                     cursor = cursor
                 )
@@ -474,7 +504,7 @@ class BlueskyConn(val context: Context) {
                 is AtpResponse.Success<GetTimelineResponse> -> timeline.response
             }
 
-            return Result.success(feed)
+            return Result.success(Timeline(feed.cursor, feed.feed))
         }
     }
 
