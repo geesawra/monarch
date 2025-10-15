@@ -295,18 +295,37 @@ class BlueskyConn(val context: Context) {
         val message: String?,
     )
 
+    private fun mkClient(
+        pds: String,
+        sessionData: SessionData,
+        labelers: List<String> = listOf()
+    ): AuthenticatedXrpcBlueskyApi {
+        val hc = HttpClient(OkHttp) {
+            defaultRequest {
+                url(pds)
+                headers["atproto-accept-labelers"] = labelers.joinToString()
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 15000
+                connectTimeoutMillis = 15000
+                socketTimeoutMillis = 15000
+            }
+        }
+
+        return AuthenticatedXrpcBlueskyApi(
+            hc,
+            BlueskyAuthPlugin.Tokens(sessionData.accessJwt, sessionData.refreshJwt)
+        )
+    }
+
     private suspend fun refreshIfNeeded(
         pdsURL: String,
         token: SessionData,
-        labelers: List<String>? = listOf()
     ): Result<Unit> {
         return runCatching {
             val httpClient = HttpClient(OkHttp) {
                 defaultRequest {
                     url(pdsURL)
-                    labelers?.let {
-                        headers["atproto-accept-labelers"] = labelers.joinToString()
-                    }
                 }
                 install(HttpTimeout) {
                     requestTimeoutMillis = 15000
@@ -326,9 +345,6 @@ class BlueskyConn(val context: Context) {
             when (gs.status) {
                 HttpStatusCode.OK -> run {
                     this.session = token
-                    val tokens =
-                        BlueskyAuthPlugin.Tokens(token.accessJwt, token.refreshJwt)
-                    this.client = AuthenticatedXrpcBlueskyApi(httpClient, tokens)
                     return Result.success(Unit)
                 }
 
@@ -357,7 +373,6 @@ class BlueskyConn(val context: Context) {
             }
 
             when (rs.status) {
-
                 HttpStatusCode.OK -> run {
                     val body: String = rs.body()
                     val rs: RefreshSessionResponse =
@@ -417,15 +432,19 @@ class BlueskyConn(val context: Context) {
                 createMutex.unlock()
                 return Result.failure(it)
             }
-
             this.pdsURL = pdsURL
 
-            val labelers = this.subscribedLabelers().getOrThrow().keys.mapNotNull { it?.did }
+            this.client = mkClient(
+                pdsURL,
+                sessionData,
+            )
 
-            refreshIfNeeded(pdsURL, sessionData, labelers).onFailure {
-                createMutex.unlock()
-                return Result.failure(it)
-            }
+            val labelers = this.subscribedLabelers().getOrThrow().keys.mapNotNull { it?.did }
+            this.client = mkClient(
+                pdsURL,
+                sessionData,
+                labelers
+            )
 
             createMutex.unlock()
         }
@@ -762,17 +781,6 @@ class BlueskyConn(val context: Context) {
                     else -> false
                 }
             } as PreferencesUnion.LabelersPref).value.labelers.map { it.did }.toMutableList()
-
-            val otherOnes = (prefs.preferences.filter {
-                when (it) {
-                    is PreferencesUnion.ContentLabelPref -> true
-                    else -> false
-                }
-            }.map { it as PreferencesUnion.ContentLabelPref }).forEach {
-                it.value.labelerDid?.let { did ->
-                    labelers += did
-                }
-            }
 
             val res = client!!.getServices(
                 GetServicesQueryParams(
