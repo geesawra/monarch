@@ -99,20 +99,39 @@ class TimelineViewModel @AssistedInject constructor(
         return Result.success(ret)
     }
 
-    fun fetchTimeline(then: () -> Unit = {}) {
+    fun fetchNewData(then: () -> Unit = {}) {
+        fetchTimeline(fresh = true)
+        fetchNotifications(fresh = true)
+        viewModelScope.launch {
+            timelineFetchJob?.join()
+            notificationsFetchJob?.join()
+            then()
+        }
+    }
+
+    fun fetchTimeline(fresh: Boolean = false, then: () -> Unit = {}) {
         uiState = uiState.copy(isFetchingMoreTimeline = true)
         runCatching {
             timelineFetchJob?.cancel()
         }
 
         timelineFetchJob = viewModelScope.launch {
-            bskyConn.fetchTimeline({
-                if (uiState.selectedFeed == "Following") {
-                    ""
+            bskyConn.fetchTimeline(
+                {
+                    if (uiState.selectedFeed == "Following") {
+                        ""
+                    } else {
+                        uiState.selectedFeed
+                    }
+                }(), if (fresh) {
+                    null
                 } else {
-                    uiState.selectedFeed
+                    uiState.timelineCursor
                 }
-            }(), uiState.timelineCursor).onSuccess { it ->
+            ).onSuccess { it ->
+                if (fresh) {
+                    uiState = uiState.copy(skeets = listOf())
+                }
                 val newData =
                     (uiState.skeets + it.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid }
 
@@ -137,14 +156,20 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun fetchNotifications(then: () -> Unit = {}) {
+    fun fetchNotifications(fresh: Boolean = false, then: () -> Unit = {}) {
         uiState = uiState.copy(isFetchingMoreNotifications = true)
         runCatching {
             notificationsFetchJob?.cancel()
         }
 
         notificationsFetchJob = viewModelScope.launch {
-            val rawNotifs = bskyConn.notifications(uiState.notificationsCursor)
+            val rawNotifs = bskyConn.notifications(
+                if (fresh) {
+                    null
+                } else {
+                    uiState.notificationsCursor
+                }
+            )
                 .onFailure {
                     if (it is CancellationException) {
                         return@onFailure
@@ -197,6 +222,10 @@ class TimelineViewModel @AssistedInject constructor(
                 }
             }
 
+            if (fresh) {
+                uiState = uiState.copy(notifications = listOf())
+            }
+
             uiState = uiState.copy(
                 notifications = uiState.notifications + notifs,
                 notificationsCursor = rawNotifs.cursor,
@@ -206,15 +235,22 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun reset() {
+    fun resetTimeline() {
         uiState = uiState.copy(
             skeets = listOf(),
             isFetchingMoreTimeline = false,
             timelineCursor = null,
-            notificationsCursor = null,
-            notifications = listOf()
         )
     }
+
+    fun resetNotifications() {
+        uiState = uiState.copy(
+            notifications = listOf(),
+            isFetchingMoreNotifications = false,
+            notificationsCursor = null,
+        )
+    }
+
 
     suspend fun post(
         content: String,
@@ -244,14 +280,14 @@ class TimelineViewModel @AssistedInject constructor(
             }
         }
     }
-    
+
     fun selectFeed(uri: String, displayName: String, avatar: String?, then: () -> Unit = {}) {
         uiState = uiState.copy(
             selectedFeed = uri,
             feedName = displayName,
             feedAvatar = avatar,
         )
-        reset()
+        resetTimeline()
         fetchTimeline { then() }
     }
 

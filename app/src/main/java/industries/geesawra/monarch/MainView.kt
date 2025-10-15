@@ -164,6 +164,7 @@ private fun InnerTimelineView(
     val drawerState = rememberDrawerState(
         initialValue = DrawerValue.Closed
     )
+    val isScrollEnabled = remember { mutableStateOf(true) }
     val ctx = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -193,13 +194,19 @@ private fun InnerTimelineView(
             isRefreshing.value = true
             when (currentDestination) {
                 TabBarDestinations.TIMELINE -> {
-                    timelineViewModel.reset()
-                    timelineViewModel.fetchTimeline { isRefreshing.value = false }
+                    isScrollEnabled.value = false
+                    timelineViewModel.fetchTimeline {
+                        isRefreshing.value = false
+                        isScrollEnabled.value = true
+                    }
                 }
 
                 TabBarDestinations.NOTIFICATIONS -> {
-                    timelineViewModel.reset()
-                    timelineViewModel.fetchNotifications { isRefreshing.value = false }
+                    isScrollEnabled.value = false
+                    timelineViewModel.fetchNotifications {
+                        isRefreshing.value = false
+                        isScrollEnabled.value = true
+                    }
                 }
             }
         },
@@ -351,22 +358,30 @@ private fun InnerTimelineView(
                     }
                 }
             ) { values ->
+                LaunchedEffect(Unit) {
+                    isScrollEnabled.value = false
+                    timelineViewModel.fetchNewData {
+                        isRefreshing.value = false
+                        isScrollEnabled.value = true
+                    }
+                }
+
                 when (currentDestination) {
                     TabBarDestinations.TIMELINE -> ShowSkeets(
                         viewModel = timelineViewModel,
                         state = timelineState,
                         modifier = Modifier.padding(values),
-                        onReplyTap = onReplyTap
-                    ) { isRefreshing.value = false }
+                        onReplyTap = onReplyTap,
+                        isScrollEnabled = isScrollEnabled
+                    )
 
                     TabBarDestinations.NOTIFICATIONS -> NotificationsView(
                         viewModel = timelineViewModel,
                         state = notificationsState,
                         modifier = Modifier.padding(values),
+                        isScrollEnabled = isScrollEnabled,
                         onReplyTap = onReplyTap
-                    ) {
-                        isRefreshing.value = false
-                    }
+                    )
                 }
             }
         }
