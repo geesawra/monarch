@@ -30,7 +30,7 @@ import kotlin.time.ExperimentalTime
 
 
 data class TimelineUiState(
-    val selectedFeed: String = "Following",
+    val selectedFeed: String = "following",
     val feedName: String = "Following",
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
@@ -118,7 +118,7 @@ class TimelineViewModel @AssistedInject constructor(
         timelineFetchJob = viewModelScope.launch {
 
             when (uiState.selectedFeed) {
-                "Following" -> bskyConn.fetchTimeline(
+                "following" -> bskyConn.fetchTimeline(
                     if (fresh) {
                         null
                     } else {
