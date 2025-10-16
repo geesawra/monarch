@@ -82,10 +82,14 @@ data class SkeetData(
                         val (parent, _) = sd.parent()
                         val root = sd.root()
 
+                        if (parent == null) {
+                            false
+                        }
+
                         val parentFollowing = parent?.following ?: false
                         val rootFollowing = root?.following ?: false
 
-                        val res = parentFollowing && rootFollowing
+                        val res = parentFollowing || rootFollowing
                         !res
                     }
                 }
