@@ -203,7 +203,7 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Mention -> {
                         val p: app.bsky.feed.Post = it.record.decodeAs()
-                        Notification.Mention(p, it.author)
+                        Notification.Mention(Pair(it.cid, it.uri), p, it.author)
                     }
 
                     ListNotificationsReason.Quote -> {

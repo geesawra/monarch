@@ -116,7 +116,16 @@ private fun RenderNotification(
         )
 
 
-//        is Notification.Mention -> TODO()
+        is Notification.Mention -> SkeetView(
+            viewModel = viewModel,
+            skeet = SkeetData.fromPost(
+                notification.parent,
+                notification.mention,
+                notification.author
+            ),
+            onReplyTap = onReplyTap,
+        )
+
         is Notification.Quote -> SkeetView(
             viewModel = viewModel,
             skeet = SkeetData.fromPost(
@@ -145,8 +154,5 @@ private fun RenderNotification(
             ),
             nested = true
         )
-
-        else -> {}
-
     }
 }

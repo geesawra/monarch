@@ -4,11 +4,17 @@ package industries.geesawra.monarch.datalayer
 
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
+import app.bsky.embed.ExternalView
+import app.bsky.embed.ExternalViewExternal
+import app.bsky.embed.ImagesView
+import app.bsky.embed.ImagesViewImage
 import app.bsky.embed.RecordViewRecord
 import app.bsky.embed.RecordViewRecordEmbedUnion
+import app.bsky.embed.VideoView
 import app.bsky.feed.FeedViewPost
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.Post
+import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.PostView
 import app.bsky.feed.PostViewEmbedUnion
@@ -20,9 +26,47 @@ import com.atproto.repo.StrongRef
 import kotlinx.datetime.toStdlibInstant
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
+import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.Handle
+import sh.christian.ozone.api.Uri
+import sh.christian.ozone.api.model.Blob
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+
+enum class CDNImageSize(
+    val size: String
+) {
+    Full("feed_fullsize"),
+    Thumb("feed_thumbnail")
+}
+
+private fun cdnBlobURL(authorDid: Did, blob: Blob?, size: CDNImageSize): Uri? {
+    val id = when (blob) {
+        is Blob.LegacyBlob -> blob.cid
+        is Blob.StandardBlob -> blob.ref.link
+        null -> return null
+    }
+
+    return Uri("https://cdn.bsky.app/img/${size.size}/plain/${authorDid.did}/${id}@jpeg")
+}
+
+private fun cdnVideoThumb(authorDid: Did, blob: Blob?): Uri? {
+    val id = when (blob) {
+        is Blob.LegacyBlob -> blob.cid
+        is Blob.StandardBlob -> blob.ref.link
+        null -> return null
+    }
+    return Uri("https://video.cdn.bsky.app/hls/${authorDid.did}/${id}/thumbnail.jpg")
+}
+
+private fun cdnVideoPlaylist(authorDid: Did, blob: Blob?): Uri? {
+    val id = when (blob) {
+        is Blob.LegacyBlob -> blob.cid
+        is Blob.StandardBlob -> blob.ref.link
+        null -> return null
+    }
+    return Uri("https://video.cdn.bsky.app/hls/${authorDid.did}/${id}/playlist.m3u8")
+}
 
 data class SkeetData(
     val likes: Long? = null,
@@ -130,28 +174,47 @@ data class SkeetData(
                 authorHandle = author.handle,
                 authorLabels = author.labels,
                 content = post.text,
-//                embed = when (post.embed) {
-//                    is PostEmbedUnion.External -> PostViewEmbedUnion.ExternalView(
-//                        ExternalView(
-//                            ExternalViewExternal(
-//                                uri = (post.embed as PostEmbedUnion.External).value.external.uri,
-//                                title = (post.embed as PostEmbedUnion.External).value.external.title,
-//                                description = (post.embed as PostEmbedUnion.External).value.external.description,
-////                                thumb = (post.embed as PostEmbedUnion.External).value.external.thumb.toUri(), // TODO fix this
-//                            )
-//                        )
-//                    )
-//
-//                    is PostEmbedUnion.Images -> PostViewEmbedUnion.ImagesView(
-//                        ImagesView((post.embed as PostEmbedUnion.Images).value.images.map {
-//                            ImagesViewImage(
-//                                fullsize = it.image,
-//                                alt = TODO(),
-//                                aspectRatio = TODO(),
-//                            )
-//                        })
-//                    )
-//
+                embed = when (post.embed) {
+                    is PostEmbedUnion.External -> {
+                        val c = (post.embed as PostEmbedUnion.External)
+                        PostViewEmbedUnion.ExternalView(
+                            ExternalView(
+                                ExternalViewExternal(
+                                    uri = c.value.external.uri,
+                                    title = c.value.external.title,
+                                    description = c.value.external.description,
+                                    thumb = cdnBlobURL(
+                                        author.did,
+                                        c.value.external.thumb,
+                                        CDNImageSize.Thumb
+                                    )
+                                )
+                            )
+                        )
+                    }
+
+                    is PostEmbedUnion.Images -> {
+                        val c = (post.embed as PostEmbedUnion.Images)
+                        PostViewEmbedUnion.ImagesView(
+                            ImagesView(c.value.images.map {
+                                ImagesViewImage(
+                                    fullsize = cdnBlobURL(
+                                        author.did,
+                                        it.image,
+                                        CDNImageSize.Full
+                                    )!!,
+                                    thumb = cdnBlobURL(
+                                        author.did,
+                                        it.image,
+                                        CDNImageSize.Thumb
+                                    )!!,
+                                    alt = it.alt,
+                                    aspectRatio = it.aspectRatio,
+                                )
+                            })
+                        )
+                    }
+
 
 //                    is PostEmbedUnion.Record -> PostViewEmbedUnion.RecordView(
 //                        RecordView(post.embed.value.record)
@@ -165,14 +228,22 @@ data class SkeetData(
 //                    )
 //
 //                    is PostEmbedUnion.Unknown -> PostViewEmbedUnion.Unknown(post.embed.value)
-//                    is PostEmbedUnion.Video -> PostViewEmbedUnion.VideoView(
-//                        VideoView(
-//                            cid = post.embed.value.cid, thumb = post.embed.value.thumb
-//                        )
-//                    )
-//
-//                    null -> null
-//                },
+                    is PostEmbedUnion.Video -> {
+                        val c = (post.embed as PostEmbedUnion.Video).value
+                        PostViewEmbedUnion.VideoView(
+                            VideoView(
+                                playlist = cdnVideoPlaylist(author.did, c.video)!!,
+                                thumbnail = cdnVideoThumb(author.did, c.video),
+                                alt = c.alt,
+                                aspectRatio = c.aspectRatio,
+                                cid = parent.first
+                            )
+                        )
+                    }
+
+                    null -> null
+                    else -> null
+                },
                 // TODO: fix embeds
                 createdAt = post.createdAt.toStdlibInstant()
             )
@@ -313,7 +384,9 @@ sealed class Notification {
         Notification()
 
     data class Follow(val follow: ProfileView) : Notification()
-    data class Mention(val mention: Post, val author: ProfileView) : Notification()
+    data class Mention(val parent: Pair<Cid, AtUri>, val mention: Post, val author: ProfileView) :
+        Notification()
+
     data class Quote(val parent: Pair<Cid, AtUri>, val quote: Post, val author: ProfileView) :
         Notification()
 }
