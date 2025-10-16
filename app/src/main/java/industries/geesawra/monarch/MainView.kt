@@ -42,6 +42,8 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
@@ -100,7 +102,6 @@ fun MainView(
             skipPartiallyExpanded = true,
         )
     )
-
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
     val isQuotePost = remember { mutableStateOf(false) }
 
@@ -122,6 +123,11 @@ fun MainView(
                 isQuotePost = isQuotePost
             )
         },
+        snackbarHost = {
+            SnackbarHost(it) { sd ->
+                Snackbar(snackbarData = sd, actionOnNewLine = true)
+            }
+        },
         content = { paddingValues ->
             InnerTimelineView(
                 modifier = Modifier.padding(paddingValues),
@@ -139,7 +145,15 @@ fun MainView(
                         scaffoldState.bottomSheetState.expand()
                     }
                 },
-                loginError = onLoginError
+                loginError = onLoginError,
+                onError = {
+                    coroutineScope.launch {
+                        scaffoldState.snackbarHostState.showSnackbar(
+                            message = "Error: $it",
+                            withDismissAction = true,
+                        )
+                    }
+                }
             )
         }
     )
@@ -154,6 +168,7 @@ private fun InnerTimelineView(
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
+    onError: (String) -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
@@ -183,8 +198,7 @@ private fun InnerTimelineView(
 
     LaunchedEffect(timelineViewModel.uiState.error) {
         timelineViewModel.uiState.error?.let {
-            Toast.makeText(ctx, "Error: $it", Toast.LENGTH_LONG)
-                .show()
+            onError(it)
         }
     }
 
@@ -230,7 +244,7 @@ private fun InnerTimelineView(
                                 timelineState.scrollToItem(0)
                             }
                         }
-                        
+
                         coroutineScope.launch {
                             drawerState.close()
                         }
