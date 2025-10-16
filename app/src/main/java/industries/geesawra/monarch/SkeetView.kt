@@ -110,7 +110,7 @@ fun SkeetView(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
