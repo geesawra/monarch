@@ -126,15 +126,15 @@ data class SkeetData(
                         val (parent, _) = sd.parent()
                         val root = sd.root()
 
-                        if (parent == null) {
-                            false
+                        parent?.let {
+                            val parentFollowing = parent.following
+                            val rootFollowing = root?.following ?: false
+
+                            val res = parentFollowing || rootFollowing
+                            !res
                         }
 
-                        val parentFollowing = parent?.following ?: false
-                        val rootFollowing = root?.following ?: false
-
-                        val res = parentFollowing || rootFollowing
-                        !res
+                        false
                     }
                 }
             }()
@@ -215,10 +215,15 @@ data class SkeetData(
                         )
                     }
 
+                    // Record need to be hydrated before being rendered!
 
-//                    is PostEmbedUnion.Record -> PostViewEmbedUnion.RecordView(
-//                        RecordView(post.embed.value.record)
-//                    )
+//                    is PostEmbedUnion.Record -> {
+//                        val c = (post.embed as PostEmbedUnion.Record).value
+//
+//                        PostViewEmbedUnion.RecordView(
+//                            RecordView(post.embed.value.record)
+//                        )
+//                    }
 //
 //                    is PostEmbedUnion.RecordWithMedia -> PostViewEmbedUnion.RecordWithMediaView(
 //                        RecordWithMediaView(
