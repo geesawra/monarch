@@ -6,12 +6,16 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.feed.GeneratorView
 import app.bsky.feed.Like
+import app.bsky.feed.Post
 import app.bsky.feed.PostReplyRef
+import app.bsky.feed.Repost
+import app.bsky.graph.Follow
 import app.bsky.notification.ListNotificationsReason
 import com.atproto.repo.StrongRef
 import dagger.assisted.Assisted
@@ -20,6 +24,7 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toStdlibInstant
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
@@ -35,7 +40,7 @@ data class TimelineUiState(
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
     val skeets: List<SkeetData> = listOf(),
-    val notifications: List<Notification> = listOf(),
+    val notifications: Notifications = Notifications(list = listOf()),
     val isFetchingMoreTimeline: Boolean = false,
     val isFetchingMoreNotifications: Boolean = false,
     val authenticated: Boolean = false,
@@ -189,54 +194,138 @@ class TimelineViewModel @AssistedInject constructor(
                     )
                 }.getOrThrow()
 
-            val notifs: List<Notification> = rawNotifs.notifications.mapNotNull {
+            val repeatable = mutableListOf<Notification>()
+
+            // we could bulk request posts here and avoid much of the network IO
+            var notifs = Notifications(list = rawNotifs.notifications.mapNotNull {
                 when (it.reason) {
                     ListNotificationsReason.Follow -> {
-                        Notification.Follow(it.author)
+                        val l: Follow = it.record.decodeAs()
+                        Notification.Follow(it.author, l.createdAt.toStdlibInstant())
                     }
 
                     ListNotificationsReason.Like -> {
                         val l: Like = it.record.decodeAs()
                         val lp = fetchRecord(l.subject.uri).getOrThrow()
-                        Notification.Like(lp.decodeAs(), it.author)
+
+                        repeatable += Notification.RawLike(
+                            lp.decodeAs(),
+                            it.author,
+                            l.createdAt.toStdlibInstant()
+                        )
+
+                        null // repeatable, will be processed later
                     }
 
                     ListNotificationsReason.Mention -> {
-                        val p: app.bsky.feed.Post = it.record.decodeAs()
-                        Notification.Mention(Pair(it.cid, it.uri), p, it.author)
+                        val p: Post = it.record.decodeAs()
+                        Notification.Mention(
+                            Pair(it.cid, it.uri),
+                            p,
+                            it.author,
+                            p.createdAt.toStdlibInstant()
+                        )
                     }
 
                     ListNotificationsReason.Quote -> {
-                        val p: app.bsky.feed.Post = it.record.decodeAs()
-                        Notification.Quote(Pair(it.cid, it.uri), p, it.author)
+                        val p: Post = it.record.decodeAs()
+                        Notification.Quote(
+                            Pair(it.cid, it.uri),
+                            p,
+                            it.author,
+                            p.createdAt.toStdlibInstant()
+                        )
                     }
 
                     ListNotificationsReason.Reply -> {
-                        val p: app.bsky.feed.Post = it.record.decodeAs()
-                        Notification.Reply(Pair(it.cid, it.uri), p, it.author)
+                        val p: Post = it.record.decodeAs()
+                        Notification.Reply(
+                            Pair(it.cid, it.uri),
+                            p,
+                            it.author,
+                            p.createdAt.toStdlibInstant()
+                        )
                     }
 
                     ListNotificationsReason.Repost -> {
-                        val p: app.bsky.feed.Repost = it.record.decodeAs()
+                        val p: Repost = it.record.decodeAs()
                         val pp = fetchRecord(p.subject.uri).getOrThrow()
-                        Notification.Repost(pp.decodeAs(), it.author)
+                        Notification.Repost(pp.decodeAs(), it.author, p.createdAt.toStdlibInstant())
                     }
 
                     else -> {
                         null
                     }
                 }
-            }
+            })
 
             if (fresh) {
-                uiState = uiState.copy(notifications = listOf())
+                uiState = uiState.copy(notifications = Notifications(list = listOf()))
             }
 
+            val processedRepeatable =
+                mutableMapOf<RepeatableNotification, MutableMap<Post, RepeatedNotification>>()
+
+            repeatable.fastForEach {
+                when (it) {
+                    is Notification.RawLike -> {
+                        val list = processedRepeatable.getOrPut(RepeatableNotification.Like) {
+                            mutableMapOf()
+                        }
+
+                        if (list.contains(it.post)) {
+                            val l = list[it.post]!!
+                            l.authors += RepeatedAuthor(it.author, it.createdAt)
+                            if (it.createdAt > l.timestamp) {
+                                l.timestamp = it.createdAt
+                            }
+                            list[it.post] = l
+                        } else {
+                            list[it.post] = RepeatedNotification(
+                                kind = RepeatableNotification.Like,
+                                authors = listOf(
+                                    RepeatedAuthor(
+                                        it.author,
+                                        it.createdAt
+                                    )
+                                ),
+                                post = it.post,
+                                timestamp = it.createdAt
+                            )
+                        }
+                    }
+
+                    else -> null
+                }
+            }
+
+            processedRepeatable.forEach { a, n ->
+                when (a) {
+                    RepeatableNotification.Like -> {
+                        n.forEach { _, r ->
+                            notifs.list += Notification.Like(
+                                data = r.copy(
+                                    r.kind,
+                                    r.post,
+                                    r.authors.sortedByDescending { it.timestamp },
+                                    r.timestamp
+                                )
+                            )
+                        }
+                    }
+
+                    RepeatableNotification.Repost -> {}
+                }
+            }
+
+            notifs.list = notifs.list.sortedByDescending { it.createdAt() }
+
             uiState = uiState.copy(
-                notifications = uiState.notifications + notifs,
+                notifications = Notifications(list = uiState.notifications.list + notifs.list),
                 notificationsCursor = rawNotifs.cursor,
                 isFetchingMoreNotifications = false,
             )
+
             then()
         }
     }

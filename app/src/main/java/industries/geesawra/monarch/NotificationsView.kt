@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,7 +38,7 @@ fun NotificationsView(
         userScrollEnabled = isScrollEnabled,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        viewModel.uiState.notifications.forEach { notif ->
+        viewModel.uiState.notifications.list.forEach { notif ->
             item() {
                 RenderNotification(
                     viewModel = viewModel,
@@ -47,7 +48,7 @@ fun NotificationsView(
             }
         }
 
-        if (viewModel.uiState.isFetchingMoreNotifications && viewModel.uiState.notifications.isNotEmpty()) {
+        if (viewModel.uiState.isFetchingMoreNotifications && viewModel.uiState.notifications.list.isNotEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -83,7 +84,7 @@ fun NotificationsView(
     }
 
     LaunchedEffect(endOfListReached) {
-        if (endOfListReached && viewModel.uiState.notifications.isNotEmpty()) {
+        if (endOfListReached && viewModel.uiState.notifications.list.isNotEmpty()) {
             viewModel.fetchNotifications()
         }
     }
@@ -106,15 +107,10 @@ private fun RenderNotification(
             nested = true
         )
 
-        is Notification.Like -> SkeetView(
-            skeet = SkeetData(
-                authorName = (notification.author.displayName
-                    ?: notification.author.handle).toString() + " liked your post",
-                authorAvatarURL = notification.author.avatar.toString()
-            ),
-            nested = true
+        is Notification.Like -> LikeRowView(
+            likeData = notification.data,
+            modifier = Modifier.height(120.dp),
         )
-
 
         is Notification.Mention -> SkeetView(
             viewModel = viewModel,
@@ -154,5 +150,7 @@ private fun RenderNotification(
             ),
             nested = true
         )
+
+        else -> {}
     }
 }

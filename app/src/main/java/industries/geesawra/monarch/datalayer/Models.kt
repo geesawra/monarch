@@ -381,15 +381,103 @@ data class SkeetData(
 }
 
 sealed class Notification {
-    data class Like(val post: Post, val author: ProfileView) : Notification()
-    data class Repost(val repost: Post, val author: ProfileView) : Notification()
-    data class Reply(val parent: Pair<Cid, AtUri>, val reply: Post, val author: ProfileView) :
+    data class RawLike(val post: Post, val author: ProfileView, val createdAt: Instant) :
         Notification()
 
-    data class Follow(val follow: ProfileView) : Notification()
-    data class Mention(val parent: Pair<Cid, AtUri>, val mention: Post, val author: ProfileView) :
+    data class Like(val data: RepeatedNotification) :
         Notification()
 
-    data class Quote(val parent: Pair<Cid, AtUri>, val quote: Post, val author: ProfileView) :
+    data class Repost(val repost: Post, val author: ProfileView, val createdAt: Instant) :
         Notification()
+
+    data class Reply(
+        val parent: Pair<Cid, AtUri>,
+        val reply: Post,
+        val author: ProfileView,
+        val createdAt: Instant
+    ) :
+        Notification()
+
+    data class Follow(val follow: ProfileView, val createdAt: Instant) : Notification()
+    data class Mention(
+        val parent: Pair<Cid, AtUri>,
+        val mention: Post,
+        val author: ProfileView,
+        val createdAt: Instant
+    ) :
+        Notification()
+
+    data class Quote(
+        val parent: Pair<Cid, AtUri>,
+        val quote: Post,
+        val author: ProfileView,
+        val createdAt: Instant
+    ) :
+        Notification()
+
+    fun createdAt(): Instant {
+        return when (this) {
+            is RawLike -> this.createdAt
+            is Follow -> this.createdAt
+            is Like -> this.data.timestamp
+            is Mention -> this.createdAt
+            is Quote -> this.createdAt
+            is Reply -> this.createdAt
+            is Repost -> this.createdAt
+        }
+    }
 }
+
+data class Notifications(
+    var list: List<Notification> = listOf()
+) {
+//    fun likes() {
+//        val likes = mutableMapOf<Post, RepeatedNotification>()
+//        list.forEach {
+//            when (it) {
+//                is Notification.Like -> {
+//                    if (likes.contains(it.post)) {
+//                        val l = likes[it.post]!!
+//                        l.authors += RepeatedAuthor(it.author, it.createdAt)
+//                        if (it.createdAt > l.timestamp) {
+//                            l.timestamp = it.createdAt
+//                        }
+//                        likes[it.post] = l
+//                    } else {
+//                        likes[it.post] = RepeatedNotification(
+//                            kind = RepeatableNotification.Like,
+//                            authors = listOf(RepeatedAuthor(it.author, it.createdAt)),
+//                            timestamp = it.createdAt
+//                        )
+//                    }
+//                }
+//
+//                else -> null
+//            }
+//        }
+//
+//        val asd = likes.entries.sortedByDescending { it.value.timestamp }.associate { it.toPair() }
+//        Log.d("likes", likes.toString())
+//    }
+}
+
+enum class RepeatableNotification(val u: Unit) {
+    Like(Unit),
+    Repost(Unit)
+}
+
+data class RepeatedNotification(
+    val kind: RepeatableNotification,
+    val post: Post,
+    var authors: List<RepeatedAuthor>,
+    var timestamp: Instant
+) {
+    fun sorted(): RepeatedNotification {
+        return this.copy(kind, post, authors.sortedByDescending { it.timestamp }, timestamp)
+    }
+}
+
+data class RepeatedAuthor(
+    val author: ProfileView,
+    val timestamp: Instant,
+)

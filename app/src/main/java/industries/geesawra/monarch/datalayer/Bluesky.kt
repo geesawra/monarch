@@ -24,12 +24,15 @@ import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetFeedGeneratorsQueryParams
 import app.bsky.feed.GetFeedQueryParams
 import app.bsky.feed.GetFeedResponse
+import app.bsky.feed.GetPostsQueryParams
+import app.bsky.feed.GetPostsResponse
 import app.bsky.feed.GetTimelineQueryParams
 import app.bsky.feed.GetTimelineResponse
 import app.bsky.feed.Like
 import app.bsky.feed.Post
 import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
+import app.bsky.feed.PostView
 import app.bsky.feed.Repost
 import app.bsky.labeler.GetServicesQueryParams
 import app.bsky.labeler.GetServicesResponse
@@ -854,6 +857,25 @@ class BlueskyConn(val context: Context) {
             return when (ret) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch notifications: ${ret.error}"))
                 is AtpResponse.Success<ListNotificationsResponse> -> Result.success(ret.response)
+            }
+        }
+    }
+
+    suspend fun getPosts(uri: List<AtUri>): Result<List<PostView>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.getPosts(
+                GetPostsQueryParams(
+                    uris = uri,
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch posts: ${ret.error}"))
+                is AtpResponse.Success<GetPostsResponse> -> Result.success(ret.response.posts)
             }
         }
     }
