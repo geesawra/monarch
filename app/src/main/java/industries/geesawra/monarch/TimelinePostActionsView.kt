@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.ThumbUpOffAlt
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -220,12 +219,6 @@ fun TimelinePostActionsView(
                 if (isReposted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-    }
-
-    if (!inThread) {
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant
-        )
     }
 }
 

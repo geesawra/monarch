@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -39,11 +41,15 @@ fun NotificationsView(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         viewModel.uiState.notifications.list.forEach { notif ->
-            item() {
+            item(notif.createdAt()) {
                 RenderNotification(
                     viewModel = viewModel,
                     notification = notif,
                     onReplyTap = onReplyTap
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
             }
         }

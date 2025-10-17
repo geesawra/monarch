@@ -1,12 +1,12 @@
 package industries.geesawra.monarch
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,13 +38,14 @@ fun LikeRowView(
     Surface(
         color = color,
         modifier = modifier
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(start = 16.dp, end = 16.dp)
             .fillMaxWidth()
-
     ) {
         Column {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.Start,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -69,15 +70,14 @@ fun LikeRowView(
 
                 Column(
                     modifier = Modifier
+                        .weight(1f)
                         .padding(start = 16.dp)
-                        .fillMaxWidth()
                 ) {
                     Text(
                         modifier = Modifier.fillMaxWidth(),
                         text = text,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1
                     )
 
                     Text(
@@ -94,15 +94,12 @@ fun LikeRowView(
                         color = MaterialTheme.colorScheme.secondary,
                         style = MaterialTheme.typography.bodySmall,
                     )
-                }
-            }
 
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
+                }
+
+            }
         }
 
 
     }
-
 }
