@@ -3,6 +3,7 @@
 package industries.geesawra.monarch.datalayer
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.text.intl.Locale
@@ -15,6 +16,7 @@ import app.bsky.actor.GetProfileQueryParams
 import app.bsky.actor.GetProfileResponse
 import app.bsky.actor.PreferencesUnion
 import app.bsky.actor.ProfileViewDetailed
+import app.bsky.embed.AspectRatio
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
 import app.bsky.embed.Record
@@ -148,8 +150,8 @@ data class SessionData(
 }
 
 data class Timeline(
-    public val cursor: String? = null,
-    public val feed: List<FeedViewPost>,
+    val cursor: String? = null,
+    val feed: List<FeedViewPost>,
 )
 
 class BlueskyConn(val context: Context) {
@@ -537,8 +539,9 @@ class BlueskyConn(val context: Context) {
                         value = Images(
                             images = blobs.map {
                                 ImagesImage(
-                                    image = it,
+                                    image = it.blob,
                                     alt = "",
+                                    aspectRatio = AspectRatio(it.width, it.height)
                                 )
                             }
                         )
@@ -549,8 +552,9 @@ class BlueskyConn(val context: Context) {
                     val blob = uploadVideo(video).getOrThrow()
                     postEmbed = PostEmbedUnion.Video(
                         value = Video(
-                            video = blob,
+                            video = blob.blob,
                             alt = "",
+                            aspectRatio = AspectRatio(blob.width, blob.height)
                         )
                     )
                 }
@@ -619,7 +623,13 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun uploadImages(images: List<Uri>): Result<List<Blob>> {
+    private data class MediaBlob(
+        val blob: Blob,
+        val width: Long,
+        val height: Long,
+    )
+
+    private suspend fun uploadImages(images: List<Uri>): Result<List<MediaBlob>> {
         val maxImageSize = 1000000
 
         return runCatching {
@@ -627,30 +637,29 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
 
-            val uploadedBlobs = mutableListOf<Blob>()
+            val uploadedBlobs = mutableListOf<MediaBlob>()
 
             val compressor = Compressor(context)
 
             images.forEach {
                 context.contentResolver.openInputStream(it)?.use { inputStream ->
-                    val byteArray = run {
+                    val compressedImage = run {
                         inputStream.mark(0)
-
                         val c = compressor.compressImage(it, maxImageSize.toLong())
-
-                        c?.let {
-                            return@run c
-                        }
-
-                        inputStream.reset()
-                        return@run inputStream.readBytes()
+                        return@run c
                     }
 
-                    val blob = client!!.uploadBlob(byteArray)
+                    val blob = client!!.uploadBlob(compressedImage.data)
                     when (blob) {
                         is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading image: ${blob.error}"))
                         is AtpResponse.Success<UploadBlobResponse> -> {
-                            uploadedBlobs.add(blob.response.blob)
+                            uploadedBlobs.add(
+                                MediaBlob(
+                                    blob = blob.response.blob,
+                                    width = compressedImage.width,
+                                    height = compressedImage.height
+                                )
+                            )
                         }
                     }
                 }
@@ -660,11 +669,30 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun uploadVideo(video: Uri): Result<Blob> {
+    private suspend fun uploadVideo(video: Uri): Result<MediaBlob> {
         return runCatching {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
             }
+
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, video)
+            val width =
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                    ?.toIntOrNull() ?: 0
+            val height =
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                    ?.toIntOrNull() ?: 0
+            val rotation =
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+                    ?.toIntOrNull() ?: 0
+
+            val dimensions = if (rotation == 90 || rotation == 270) {
+                Pair(height, width)
+            } else {
+                Pair(width, height)
+            }
+            retriever.release()
 
             val uploadedBlobs = mutableListOf<Blob>()
 
@@ -776,7 +804,13 @@ class BlueskyConn(val context: Context) {
             }
 
 
-            return Result.success(uploadedBlobs.first())
+            return Result.success(
+                MediaBlob(
+                    blob = uploadedBlobs.first(),
+                    width = dimensions.first.toLong(),
+                    height = dimensions.second.toLong()
+                )
+            )
         }
     }
 

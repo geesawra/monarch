@@ -26,10 +26,37 @@ import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.io.path.Path
+import kotlin.io.path.createTempFile
 import kotlin.math.roundToInt
 
 // Adapted from:
 // http://github.com/philipplackner/ImageCompression/blob/master/app/src/main/java/com/plcoding/imagecompression/ImageCompressor.kt
+
+data class CompressedImage(
+    val data: ByteArray,
+    val width: Long,
+    val height: Long,
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as CompressedImage
+
+        if (width != other.width) return false
+        if (height != other.height) return false
+        if (!data.contentEquals(other.data)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = width.hashCode()
+        result = 31 * result + height.hashCode()
+        result = 31 * result + data.contentHashCode()
+        return result
+    }
+}
 
 class Compressor(
     private val context: Context
@@ -37,7 +64,7 @@ class Compressor(
     suspend fun compressImage(
         contentUri: Uri,
         compressionThreshold: Long
-    ): ByteArray? {
+    ): CompressedImage {
         return withContext(Dispatchers.IO) {
             val mimeType = context.contentResolver.getType(contentUri)
             val inputBytes = context
@@ -45,7 +72,7 @@ class Compressor(
                 .openInputStream(contentUri)
                 ?.use { inputStream ->
                     inputStream.readBytes()
-                } ?: return@withContext null
+                }!!
 
             ensureActive()
 
@@ -78,7 +105,11 @@ class Compressor(
                     compressFormat != Bitmap.CompressFormat.PNG
                 )
 
-                outputBytes
+                CompressedImage(
+                    data = outputBytes,
+                    width = bitmap.width.toLong(),
+                    height = bitmap.height.toLong()
+                )
             }
         }
     }
@@ -117,7 +148,7 @@ class Compressor(
             }
 
             val tempFile =
-                kotlin.io.path.createTempFile(
+                createTempFile(
                     directory = Path(context.cacheDir.toString()),
                     prefix = "kotlinTemp",
                     suffix = ".tmp",
