@@ -63,7 +63,6 @@ import kotlin.time.ExperimentalTime
 @Composable
 fun SkeetView(
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.surface,
     viewModel: TimelineViewModel? = null,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     skeet: SkeetData,
@@ -82,9 +81,6 @@ fun SkeetView(
     }
 
     val minSize = 55.dp
-
-    val (parent, _) = skeet.parent()
-    val hasParent = parent != null
 
     Surface(
         color = Color.Transparent,
@@ -153,11 +149,13 @@ private fun SkeetContent(
 ) {
     val context = LocalContext.current
 
-    Text(
-        text = skeet.content,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodyLarge,
-    )
+    if (skeet.content.isNotEmpty()) {
+        Text(
+            text = skeet.annotatedContent(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
 
     if (skeet.embed == null || disableEmbeds) {
         return

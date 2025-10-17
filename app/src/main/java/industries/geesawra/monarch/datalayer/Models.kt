@@ -2,6 +2,14 @@
 
 package industries.geesawra.monarch.datalayer
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.embed.ExternalView
@@ -21,6 +29,8 @@ import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.ReplyRef
 import app.bsky.feed.ReplyRefParentUnion
 import app.bsky.feed.ReplyRefRootUnion
+import app.bsky.richtext.Facet
+import app.bsky.richtext.FacetFeatureUnion
 import com.atproto.label.Label
 import com.atproto.repo.StrongRef
 import kotlinx.datetime.toStdlibInstant
@@ -85,7 +95,7 @@ data class SkeetData(
     val reason: FeedViewPostReasonUnion? = null,
     val reply: ReplyRef? = null,
     val createdAt: Instant? = null,
-
+    val facets: List<Facet> = listOf(),
     val blocked: Boolean = false,
     val notFound: Boolean = false,
     val following: Boolean = false,
@@ -112,6 +122,7 @@ data class SkeetData(
                 embed = post.post.embed,
                 reason = post.reason,
                 reply = post.reply,
+                facets = content.facets,
                 createdAt = content.createdAt.toStdlibInstant(),
                 following = post.post.author.viewer?.following != null,
                 follower = post.post.author.viewer?.followedBy != null,
@@ -255,7 +266,8 @@ data class SkeetData(
                     else -> null
                 },
                 // TODO: fix embeds
-                createdAt = post.createdAt.toStdlibInstant()
+                createdAt = post.createdAt.toStdlibInstant(),
+                facets = post.facets,
             )
         }
 
@@ -296,8 +308,92 @@ data class SkeetData(
                 embed = embed,
                 reason = null,
                 reply = null,
-                createdAt = content.createdAt.toStdlibInstant()
+                createdAt = content.createdAt.toStdlibInstant(),
+                facets = content.facets,
             )
+        }
+    }
+
+    private sealed class AnnotatedData {
+        data class NoAnnotation(val data: String) : AnnotatedData()
+        data class WithAnnotation(val data: Facet, val content: String) : AnnotatedData()
+    }
+
+    fun annotatedContent(): AnnotatedString {
+        if (this.facets.isEmpty()) {
+            return buildAnnotatedString {
+                append(this@SkeetData.content)
+            }
+        }
+
+        val c = this.content.toByteArray(Charsets.UTF_8)
+
+        var lastIdx: Long = 0
+        val content = mutableListOf<AnnotatedData>()
+        this.facets.forEach { f ->
+            content.add(
+                AnnotatedData.NoAnnotation(
+                    c.slice(
+                        lastIdx.toInt()..
+                                f.index.byteStart.toInt() - 1
+                    ).toByteArray().toString(Charsets.UTF_8)
+                )
+            )
+            content.add(
+                AnnotatedData.WithAnnotation(
+                    data = f, content = c.slice(
+                        f.index.byteStart.toInt()..
+                                f.index.byteEnd.toInt() - 1
+                    ).toByteArray().toString(Charsets.UTF_8)
+                )
+            )
+            lastIdx = f.index.byteEnd
+        }
+
+        return buildAnnotatedString {
+            content.forEach { content ->
+                when (content) {
+                    is AnnotatedData.NoAnnotation -> append(content.data)
+                    is AnnotatedData.WithAnnotation -> {
+                        val f = content.data.features.first()
+                        when (f) {
+                            is FacetFeatureUnion.Link -> withLink(
+                                LinkAnnotation.Url(
+                                    f.value.uri.uri,
+                                    TextLinkStyles(style = SpanStyle(color = Color.Blue))
+                                )
+                            ) {
+                                append(content.content)
+                            }
+
+                            is FacetFeatureUnion.Mention -> withLink(
+                                LinkAnnotation.Url(
+                                    f.value.did.did,
+                                    TextLinkStyles(style = SpanStyle(color = Color.Blue))
+                                )
+                            ) {
+                                append(
+                                    content.content
+                                )
+                            }
+
+                            is FacetFeatureUnion.Tag -> withStyle(
+                                SpanStyle(
+                                    color = Color.Blue
+                                )
+                            )
+                            {
+                                append(content.content)
+                            }
+
+
+                            is FacetFeatureUnion.Unknown -> append(
+                                content.content
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
