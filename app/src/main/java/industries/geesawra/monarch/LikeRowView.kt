@@ -3,6 +3,7 @@ package industries.geesawra.monarch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,70 +37,65 @@ fun LikeRowView(
     val minSize = 55.dp
 
     Surface(
-        color = color,
+        color = Color.Transparent,
         modifier = modifier
-            .padding(start = 16.dp, end = 16.dp)
-            .fillMaxWidth()
+            .padding(top = 8.dp, start = 16.dp, end = 16.dp)
+            .fillMaxSize()
     ) {
-        Column {
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.Start,
-                modifier = Modifier.fillMaxWidth()
+        Row(
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(likeData.authors.first().author.avatar?.uri)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Avatar",
+                modifier = Modifier
+                    .size(minSize)
+                    .clip(CircleShape)
+            )
+
+            val authors = likeData.authors
+            val firstAuthorName =
+                authors.first().author.displayName ?: authors.first().author.handle
+            val remainingCount = authors.size - 1
+            val text = when {
+                remainingCount > 1 -> "$firstAuthorName and $remainingCount others liked this"
+                remainingCount == 1 -> "$firstAuthorName and 1 other liked this"
+                else -> "$firstAuthorName liked this"
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp)
             ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(likeData.authors.first().author.avatar?.uri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Avatar",
-                    modifier = Modifier
-                        .size(minSize)
-                        .clip(CircleShape)
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
                 )
 
-                val authors = likeData.authors
-                val firstAuthorName =
-                    authors.first().author.displayName ?: authors.first().author.handle
-                val remainingCount = authors.size - 1
-                val text = when {
-                    remainingCount > 1 -> "$firstAuthorName and $remainingCount others liked this"
-                    remainingCount == 1 -> "$firstAuthorName and 1 other liked this"
-                    else -> "$firstAuthorName liked this"
-                }
+                Text(
+                    text = HumanReadable.timeAgo(likeData.timestamp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 16.dp)
-                ) {
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-
-                    Text(
-                        text = HumanReadable.timeAgo(likeData.timestamp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = likeData.post.text,
-                        color = MaterialTheme.colorScheme.secondary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-
-                }
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = likeData.post.text,
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
 
             }
         }
-
-
     }
 }

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -88,12 +87,11 @@ fun SkeetView(
     val hasParent = parent != null
 
     Surface(
-        color = color,
-        modifier = if (!inThread && !hasParent) {
-            modifier.padding(start = 16.dp, end = 16.dp)
-        } else {
-            modifier.padding(top = 8.dp, start = 16.dp, end = 16.dp)
-        }.background(color)
+        color = Color.Transparent,
+        modifier =
+            modifier
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp)
+                .background(Color.Transparent)
     ) {
         Row(
             verticalAlignment = Alignment.Top,
@@ -106,11 +104,13 @@ fun SkeetView(
                     .sizeIn(minHeight = minSize),
             ) {
 
+                SkeetReason(modifier = Modifier.padding(start = 4.dp), skeet = skeet)
+
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -155,7 +155,7 @@ private fun SkeetContent(
 
     Text(
         text = skeet.content,
-        color = MaterialTheme.colorScheme.onSurface,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyLarge,
     )
 
@@ -226,7 +226,7 @@ fun Embeds(context: Context, nested: Boolean, embed: PostViewEmbedUnion?) {
 
 @Composable
 private fun ImageView(img: List<ImagesViewImage>) {
-    Card(
+    OutlinedCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp, bottom = 8.dp),
@@ -244,7 +244,7 @@ private fun ImageView(img: List<ImagesViewImage>) {
 
 @Composable
 fun VideoView(uri: Uri) {
-    Card(
+    OutlinedCard(
         modifier = Modifier
             .heightIn(max = 500.dp)
             .fillMaxWidth()
@@ -395,12 +395,10 @@ private fun RecordWithMediaView(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
-    val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
-
+private fun SkeetReason(modifier: Modifier = Modifier, skeet: SkeetData) {
     Column(modifier = modifier) {
+        var isRepost = false
         skeet.reason?.let {
             it
             when (it) {
@@ -414,12 +412,43 @@ private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
                             .padding(bottom = 4.dp),
                         fontWeight = FontWeight.Bold
                     )
+                    isRepost = true
                 }
 
                 else -> {}
             }
         }
 
+        if (!isRepost) {
+            skeet.reply?.let {
+                it
+                val parent = it.parent
+                when (parent) {
+                    is ReplyRefParentUnion.PostView -> {
+                        Text(
+                            text = "In reply to ${parent.value.author.displayName ?: parent.value.author.handle.toString()}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = 4.dp),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    else -> {}
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData) {
+    val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
+
+    Column(modifier = modifier) {
         Text(
             text = authorName,
             color = MaterialTheme.colorScheme.onSurface,
@@ -447,7 +476,7 @@ private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
                     return@forEach
                 }
 
-                Card(
+                OutlinedCard(
                     modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
                     shape = CircleShape
                 ) {
@@ -457,26 +486,6 @@ private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
                         style = TextStyle(fontSize = 12.sp),
                     )
                 }
-            }
-        }
-
-
-        skeet.reply?.let {
-            it
-            val parent = it.parent
-            when (parent) {
-                is ReplyRefParentUnion.PostView -> {
-                    Text(
-                        text = "In reply to ${parent.value.author.displayName ?: parent.value.author.handle.toString()}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 4.dp),
-                    )
-                }
-
-                else -> {}
             }
         }
 
@@ -490,4 +499,12 @@ private fun SkeetHeader(skeet: SkeetData, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+@Composable
+fun Divider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
 }

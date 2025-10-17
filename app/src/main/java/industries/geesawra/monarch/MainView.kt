@@ -5,6 +5,7 @@ package industries.geesawra.monarch
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +22,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AirlineStops
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
@@ -171,7 +171,7 @@ private fun InnerTimelineView(
     onError: (String) -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         rememberTopAppBarState()
     )
     val timelineState = rememberLazyListState()
@@ -329,7 +329,22 @@ private fun InnerTimelineView(
                                             .size(40.dp),
                                         onClick = {
                                             coroutineScope.launch {
-                                                timelineState.animateScrollToItem(0)
+                                                launch {
+                                                    if (timelineState.firstVisibleItemIndex > 8) {
+                                                        timelineState.scrollToItem(0)
+                                                    } else {
+                                                        timelineState.animateScrollToItem(0)
+                                                    }
+                                                }
+
+                                                launch {
+                                                    animate(
+                                                        initialValue = scrollBehavior.state.heightOffset,
+                                                        targetValue = 0f
+                                                    ) { value, /* velocity */ _ ->
+                                                        scrollBehavior.state.heightOffset = value
+                                                    }
+                                                }
                                             }
                                         },
                                         shape = FloatingActionButtonDefaults.smallShape,
@@ -347,18 +362,40 @@ private fun InnerTimelineView(
                         }
 
                         TabBarDestinations.NOTIFICATIONS -> {
-                            if (notificationsState.canScrollBackward) {
+                            AnimatedVisibility(
+                                visible = notificationsState.canScrollBackward,
+                                enter = slideInVertically(),
+                                exit = slideOutVertically()
+                            ) {
                                 FloatingActionButton(
+                                    modifier = Modifier
+                                        .size(40.dp),
                                     onClick = {
                                         coroutineScope.launch {
-                                            notificationsState.animateScrollToItem(0)
+                                            launch {
+                                                if (notificationsState.firstVisibleItemIndex > 8) {
+                                                    notificationsState.scrollToItem(0)
+                                                } else {
+                                                    notificationsState.animateScrollToItem(0)
+                                                }
+                                            }
+
+                                            launch {
+                                                animate(
+                                                    initialValue = scrollBehavior.state.heightOffset,
+                                                    targetValue = 0f
+                                                ) { value, /* velocity */ _ ->
+                                                    scrollBehavior.state.heightOffset = value
+                                                }
+                                            }
                                         }
                                     },
                                     shape = FloatingActionButtonDefaults.smallShape,
                                 ) {
-                                    Icon(Icons.Default.AirlineStops, "Scroll to top")
+                                    Icon(Icons.Default.ArrowUpward, "Scroll to top")
                                 }
                             }
+
                         }
                     }
                 },

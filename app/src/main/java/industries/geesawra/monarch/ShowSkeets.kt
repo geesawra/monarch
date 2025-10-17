@@ -12,8 +12,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import app.bsky.feed.FeedViewPostReasonUnion
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 
@@ -38,51 +38,59 @@ fun ShowSkeets(
     LazyColumn(
         state = state,
         userScrollEnabled = isScrollEnabled,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         viewModel.uiState.skeets.filter {
             !it.replyToNotFollowing
         }.forEach { skeet ->
             item(key = skeet.key()) {
-                val root = skeet.root()
-                val (parent, parentsParent) = skeet.parent()
-                root?.let {
-                    SkeetView(
-                        viewModel = viewModel,
-                        skeet = it,
-                        onReplyTap = onReplyTap,
-                        inThread = true
-                    )
-                }
-
-                parent?.let {
-                    if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
-                        ConditionalCard("See more")
-
-                        VerticalDivider(
-                            thickness = 4.dp,
-                            modifier = Modifier
-                                .height(50.dp)
-                                .padding(start = (16 + 25).dp)
-                                .clip(RoundedCornerShape(12.dp))
-                        )
+                ElevatedCard {
+                    val isRepost = when (skeet.reason) {
+                        is FeedViewPostReasonUnion.ReasonRepost -> true
+                        else -> false
                     }
 
-                    SkeetView(
-                        viewModel = viewModel,
-                        skeet = it,
-                        onReplyTap = onReplyTap,
-                        inThread = true
-                    )
+                    val root = skeet.root()
+                    val (parent, parentsParent) = skeet.parent()
+
+                    if (!isRepost) {
+                        root?.let {
+                            SkeetView(
+                                viewModel = viewModel,
+                                skeet = it,
+                                onReplyTap = onReplyTap,
+                                inThread = true
+                            )
+                        }
+
+                        parent?.let {
+                            if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
+                                ConditionalCard("See more")
+
+                                VerticalDivider(
+                                    thickness = 4.dp,
+                                    modifier = Modifier
+                                        .height(50.dp)
+                                        .padding(start = (16 + 25).dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                )
+                            }
+
+                            SkeetView(
+                                viewModel = viewModel,
+                                skeet = it,
+                                onReplyTap = onReplyTap,
+                                inThread = true
+                            )
+                        }
+                    }
+
+
+                    SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
                 }
-
-
-                SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
             }
         }
 
