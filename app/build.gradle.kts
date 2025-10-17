@@ -56,6 +56,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("io.ktor:ktor-client-cio:3.0.1") // Or another engine like OkHttp
     implementation("io.ktor:ktor-client-plugins:3.0.1") // Or more specifically:
     implementation("io.ktor:ktor-client-core:3.0.1") // Or the version aligned with the library
