@@ -498,11 +498,3 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData) {
         }
     }
 }
-
-@Composable
-fun Divider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp),
-        color = MaterialTheme.colorScheme.outlineVariant
-    )
-}

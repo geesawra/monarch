@@ -260,7 +260,12 @@ class TimelineViewModel @AssistedInject constructor(
                                     .decodeAs()
 
                             }
-//                            is PostEmbedUnion.RecordWithMedia -> TODO()
+
+                            is PostEmbedUnion.RecordWithMedia -> {
+                                fetchRecord((rpp.embed as PostEmbedUnion.RecordWithMedia).value.record.record.uri).getOrThrow()
+                                    .decodeAs()
+                            }
+
                             else -> rpp
                         }
 
@@ -270,7 +275,7 @@ class TimelineViewModel @AssistedInject constructor(
                             p.createdAt.toStdlibInstant()
                         )
 
-                        null // repeatable, will be processed later
+                        null
                     }
 
                     else -> {
