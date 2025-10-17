@@ -271,6 +271,26 @@ data class SkeetData(
             )
         }
 
+        fun fromPost(
+            parent: Pair<Cid, AtUri>,
+            post: Post,
+            author: ProfileView,
+            embed: PostViewEmbedUnion?
+        ): SkeetData {
+            return SkeetData(
+                cid = parent.first,
+                uri = parent.second,
+                authorAvatarURL = author.avatar?.uri,
+                authorName = author.displayName,
+                authorHandle = author.handle,
+                authorLabels = author.labels,
+                content = post.text,
+                embed = embed,
+                createdAt = post.createdAt.toStdlibInstant(),
+                facets = post.facets,
+            )
+        }
+
 
         fun fromRecordView(post: RecordViewRecord): SkeetData {
             val content: Post = (post.value.decodeAs())
@@ -487,10 +507,13 @@ sealed class Notification {
     data class RawLike(val post: Post, val author: ProfileView, val createdAt: Instant) :
         Notification()
 
+    data class RawRepost(val post: Post, val author: ProfileView, val createdAt: Instant) :
+        Notification()
+
     data class Like(val data: RepeatedNotification) :
         Notification()
 
-    data class Repost(val repost: Post, val author: ProfileView, val createdAt: Instant) :
+    data class Repost(val data: RepeatedNotification) :
         Notification()
 
     data class Reply(
@@ -521,19 +544,17 @@ sealed class Notification {
     fun createdAt(): Instant {
         return when (this) {
             is RawLike -> this.createdAt
+            is RawRepost -> this.createdAt
             is Follow -> this.createdAt
             is Like -> this.data.timestamp
             is Mention -> this.createdAt
             is Quote -> this.createdAt
             is Reply -> this.createdAt
-            is Repost -> this.createdAt
+            is Repost -> this.data.timestamp
         }
     }
 }
 
-data class Notifications(
-    var list: List<Notification> = listOf()
-)
 
 enum class RepeatableNotification(val u: Unit) {
     Like(Unit),

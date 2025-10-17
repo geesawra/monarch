@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.runtime.Composable
@@ -38,11 +39,15 @@ fun NotificationsView(
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         userScrollEnabled = isScrollEnabled,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        viewModel.uiState.notifications.list.forEach { notif ->
+        viewModel.uiState.notifications.forEach { notif ->
             item(notif.createdAt()) {
-                ElevatedCard {
+                ElevatedCard(
+                    elevation = CardDefaults.elevatedCardElevation(
+                        defaultElevation = 0.dp
+                    )
+                ) {
                     RenderNotification(
                         viewModel = viewModel,
                         notification = notif,
@@ -52,7 +57,7 @@ fun NotificationsView(
             }
         }
 
-        if (viewModel.uiState.isFetchingMoreNotifications && viewModel.uiState.notifications.list.isNotEmpty()) {
+        if (viewModel.uiState.isFetchingMoreNotifications && viewModel.uiState.notifications.isNotEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -88,7 +93,7 @@ fun NotificationsView(
     }
 
     LaunchedEffect(endOfListReached) {
-        if (endOfListReached && viewModel.uiState.notifications.list.isNotEmpty()) {
+        if (endOfListReached && viewModel.uiState.notifications.isNotEmpty()) {
             viewModel.fetchNotifications()
         }
     }
@@ -111,8 +116,8 @@ private fun RenderNotification(
             nested = true
         )
 
-        is Notification.Like -> LikeRowView(
-            likeData = notification.data,
+        is Notification.Like -> LikeRepostRowView(
+            data = notification.data,
         )
 
         is Notification.Mention -> SkeetView(
@@ -145,14 +150,10 @@ private fun RenderNotification(
             onReplyTap = onReplyTap,
         )
 
-        is Notification.Repost -> SkeetView(
-            skeet = SkeetData(
-                authorName = (notification.author.displayName
-                    ?: notification.author.handle).toString() + " reposted your post",
-                authorAvatarURL = notification.author.avatar.toString()
-            ),
-            nested = true
+        is Notification.Repost -> LikeRepostRowView(
+            data = notification.data,
         )
+
 
         else -> {}
     }

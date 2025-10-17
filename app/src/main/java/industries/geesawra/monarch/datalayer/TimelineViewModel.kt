@@ -9,10 +9,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.feed.GeneratorView
 import app.bsky.feed.Like
 import app.bsky.feed.Post
+import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.Repost
 import app.bsky.graph.Follow
@@ -32,6 +34,7 @@ import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.JsonContent
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 
 data class TimelineUiState(
@@ -40,7 +43,7 @@ data class TimelineUiState(
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
     val skeets: List<SkeetData> = listOf(),
-    val notifications: Notifications = Notifications(list = listOf()),
+    val notifications: List<Notification> = listOf(),
     val isFetchingMoreTimeline: Boolean = false,
     val isFetchingMoreNotifications: Boolean = false,
     val authenticated: Boolean = false,
@@ -197,7 +200,7 @@ class TimelineViewModel @AssistedInject constructor(
             val repeatable = mutableListOf<Notification>()
 
             // we could bulk request posts here and avoid much of the network IO
-            var notifs = Notifications(list = rawNotifs.notifications.mapNotNull {
+            var notifs = rawNotifs.notifications.mapNotNull {
                 when (it.reason) {
                     ListNotificationsReason.Follow -> {
                         val l: Follow = it.record.decodeAs()
@@ -249,22 +252,63 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Repost -> {
                         val p: Repost = it.record.decodeAs()
-                        val pp = fetchRecord(p.subject.uri).getOrThrow()
-                        Notification.Repost(pp.decodeAs(), it.author, p.createdAt.toStdlibInstant())
+                        val rpp: Post = fetchRecord(p.subject.uri).getOrThrow().decodeAs()
+
+                        val pp = when (rpp.embed) {
+                            is PostEmbedUnion.Record -> {
+                                fetchRecord((rpp.embed as PostEmbedUnion.Record).value.record.uri).getOrThrow()
+                                    .decodeAs()
+
+                            }
+//                            is PostEmbedUnion.RecordWithMedia -> TODO()
+                            else -> rpp
+                        }
+
+                        repeatable += Notification.RawRepost(
+                            pp,
+                            it.author,
+                            p.createdAt.toStdlibInstant()
+                        )
+
+                        null // repeatable, will be processed later
                     }
 
                     else -> {
                         null
                     }
                 }
-            })
+            }.toMutableList()
 
             if (fresh) {
-                uiState = uiState.copy(notifications = Notifications(list = listOf()))
+                uiState = uiState.copy(notifications = listOf())
             }
 
             val processedRepeatable =
                 mutableMapOf<RepeatableNotification, MutableMap<Post, RepeatedNotification>>()
+
+            val processRepeatable =
+                { kind: RepeatableNotification, list: MutableMap<Post, RepeatedNotification>, post: Post, author: ProfileView, createdAt: Instant ->
+                    if (list.contains(post)) {
+                        val l = list[post]!!
+                        l.authors += RepeatedAuthor(author, createdAt)
+                        if (createdAt > l.timestamp) {
+                            l.timestamp = createdAt
+                        }
+                        list[post] = l
+                    } else {
+                        list[post] = RepeatedNotification(
+                            kind = kind,
+                            authors = listOf(
+                                RepeatedAuthor(
+                                    author,
+                                    createdAt
+                                )
+                            ),
+                            post = post,
+                            timestamp = createdAt
+                        )
+                    }
+                }
 
             repeatable.fastForEach {
                 when (it) {
@@ -273,26 +317,27 @@ class TimelineViewModel @AssistedInject constructor(
                             mutableMapOf()
                         }
 
-                        if (list.contains(it.post)) {
-                            val l = list[it.post]!!
-                            l.authors += RepeatedAuthor(it.author, it.createdAt)
-                            if (it.createdAt > l.timestamp) {
-                                l.timestamp = it.createdAt
-                            }
-                            list[it.post] = l
-                        } else {
-                            list[it.post] = RepeatedNotification(
-                                kind = RepeatableNotification.Like,
-                                authors = listOf(
-                                    RepeatedAuthor(
-                                        it.author,
-                                        it.createdAt
-                                    )
-                                ),
-                                post = it.post,
-                                timestamp = it.createdAt
-                            )
+                        processRepeatable(
+                            RepeatableNotification.Like,
+                            list,
+                            it.post,
+                            it.author,
+                            it.createdAt
+                        )
+                    }
+
+                    is Notification.RawRepost -> {
+                        val list = processedRepeatable.getOrPut(RepeatableNotification.Repost) {
+                            mutableMapOf()
                         }
+
+                        processRepeatable(
+                            RepeatableNotification.Repost,
+                            list,
+                            it.post,
+                            it.author,
+                            it.createdAt
+                        )
                     }
 
                     else -> null
@@ -303,7 +348,7 @@ class TimelineViewModel @AssistedInject constructor(
                 when (a) {
                     RepeatableNotification.Like -> {
                         n.forEach { _, r ->
-                            notifs.list += Notification.Like(
+                            notifs += Notification.Like(
                                 data = r.copy(
                                     r.kind,
                                     r.post,
@@ -314,14 +359,25 @@ class TimelineViewModel @AssistedInject constructor(
                         }
                     }
 
-                    RepeatableNotification.Repost -> {}
+                    RepeatableNotification.Repost -> {
+                        n.forEach { _, r ->
+                            notifs += Notification.Like(
+                                data = r.copy(
+                                    r.kind,
+                                    r.post,
+                                    r.authors.sortedByDescending { it.timestamp },
+                                    r.timestamp
+                                )
+                            )
+                        }
+                    }
                 }
             }
 
-            notifs.list = notifs.list.sortedByDescending { it.createdAt() }
+            notifs = notifs.sortedByDescending { it.createdAt() }.toMutableList()
 
             uiState = uiState.copy(
-                notifications = Notifications(list = uiState.notifications.list + notifs.list),
+                notifications = uiState.notifications + notifs,
                 notificationsCursor = rawNotifs.cursor,
                 isFetchingMoreNotifications = false,
             )

@@ -23,15 +23,17 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import industries.geesawra.monarch.datalayer.RepeatableNotification
 import industries.geesawra.monarch.datalayer.RepeatedNotification
 import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
 @Composable
-fun LikeRowView(
+fun LikeRepostRowView(
     modifier: Modifier = Modifier,
-    likeData: RepeatedNotification
+    data: RepeatedNotification
+
 ) {
     val minSize = 55.dp
 
@@ -50,7 +52,7 @@ fun LikeRowView(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(likeData.authors.first().author.avatar?.uri)
+                    .data(data.authors.first().author.avatar?.uri)
                     .crossfade(true)
                     .build(),
                 contentDescription = "Avatar",
@@ -59,14 +61,31 @@ fun LikeRowView(
                     .clip(CircleShape)
             )
 
-            val authors = likeData.authors
+            val authors = data.authors
             val firstAuthorName =
                 authors.first().author.displayName ?: authors.first().author.handle
             val remainingCount = authors.size - 1
             val text = when {
-                remainingCount > 1 -> "$firstAuthorName and $remainingCount others liked this"
-                remainingCount == 1 -> "$firstAuthorName and 1 other liked this"
-                else -> "$firstAuthorName liked this"
+                remainingCount > 1 -> "$firstAuthorName and $remainingCount others ${
+                    when (data.kind) {
+                        RepeatableNotification.Like -> "liked"
+                        RepeatableNotification.Repost -> "reposted"
+                    }
+                } this"
+
+                remainingCount == 1 -> "$firstAuthorName and 1 other ${
+                    when (data.kind) {
+                        RepeatableNotification.Like -> "liked"
+                        RepeatableNotification.Repost -> "reposted"
+                    }
+                } this"
+
+                else -> "$firstAuthorName ${
+                    when (data.kind) {
+                        RepeatableNotification.Like -> "liked"
+                        RepeatableNotification.Repost -> "reposted"
+                    }
+                } this"
             }
 
             Column(
@@ -82,7 +101,7 @@ fun LikeRowView(
                 )
 
                 Text(
-                    text = HumanReadable.timeAgo(likeData.timestamp),
+                    text = HumanReadable.timeAgo(data.timestamp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.End,
@@ -91,7 +110,7 @@ fun LikeRowView(
 
                 Text(
                     modifier = Modifier.fillMaxWidth(),
-                    text = likeData.post.text,
+                    text = data.post.text,
                     color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.bodySmall,
                 )
