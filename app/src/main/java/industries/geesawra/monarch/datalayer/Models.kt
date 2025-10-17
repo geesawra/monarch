@@ -2,7 +2,8 @@
 
 package industries.geesawra.monarch.datalayer
 
-import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -339,6 +340,7 @@ data class SkeetData(
         data class WithAnnotation(val data: Facet, val content: String) : AnnotatedData()
     }
 
+    @Composable
     fun annotatedContent(): AnnotatedString {
         if (this.facets.isEmpty()) {
             return buildAnnotatedString {
@@ -380,7 +382,7 @@ data class SkeetData(
                             is FacetFeatureUnion.Link -> withLink(
                                 LinkAnnotation.Url(
                                     f.value.uri.uri,
-                                    TextLinkStyles(style = SpanStyle(color = Color.Blue))
+                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface))
                                 )
                             ) {
                                 append(content.content)
@@ -389,7 +391,7 @@ data class SkeetData(
                             is FacetFeatureUnion.Mention -> withLink(
                                 LinkAnnotation.Url(
                                     f.value.did.did,
-                                    TextLinkStyles(style = SpanStyle(color = Color.Blue))
+                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface))
                                 )
                             ) {
                                 append(
@@ -399,7 +401,7 @@ data class SkeetData(
 
                             is FacetFeatureUnion.Tag -> withStyle(
                                 SpanStyle(
-                                    color = Color.Blue
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                             {
