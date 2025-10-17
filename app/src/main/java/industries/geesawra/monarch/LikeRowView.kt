@@ -3,10 +3,10 @@ package industries.geesawra.monarch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,7 +31,6 @@ import kotlin.time.ExperimentalTime
 @Composable
 fun LikeRowView(
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.surface,
     likeData: RepeatedNotification
 ) {
     val minSize = 55.dp
@@ -39,13 +38,15 @@ fun LikeRowView(
     Surface(
         color = Color.Transparent,
         modifier = modifier
-            .padding(top = 8.dp, start = 16.dp, end = 16.dp)
-            .fillMaxSize()
+            .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
+            .fillMaxWidth()
     ) {
         Row(
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.Start,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)

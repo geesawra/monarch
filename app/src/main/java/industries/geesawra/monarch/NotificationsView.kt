@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -114,7 +113,6 @@ private fun RenderNotification(
 
         is Notification.Like -> LikeRowView(
             likeData = notification.data,
-            modifier = Modifier.height(120.dp),
         )
 
         is Notification.Mention -> SkeetView(
