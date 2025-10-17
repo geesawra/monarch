@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.VerticalDivider
@@ -41,13 +42,17 @@ fun ShowSkeets(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         viewModel.uiState.skeets.filter {
             !it.replyToNotFollowing
         }.forEach { skeet ->
             item(key = skeet.key()) {
-                ElevatedCard {
+                ElevatedCard(
+                    elevation = CardDefaults.elevatedCardElevation(
+                        defaultElevation = 0.dp
+                    )
+                ) {
                     val isRepost = when (skeet.reason) {
                         is FeedViewPostReasonUnion.ReasonRepost -> true
                         else -> false
