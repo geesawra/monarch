@@ -15,8 +15,6 @@ import androidx.compose.material.icons.automirrored.filled.ReplyAll
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.filled.ThumbUpOffAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -186,7 +184,7 @@ fun TimelinePostActionsView(
             }
         ) {
             IconWithNumber(
-                if (isLiked) Icons.Default.ThumbUp else Icons.Default.ThumbUpOffAlt,
+                if (isLiked) HeartFilled else Heart,
                 contentDescription = "Like",
                 number = likes,
                 tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
