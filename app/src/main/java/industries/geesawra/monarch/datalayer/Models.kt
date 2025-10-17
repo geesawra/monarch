@@ -117,23 +117,30 @@ data class SkeetData(
                 follower = post.post.author.viewer?.followedBy != null,
             )
 
-            sd.replyToNotFollowing = when (sd.reason) {
-                is FeedViewPostReasonUnion.ReasonPin -> false
-                is FeedViewPostReasonUnion.ReasonRepost -> false
-                is FeedViewPostReasonUnion.Unknown -> false
-                else -> {
-                    val (parent, _) = sd.parent()
-                    val root = sd.root()
+            sd.replyToNotFollowing = run {
+                when (sd.reason) {
+                    is FeedViewPostReasonUnion.ReasonPin,
+                    FeedViewPostReasonUnion.Unknown,
+                    FeedViewPostReasonUnion.ReasonRepost -> false
 
-                    parent?.let {
-                        val parentFollowing = parent.following
-                        val rootFollowing = root?.following ?: false
+                    else -> {
+                        val (parent, _) = sd.parent()
+                        val root = sd.root()
 
-                        val res = parentFollowing || rootFollowing
-                        !res
+                        parent?.let {
+                            val parentFollowing = parent.following
+                            val rootFollowing = root?.following ?: false
+
+                            if (!parentFollowing && root == null) {
+                                return@run false
+                            }
+
+                            val res = parentFollowing || rootFollowing
+                            return@run !res
+                        }
+
+                        return@run false
                     }
-
-                    false
                 }
             }
 
@@ -430,36 +437,7 @@ sealed class Notification {
 
 data class Notifications(
     var list: List<Notification> = listOf()
-) {
-//    fun likes() {
-//        val likes = mutableMapOf<Post, RepeatedNotification>()
-//        list.forEach {
-//            when (it) {
-//                is Notification.Like -> {
-//                    if (likes.contains(it.post)) {
-//                        val l = likes[it.post]!!
-//                        l.authors += RepeatedAuthor(it.author, it.createdAt)
-//                        if (it.createdAt > l.timestamp) {
-//                            l.timestamp = it.createdAt
-//                        }
-//                        likes[it.post] = l
-//                    } else {
-//                        likes[it.post] = RepeatedNotification(
-//                            kind = RepeatableNotification.Like,
-//                            authors = listOf(RepeatedAuthor(it.author, it.createdAt)),
-//                            timestamp = it.createdAt
-//                        )
-//                    }
-//                }
-//
-//                else -> null
-//            }
-//        }
-//
-//        val asd = likes.entries.sortedByDescending { it.value.timestamp }.associate { it.toPair() }
-//        Log.d("likes", likes.toString())
-//    }
-}
+)
 
 enum class RepeatableNotification(val u: Unit) {
     Like(Unit),
