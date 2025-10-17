@@ -105,10 +105,12 @@ class Compressor(
                     compressFormat != Bitmap.CompressFormat.PNG
                 )
 
+                val ob = BitmapFactory.decodeByteArray(outputBytes, 0, outputBytes.size)
+
                 CompressedImage(
                     data = outputBytes,
-                    width = bitmap.width.toLong(),
-                    height = bitmap.height.toLong()
+                    width = ob.width.toLong(),
+                    height = ob.height.toLong()
                 )
             }
         }
