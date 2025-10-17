@@ -1,5 +1,6 @@
 package industries.geesawra.monarch
 
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
@@ -22,7 +23,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -99,20 +103,30 @@ fun LikeRepostRowView(
                 }, label = "size transform"
             ) {
                 when (it) {
-                    true -> Column(
-                        modifier = Modifier
-                            .clickable {
-                                if (data.authors.count() > 1) {
-                                    showAvatars.value = !showAvatars.value
-                                }
+                    true -> Column {
+                        IconButton(
+                            modifier = Modifier.align(Alignment.End),
+                            onClick = {
+                                showAvatars.value = !showAvatars.value
                             }
-                    ) {
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Close avatar list",
+                            )
+                        }
                         data.authors.take(8).forEachIndexed { idx, it ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Start,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clickable {
+                                        Log.d(
+                                            "LikeRepostRowView",
+                                            "Clicked ${it.author.handle.handle}"
+                                        )
+                                    },
                             ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
