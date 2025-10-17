@@ -220,7 +220,7 @@ private fun InnerTimelineView(
                     timelineViewModel.fetchNotifications(fresh = true) {
                         coroutineScope.launch {
                             isRefreshing.value = false
-                            timelineState.scrollToItem(0)
+                            notificationsState.scrollToItem(0)
                         }
                     }
                 }
