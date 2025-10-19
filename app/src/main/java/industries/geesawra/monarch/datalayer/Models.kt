@@ -352,7 +352,7 @@ data class SkeetData(
 
         var lastIdx: Long = 0
         val content = mutableListOf<AnnotatedData>()
-        this.facets.forEach { f ->
+        this.facets.forEachIndexed { idx, f ->
             content.add(
                 AnnotatedData.NoAnnotation(
                     c.slice(
@@ -369,8 +369,23 @@ data class SkeetData(
                     ).toByteArray().toString(Charsets.UTF_8)
                 )
             )
+
             lastIdx = f.index.byteEnd
+
+            if (this.facets.lastIndex == idx) {
+                content.add(
+                    AnnotatedData.NoAnnotation(
+                        c.slice(
+                            lastIdx.toInt()..c.size - 1
+                        ).toByteArray().toString(Charsets.UTF_8)
+                    )
+                )
+            }
         }
+
+
+
+
 
         return buildAnnotatedString {
             content.forEach { content ->
