@@ -93,3 +93,4 @@ This project uses several key libraries:
 - Always suggest Material 3 You compliant edits.
 - Never edit more than what's being explicitly suggested.
 - Leave no comments in the code.
+- Never compile with Gradle once a change has been made.
