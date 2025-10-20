@@ -140,9 +140,19 @@ data class SkeetData(
                         val (parent, _) = sd.parent()
                         val root = sd.root()
 
+                        if (parent?.authorHandle == sd.authorHandle && (root == null || root.authorHandle == sd.authorHandle)) {
+                            return@run false
+                        }
+
                         parent?.let {
+
                             val parentFollowing = parent.following
                             val rootFollowing = root?.following ?: false
+
+                            if (root?.authorHandle == sd.authorHandle && parentFollowing) {
+                                return@run false
+                            }
+
 
                             if (!parentFollowing && root == null) {
                                 return@run false
