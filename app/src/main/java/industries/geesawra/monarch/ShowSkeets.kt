@@ -63,7 +63,6 @@ fun ShowSkeets(
                 val root = skeet.root()
                 val (parent, parentsParent) = skeet.parent()
 
-
                 if (!isShowingThread) {
                     if (!isRepost) {
                         root?.let {
@@ -107,7 +106,12 @@ fun ShowSkeets(
                 }
 
 
-                SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
+                SkeetView(
+                    viewModel = viewModel,
+                    skeet = skeet,
+                    onReplyTap = onReplyTap,
+                    showInReplyTo = parent == null
+                )
             }
         }
 

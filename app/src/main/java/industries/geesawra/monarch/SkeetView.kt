@@ -69,6 +69,7 @@ fun SkeetView(
     nested: Boolean = false,
     disableEmbeds: Boolean = false,
     inThread: Boolean = false,
+    showInReplyTo: Boolean = true
 ) {
     if (skeet.blocked) {
         ConditionalCard(text = "Blocked :(", wrapWithCard = !nested)
@@ -100,7 +101,7 @@ fun SkeetView(
                     .sizeIn(minHeight = minSize),
             ) {
 
-                SkeetReason(modifier = Modifier.padding(start = 4.dp), skeet = skeet)
+                SkeetReason(modifier = Modifier.padding(start = 4.dp), skeet = skeet, showInReplyTo)
 
                 Row(
                     modifier = Modifier
@@ -394,7 +395,11 @@ private fun RecordWithMediaView(
 }
 
 @Composable
-private fun SkeetReason(modifier: Modifier = Modifier, skeet: SkeetData) {
+private fun SkeetReason(
+    modifier: Modifier = Modifier,
+    skeet: SkeetData,
+    showInReplyTo: Boolean = true
+) {
     Column(modifier = modifier) {
         var isRepost = false
         skeet.reason?.let {
@@ -417,7 +422,7 @@ private fun SkeetReason(modifier: Modifier = Modifier, skeet: SkeetData) {
             }
         }
 
-        if (!isRepost) {
+        if (!isRepost && showInReplyTo) {
             skeet.reply?.let {
                 it
                 val parent = it.parent
