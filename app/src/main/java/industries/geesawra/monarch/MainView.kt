@@ -95,6 +95,7 @@ fun MainView(
     timelineViewModel: TimelineViewModel,
     coroutineScope: CoroutineScope,
     onLoginError: () -> Unit,
+    onThreadTap: (SkeetData) -> Unit,
 ) {
     val scrollState = rememberScrollState()
     val scaffoldState = rememberBottomSheetScaffoldState(
@@ -153,6 +154,9 @@ fun MainView(
                             withDismissAction = true,
                         )
                     }
+                },
+                onSeeMoreTap = {
+                    onThreadTap(it)
                 }
             )
         }
@@ -169,6 +173,7 @@ private fun InnerTimelineView(
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
     onError: (String) -> Unit,
+    onSeeMoreTap: (SkeetData) -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
@@ -429,7 +434,9 @@ private fun InnerTimelineView(
                         state = timelineState,
                         modifier = Modifier.padding(values),
                         onReplyTap = onReplyTap,
-                        isScrollEnabled = isScrollEnabled
+                        data = timelineViewModel.uiState.skeets,
+                        isScrollEnabled = isScrollEnabled,
+                        onSeeMoreTap = onSeeMoreTap
                     )
 
                     TabBarDestinations.NOTIFICATIONS -> NotificationsView(

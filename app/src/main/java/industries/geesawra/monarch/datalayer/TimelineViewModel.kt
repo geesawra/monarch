@@ -12,11 +12,13 @@ import androidx.lifecycle.viewModelScope
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.feed.GeneratorView
+import app.bsky.feed.GetPostThreadResponseThreadUnion
 import app.bsky.feed.Like
 import app.bsky.feed.Post
 import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.Repost
+import app.bsky.feed.ThreadViewPostReplieUnion
 import app.bsky.graph.Follow
 import app.bsky.notification.ListNotificationsReason
 import com.atproto.repo.StrongRef
@@ -53,6 +55,8 @@ data class TimelineUiState(
     val notificationsCursor: String? = null,
 
     val cidInteractedWith: Map<Cid, RKey> = mapOf(),
+
+    val currentlyShownThread: List<SkeetData> = listOf(),
 
     val loginError: String? = null,
     val error: String? = null,
@@ -195,7 +199,11 @@ class TimelineViewModel @AssistedInject constructor(
                         isFetchingMoreNotifications = false,
                         error = "Failed to fetch notifications: ${it.message}"
                     )
-                }.getOrThrow()
+                }.getOrNull()
+
+            if (rawNotifs == null) {
+                return@launch
+            }
 
             val repeatable = mutableListOf<Notification>()
 
@@ -491,6 +499,63 @@ class TimelineViewModel @AssistedInject constructor(
                 )
                 then()
             }
+        }
+    }
+
+    fun setThread(tappedElement: SkeetData) {
+        uiState = uiState.copy(currentlyShownThread = listOf(tappedElement))
+    }
+
+    fun getThread(then: () -> Unit) {
+        viewModelScope.launch {
+            bskyConn.getThread(uiState.currentlyShownThread.first().uri).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                uiState = uiState.copy(
+                    currentlyShownThread = uiState.currentlyShownThread + run {
+                        when (it.thread) {
+                            is GetPostThreadResponseThreadUnion.BlockedPost -> listOf(
+                                SkeetData(
+                                    blocked = true
+                                )
+                            )
+
+                            is GetPostThreadResponseThreadUnion.NotFoundPost -> listOf(
+                                SkeetData(
+                                    notFound = true
+                                )
+                            )
+
+                            is GetPostThreadResponseThreadUnion.ThreadViewPost -> (it.thread as GetPostThreadResponseThreadUnion.ThreadViewPost).value.replies.mapNotNull { r ->
+                                when (r) {
+                                    is ThreadViewPostReplieUnion.BlockedPost -> SkeetData(
+                                        blocked = true
+                                    )
+
+                                    is ThreadViewPostReplieUnion.NotFoundPost -> SkeetData(
+                                        notFound = true
+                                    )
+
+                                    is ThreadViewPostReplieUnion.ThreadViewPost -> SkeetData.fromPostView(
+                                        r.value.post,
+                                        r.value.post.author
+                                    )
+
+                                    is ThreadViewPostReplieUnion.Unknown -> null
+                                }
+                            }
+
+                            is GetPostThreadResponseThreadUnion.Unknown -> listOf()
+                        }
+                    }
+                )
+
+                then()
+            }
+
         }
     }
 }

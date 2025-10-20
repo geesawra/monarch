@@ -9,11 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,7 +34,11 @@ fun ShowSkeets(
     viewModel: TimelineViewModel,
     isScrollEnabled: Boolean,
     state: LazyListState = rememberLazyListState(),
+    data: List<SkeetData>,
+    isShowingThread: Boolean = false,
+    shouldFetchMoreData: Boolean = true,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onSeeMoreTap: ((SkeetData) -> Unit)? = null,
 ) {
     LazyColumn(
         state = state,
@@ -44,23 +48,21 @@ fun ShowSkeets(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        viewModel.uiState.skeets.filter {
-            !it.replyToNotFollowing
-        }.forEach { skeet ->
-            item(key = skeet.key()) {
-                ElevatedCard(
-                    elevation = CardDefaults.elevatedCardElevation(
-                        defaultElevation = 0.dp
-                    )
-                ) {
-                    val isRepost = when (skeet.reason) {
-                        is FeedViewPostReasonUnion.ReasonRepost -> true
-                        else -> false
-                    }
+        items(
+            items = data.filter { !it.replyToNotFollowing },
+            key = { it.key() }
+        ) { skeet ->
+            Card {
+                val isRepost = when (skeet.reason) {
+                    is FeedViewPostReasonUnion.ReasonRepost -> true
+                    else -> false
+                }
 
-                    val root = skeet.root()
-                    val (parent, parentsParent) = skeet.parent()
+                val root = skeet.root()
+                val (parent, parentsParent) = skeet.parent()
 
+
+                if (!isShowingThread) {
                     if (!isRepost) {
                         root?.let {
                             SkeetView(
@@ -73,7 +75,15 @@ fun ShowSkeets(
 
                         parent?.let {
                             if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
-                                ConditionalCard("See more")
+                                ConditionalCard(
+                                    text = "See more",
+                                    onTap = {
+                                        if (onSeeMoreTap != null) {
+                                            viewModel.setThread(root)
+                                            onSeeMoreTap(root)
+                                        }
+                                    }
+                                )
 
                                 VerticalDivider(
                                     thickness = 4.dp,
@@ -92,14 +102,14 @@ fun ShowSkeets(
                             )
                         }
                     }
-
-
-                    SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
                 }
+
+
+                SkeetView(viewModel = viewModel, skeet = skeet, onReplyTap = onReplyTap)
             }
         }
 
-        if (viewModel.uiState.isFetchingMoreTimeline && viewModel.uiState.skeets.isNotEmpty()) {
+        if (viewModel.uiState.isFetchingMoreTimeline && data.isNotEmpty() && shouldFetchMoreData) {
             item {
                 Box(
                     modifier = Modifier
@@ -135,7 +145,7 @@ fun ShowSkeets(
     }
 
     LaunchedEffect(endOfListReached) {
-        if (endOfListReached && viewModel.uiState.skeets.isNotEmpty()) {
+        if (endOfListReached && viewModel.uiState.skeets.isNotEmpty() && shouldFetchMoreData) {
             viewModel.fetchTimeline()
         }
     }

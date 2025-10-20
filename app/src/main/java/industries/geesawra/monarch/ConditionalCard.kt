@@ -1,5 +1,6 @@
 package industries.geesawra.monarch
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,10 +15,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun ConditionalCard(text: String, wrapWithCard: Boolean = true) {
+fun ConditionalCard(
+    modifier: Modifier = Modifier,
+    onTap: () -> Unit = {},
+    text: String,
+    wrapWithCard: Boolean = true
+) {
     if (wrapWithCard) {
         OutlinedCard(
-            modifier = Modifier
+            modifier = modifier
                 .height(80.dp)
                 .padding(8.dp)
                 .fillMaxWidth()
@@ -25,10 +31,11 @@ fun ConditionalCard(text: String, wrapWithCard: Boolean = true) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 16.dp),
+                    .clickable { onTap() },
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
+                    modifier = Modifier.padding(start = 16.dp),
                     text = text,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

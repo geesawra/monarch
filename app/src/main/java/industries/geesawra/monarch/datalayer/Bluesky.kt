@@ -26,6 +26,8 @@ import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetFeedGeneratorsQueryParams
 import app.bsky.feed.GetFeedQueryParams
 import app.bsky.feed.GetFeedResponse
+import app.bsky.feed.GetPostThreadQueryParams
+import app.bsky.feed.GetPostThreadResponse
 import app.bsky.feed.GetPostsQueryParams
 import app.bsky.feed.GetPostsResponse
 import app.bsky.feed.GetTimelineQueryParams
@@ -982,6 +984,25 @@ class BlueskyConn(val context: Context) {
 
     suspend fun deleteRepost(rKey: RKey): Result<Unit> {
         return deleteRecord(rKey, "app.bsky.feed.repost")
+    }
+
+    suspend fun getThread(uri: AtUri): Result<GetPostThreadResponse> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val res = client!!.getPostThread(
+                GetPostThreadQueryParams(
+                    uri = uri,
+                )
+            )
+
+            return when (res) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get thread: ${res.error?.message}"))
+                is AtpResponse.Success<GetPostThreadResponse> -> Result.success(res.response)
+            }
+        }
     }
 
     private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> {

@@ -5,11 +5,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -18,7 +21,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -44,6 +46,7 @@ class Application : Application()
 enum class ViewList() {
     Login,
     Main,
+    ShowThread,
 }
 
 @AndroidEntryPoint
@@ -106,14 +109,17 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = initialRoute,
                         modifier = Modifier.fillMaxSize(),
-                        popExitTransition = {
-                            scaleOut(
-                                targetScale = 0.9f,
-                                transformOrigin = TransformOrigin(0.5f, 0.5f)
-                            )
+                        enterTransition = {
+                            slideInHorizontally(initialOffsetX = { it })
+                        },
+                        exitTransition = {
+                            slideOutHorizontally(targetOffsetX = { -it })
                         },
                         popEnterTransition = {
-                            EnterTransition.None
+                            slideInHorizontally(initialOffsetX = { -it })
+                        },
+                        popExitTransition = {
+                            slideOutHorizontally(targetOffsetX = { it })
                         },
                     ) {
                         composable(route = ViewList.Main.name) {
@@ -122,9 +128,21 @@ class MainActivity : ComponentActivity() {
                                 coroutineScope = rememberCoroutineScope(),
                                 onLoginError = {
                                     navController.navigate(ViewList.Login.name)
+                                },
+                                onThreadTap = {
+                                    navController.navigate(ViewList.ShowThread.name)
                                 }
                             )
                         }
+                        composable(route = ViewList.ShowThread.name) {
+                            ThreadView(
+                                modifier = Modifier
+                                    .windowInsetsPadding(WindowInsets.statusBars),
+                                timelineViewModel = timelineViewModel,
+                                coroutineScope = rememberCoroutineScope(),
+                            )
+                        }
+
                         composable(route = ViewList.Login.name) {
                             Surface(
                                 modifier = Modifier.fillMaxSize(),
