@@ -506,7 +506,10 @@ class TimelineViewModel @AssistedInject constructor(
         uiState = uiState.copy(currentlyShownThread = listOf(listOf(tappedElement)))
     }
 
-    private fun getAllThreads(thread: GetPostThreadResponseThreadUnion): List<List<SkeetData>> {
+    private fun getAllThreads(
+        thread: GetPostThreadResponseThreadUnion,
+        startingLevel: Int = 0
+    ): List<List<SkeetData>> {
         if (thread !is GetPostThreadResponseThreadUnion.ThreadViewPost) {
             return when (thread) {
                 is GetPostThreadResponseThreadUnion.BlockedPost -> listOf(listOf(SkeetData(blocked = true)))
@@ -518,35 +521,51 @@ class TimelineViewModel @AssistedInject constructor(
         val rootSkeet = SkeetData.fromPostView(thread.value.post, thread.value.post.author)
         val threads = mutableListOf<List<SkeetData>>()
 
-        fun findPaths(current: ThreadViewPostReplieUnion, currentPath: List<SkeetData>, level: Int) {
-            val skeet = when (current) {
-                is ThreadViewPostReplieUnion.ThreadViewPost -> SkeetData.fromPostView(
-                    current.value.post,
-                    current.value.post.author
-                ).copy(nestingLevel = level)
+//        fun findPaths(current: ThreadViewPostReplieUnion, currentPath: List<SkeetData>, level: Int) {
+//            val skeet = when (current) {
+//                is ThreadViewPostReplieUnion.ThreadViewPost -> SkeetData.fromPostView(
+//                    current.value.post,
+//                    current.value.post.author
+//                ).copy(nestingLevel = level)
+//
+//                is ThreadViewPostReplieUnion.BlockedPost -> SkeetData(blocked = true)
+//                is ThreadViewPostReplieUnion.NotFoundPost -> SkeetData(notFound = true)
+//                else -> null
+//            }
+//
+//            if (skeet == null) return
+//
+//            val newPath = currentPath + skeet
+//            val replies = (current as? ThreadViewPostReplieUnion.ThreadViewPost)?.value?.replies
+//
+//            if (replies.isNullOrEmpty()) {
+//                threads.add(newPath)
+//            } else {
+//                replies.forEach { findPaths(it, newPath, level + 1) }
+//            }
+//        }
+//
 
-                is ThreadViewPostReplieUnion.BlockedPost -> SkeetData(blocked = true)
-                is ThreadViewPostReplieUnion.NotFoundPost -> SkeetData(notFound = true)
-                else -> null
-            }
+        val list = mutableListOf<SkeetData>()
 
-            if (skeet == null) return
+        thread.value.replies.forEach { reply ->
+            when (reply) {
+                is ThreadViewPostReplieUnion.BlockedPost -> listOf(listOf(SkeetData(blocked = true)))
+                is ThreadViewPostReplieUnion.NotFoundPost -> listOf(listOf(SkeetData(notFound = true)))
+                is ThreadViewPostReplieUnion.ThreadViewPost -> run {
+                    list.add(SkeetData.fromPostView(reply.value.post, reply.value.post.author))
+                    threads += getAllThreads(
+                        GetPostThreadResponseThreadUnion.ThreadViewPost(reply.value),
+                        startingLevel + 1
+                    )
+                }
 
-            val newPath = currentPath + skeet
-            val replies = (current as? ThreadViewPostReplieUnion.ThreadViewPost)?.value?.replies
-
-            if (replies.isNullOrEmpty()) {
-                threads.add(newPath)
-            } else {
-                replies.forEach { findPaths(it, newPath, level + 1) }
+                is ThreadViewPostReplieUnion.Unknown -> {}
             }
         }
 
-        if (thread.value.replies.isEmpty()) {
-            threads.add(listOf(rootSkeet))
-        } else {
-            thread.value.replies.forEach { findPaths(it, listOf(rootSkeet), 1) }
-        }
+
+        threads.add(list)
 
         return threads.map { it.sortedBy { skeet -> skeet.createdAt } }
     }

@@ -70,7 +70,13 @@ fun ShowSkeets(
                                 viewModel = viewModel,
                                 skeet = it,
                                 onReplyTap = onReplyTap,
-                                inThread = true
+                                inThread = true,
+//                                onShowThread = {
+//                                    if (onSeeMoreTap != null) {
+//                                        viewModel.setThread(root)
+//                                        onSeeMoreTap(root)
+//                                    }
+//                                }
                             )
                         }
 
@@ -99,7 +105,13 @@ fun ShowSkeets(
                                 viewModel = viewModel,
                                 skeet = it,
                                 onReplyTap = onReplyTap,
-                                inThread = true
+                                inThread = true,
+//                                onShowThread = {
+//                                    if (onSeeMoreTap != null) {
+//                                        viewModel.setThread(parent)
+//                                        onSeeMoreTap(parent)
+//                                    }
+//                                }
                             )
                         }
                     }
@@ -110,7 +122,13 @@ fun ShowSkeets(
                     viewModel = viewModel,
                     skeet = skeet,
                     onReplyTap = onReplyTap,
-                    showInReplyTo = parent == null
+                    showInReplyTo = parent == null,
+//                    onShowThread = {
+//                        if (onSeeMoreTap != null) {
+//                            viewModel.setThread(skeet)
+//                            onSeeMoreTap(skeet)
+//                        }
+//                    }
                 )
             }
         }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -40,15 +41,16 @@ fun NotificationsView(
         userScrollEnabled = isScrollEnabled,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        viewModel.uiState.notifications.forEach { notif ->
-            item(notif.createdAt()) {
-                Card {
-                    RenderNotification(
-                        viewModel = viewModel,
-                        notification = notif,
-                        onReplyTap = onReplyTap
-                    )
-                }
+        items(
+            items = viewModel.uiState.notifications,
+            key = { it.createdAt() }
+        ) { notif ->
+            Card {
+                RenderNotification(
+                    viewModel = viewModel,
+                    notification = notif,
+                    onReplyTap = onReplyTap
+                )
             }
         }
 

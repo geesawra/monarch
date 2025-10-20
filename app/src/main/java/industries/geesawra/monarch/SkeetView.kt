@@ -69,7 +69,8 @@ fun SkeetView(
     nested: Boolean = false,
     disableEmbeds: Boolean = false,
     inThread: Boolean = false,
-    showInReplyTo: Boolean = true
+    showInReplyTo: Boolean = true,
+    onShowThread: (SkeetData) -> Unit = {},
 ) {
     if (skeet.blocked) {
         ConditionalCard(text = "Blocked :(", wrapWithCard = !nested)
@@ -89,6 +90,9 @@ fun SkeetView(
             modifier
                 .padding(top = 8.dp, start = 16.dp, end = 16.dp)
                 .background(Color.Transparent)
+                .clickable {
+                    onShowThread(skeet)
+                }
     ) {
         Row(
             verticalAlignment = Alignment.Top,
