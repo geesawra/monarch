@@ -53,6 +53,7 @@ data class TimelineUiState(
 
     val timelineCursor: String? = null,
     val notificationsCursor: String? = null,
+    val unreadNotificationsAmt: Int = 0,
 
     val cidInteractedWith: Map<Cid, RKey> = mapOf(),
 
@@ -204,6 +205,15 @@ class TimelineViewModel @AssistedInject constructor(
             if (rawNotifs == null) {
                 return@launch
             }
+
+            uiState = uiState.copy(
+                unreadNotificationsAmt = rawNotifs.notifications.fold(0) { acc, notification ->
+                    when (notification.isRead) {
+                        false -> acc + 1
+                        true -> acc
+                    }
+                }
+            )
 
             val repeatable = mutableListOf<Notification>()
 

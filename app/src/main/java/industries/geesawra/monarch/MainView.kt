@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,7 +57,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,6 +72,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -82,10 +88,24 @@ import kotlin.time.ExperimentalTime
 enum class TabBarDestinations(
     @param:StringRes val label: Int,
     val icon: ImageVector,
-    @param:StringRes val contentDescription: Int
+    @param:StringRes val contentDescription: Int,
+    val badgeValue: MutableIntState? = null,
+    val badgeDescFmt: (Int) -> String = { "" },
 ) {
     TIMELINE(R.string.timeline, Icons.Filled.Home, R.string.timeline),
-    NOTIFICATIONS(R.string.notifications, Icons.Filled.Notifications, R.string.notifications)
+    NOTIFICATIONS(
+        R.string.notifications,
+        Icons.Filled.Notifications,
+        R.string.notifications,
+        mutableIntStateOf(0),
+        badgeDescFmt = { notifAmt ->
+            when (notifAmt) {
+                0 -> "No new notifications"
+                1 -> "1 new notification"
+                else -> "$notifAmt new notifications"
+            }
+        }
+    )
 }
 
 
@@ -258,6 +278,11 @@ private fun InnerTimelineView(
                 )
             }
         ) {
+            LaunchedEffect(timelineViewModel.uiState.unreadNotificationsAmt) {
+                TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue =
+                    timelineViewModel.uiState.unreadNotificationsAmt
+            }
+
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
                 modifier = Modifier
@@ -409,10 +434,37 @@ private fun InnerTimelineView(
                         TabBarDestinations.entries.forEach {
                             NavigationBarItem(
                                 icon = {
-                                    Icon(
-                                        it.icon,
-                                        contentDescription = stringResource(it.contentDescription)
-                                    )
+                                    if (it.badgeValue != null) {
+                                        val badgeValue = remember { it.badgeValue }
+                                        BadgedBox(
+                                            badge = {
+                                                if (badgeValue.intValue == 0) {
+                                                    return@BadgedBox
+                                                }
+
+                                                Badge {
+                                                    Text(
+                                                        badgeValue.intValue.toString(),
+                                                        modifier =
+                                                            Modifier.semantics {
+                                                                contentDescription =
+                                                                    it.badgeDescFmt(it.badgeValue.intValue)
+                                                            },
+                                                    )
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                it.icon,
+                                                contentDescription = stringResource(it.contentDescription)
+                                            )
+                                        }
+                                    } else {
+                                        Icon(
+                                            it.icon,
+                                            contentDescription = stringResource(it.contentDescription)
+                                        )
+                                    }
                                 },
                                 label = { Text(stringResource(it.label)) },
                                 selected = it == currentDestination,
