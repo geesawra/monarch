@@ -80,6 +80,7 @@ private fun cdnVideoPlaylist(authorDid: Did, blob: Blob?): Uri? {
 }
 
 data class SkeetData(
+    val nestingLevel: Int = 0,
     val likes: Long? = null,
     val reposts: Long? = null,
     val replies: Long? = null,

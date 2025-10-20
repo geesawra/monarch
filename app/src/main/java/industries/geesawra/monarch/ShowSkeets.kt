@@ -52,7 +52,9 @@ fun ShowSkeets(
             items = data.filter { !it.replyToNotFollowing },
             key = { it.key() }
         ) { skeet ->
-            Card {
+            Card(
+                modifier = Modifier.padding(start = (skeet.nestingLevel * 16).dp)
+            ) {
                 val isRepost = when (skeet.reason) {
                     is FeedViewPostReasonUnion.ReasonRepost -> true
                     else -> false
