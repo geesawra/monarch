@@ -140,6 +140,9 @@ class MainActivity : ComponentActivity() {
                                     .windowInsetsPadding(WindowInsets.statusBars),
                                 timelineViewModel = timelineViewModel,
                                 coroutineScope = rememberCoroutineScope(),
+                                backButton = {
+                                    navController.popBackStack()
+                                }
                             )
                         }
 
