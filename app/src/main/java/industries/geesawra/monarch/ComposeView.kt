@@ -95,8 +95,8 @@ fun ComposeView(
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
 
-    LaunchedEffect(scaffoldState.bottomSheetState.currentValue) {
-        when (scaffoldState.bottomSheetState.currentValue) {
+    LaunchedEffect(scaffoldState.bottomSheetState.targetValue) {
+        when (scaffoldState.bottomSheetState.targetValue) {
             SheetValue.Hidden -> {
                 composeFieldState.clearText()
                 keyboardController?.hide()
@@ -109,8 +109,8 @@ fun ComposeView(
             }
 
             SheetValue.PartiallyExpanded, SheetValue.Expanded -> {
-                keyboardController?.hide()
-                focusManager.clearFocus()
+                focusRequester.requestFocus()
+                keyboardController?.show()
             }
         }
     }
