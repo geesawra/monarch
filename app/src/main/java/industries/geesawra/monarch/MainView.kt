@@ -480,6 +480,11 @@ private fun InnerTimelineView(
                     }
                 }
 
+                LaunchedEffect(notificationsState.canScrollBackward) {
+                    TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = 0
+                }
+
+
                 when (currentDestination) {
                     TabBarDestinations.TIMELINE -> ShowSkeets(
                         viewModel = timelineViewModel,

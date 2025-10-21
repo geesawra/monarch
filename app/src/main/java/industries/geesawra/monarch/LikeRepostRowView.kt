@@ -103,7 +103,9 @@ fun LikeRepostRowView(
                 }, label = "size transform"
             ) {
                 when (it) {
-                    true -> Column {
+                    true -> Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         IconButton(
                             modifier = Modifier.align(Alignment.End),
                             onClick = {
