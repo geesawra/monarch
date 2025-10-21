@@ -211,6 +211,26 @@ class TimelineViewModel @AssistedInject constructor(
             )
 
             val repeatable = mutableListOf<Notification>()
+            val postsToFetch = rawNotifs.notifications.mapNotNull {
+                when (it.reason) {
+                    ListNotificationsReason.Like -> {
+                        val l: Like = it.record.decodeAs()
+                        l.subject.uri
+                    }
+
+                    ListNotificationsReason.Repost -> {
+                        val l: Repost = it.record.decodeAs()
+                        l.subject.uri
+                    }
+
+                    else -> null
+                }
+            }
+
+            val posts = postsToFetch.chunked(25).fold(mapOf<AtUri, Post>()) { acc, chunk ->
+                acc + bskyConn.getPosts(chunk).getOrThrow()
+                    .associate { it.uri to it.record.decodeAs<Post>() }
+            }
 
             // we could bulk request posts here and avoid much of the network IO
             var notifs = rawNotifs.notifications.mapNotNull {
@@ -222,10 +242,11 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Like -> {
                         val l: Like = it.record.decodeAs()
-                        val lp = fetchRecord(l.subject.uri).getOrThrow()
+                        val lp = posts[l.subject.uri]!!
+
 
                         repeatable += Notification.RawLike(
-                            lp.decodeAs(),
+                            lp,
                             it.author,
                             l.createdAt.toStdlibInstant()
                         )
@@ -265,7 +286,7 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Repost -> {
                         val p: Repost = it.record.decodeAs()
-                        val rpp: Post = fetchRecord(p.subject.uri).getOrThrow().decodeAs()
+                        val rpp = posts[p.subject.uri]!!
 
                         val pp = when (rpp.embed) {
                             is PostEmbedUnion.Record -> {
