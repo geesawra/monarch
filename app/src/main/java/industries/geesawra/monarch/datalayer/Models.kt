@@ -427,7 +427,7 @@ data class SkeetData(
 
                             is FacetFeatureUnion.Tag -> withStyle(
                                 SpanStyle(
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                             {
