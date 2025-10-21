@@ -635,6 +635,16 @@ data class RepeatedAuthor(
 )
 
 data class ThreadPost(
-    val post: SkeetData,
-    val replies: List<ThreadPost>
-)
+    val post: SkeetData = SkeetData(),
+    val level: Int = 0,
+    val replies: List<ThreadPost> = listOf()
+) {
+    fun flatten(): List<SkeetData> {
+        val list = mutableListOf<SkeetData>()
+        list.add(post.copy(nestingLevel = level))
+        replies.forEach { reply ->
+            list.addAll(reply.flatten())
+        }
+        return list
+    }
+}

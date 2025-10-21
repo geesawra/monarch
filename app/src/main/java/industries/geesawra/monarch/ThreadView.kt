@@ -1,11 +1,9 @@
 package industries.geesawra.monarch
 
-import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -20,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.util.fastForEach
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 
@@ -66,7 +63,6 @@ fun ThreadView(
         ) { padding ->
             LaunchedEffect(Unit) {
                 timelineViewModel.getThread {
-                    Log.d("ThreadView", "Thread retrieved")
                     isRefreshing.value = false
                 }
             }
@@ -74,19 +70,14 @@ fun ThreadView(
             Column(
                 modifier = Modifier.padding(padding)
             ) {
-                timelineViewModel.uiState.currentlyShownThread.fastForEach { threadView ->
-                    ShowSkeets(
-                        viewModel = timelineViewModel,
-                        isScrollEnabled = true,
-                        data = threadView,
-                        shouldFetchMoreData = false,
-                        isShowingThread = true,
-                    )
-
-                    HorizontalDivider()
-                }
+                ShowSkeets(
+                    viewModel = timelineViewModel,
+                    isScrollEnabled = true,
+                    data = timelineViewModel.uiState.currentlyShownThread.flatten(),
+                    shouldFetchMoreData = false,
+                    isShowingThread = true,
+                )
             }
         }
     }
 }
-
