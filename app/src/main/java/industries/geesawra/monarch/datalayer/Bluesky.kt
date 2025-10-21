@@ -626,6 +626,16 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    suspend fun fetchSelf(): Result<ProfileViewDetailed> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            return fetchActor(session!!.did)
+        }
+    }
+
     private data class MediaBlob(
         val blob: Blob,
         val width: Long,

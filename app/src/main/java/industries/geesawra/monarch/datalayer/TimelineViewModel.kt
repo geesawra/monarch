@@ -39,6 +39,7 @@ import kotlin.time.Instant
 
 
 data class TimelineUiState(
+    val user: ProfileViewDetailed? = null,
     val selectedFeed: String = "following",
     val feedName: String = "Following",
     val feedAvatar: String? = null,
@@ -81,6 +82,7 @@ class TimelineViewModel @AssistedInject constructor(
     init {
         fetchTimeline(fresh = true)
         fetchNotifications(fresh = true)
+        fetchSelf()
     }
 
     fun loadSession() {
@@ -105,7 +107,7 @@ class TimelineViewModel @AssistedInject constructor(
         return Result.success(ret)
     }
 
-    suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> {
+    private suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> {
         val ret = bskyConn.fetchActor(did).onFailure {
             uiState = when (it) {
                 is LoginException -> uiState.copy(loginError = it.message)
@@ -114,6 +116,19 @@ class TimelineViewModel @AssistedInject constructor(
         }.getOrThrow()
 
         return Result.success(ret)
+    }
+
+    fun fetchSelf() {
+        viewModelScope.launch {
+            val ret = bskyConn.fetchSelf().onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                uiState = uiState.copy(user = it)
+            }
+        }
     }
 
     fun fetchTimeline(fresh: Boolean = false, then: () -> Unit = {}) {
@@ -558,15 +573,27 @@ class TimelineViewModel @AssistedInject constructor(
             }
         }
 
-        val currentPostSkeetData = SkeetData.fromPostView(threadUnion.value.post, threadUnion.value.post.author)
+        val currentPostSkeetData =
+            SkeetData.fromPostView(threadUnion.value.post, threadUnion.value.post.author)
 
         val replies = threadUnion.value.replies.map { replyUnion ->
             readThread(
                 threadUnion = when (replyUnion) {
-                    is ThreadViewPostReplieUnion.BlockedPost -> GetPostThreadResponseThreadUnion.BlockedPost(replyUnion.value)
-                    is ThreadViewPostReplieUnion.NotFoundPost -> GetPostThreadResponseThreadUnion.NotFoundPost(replyUnion.value)
-                    is ThreadViewPostReplieUnion.ThreadViewPost -> GetPostThreadResponseThreadUnion.ThreadViewPost(replyUnion.value)
-                    is ThreadViewPostReplieUnion.Unknown -> GetPostThreadResponseThreadUnion.Unknown(replyUnion.value)
+                    is ThreadViewPostReplieUnion.BlockedPost -> GetPostThreadResponseThreadUnion.BlockedPost(
+                        replyUnion.value
+                    )
+
+                    is ThreadViewPostReplieUnion.NotFoundPost -> GetPostThreadResponseThreadUnion.NotFoundPost(
+                        replyUnion.value
+                    )
+
+                    is ThreadViewPostReplieUnion.ThreadViewPost -> GetPostThreadResponseThreadUnion.ThreadViewPost(
+                        replyUnion.value
+                    )
+
+                    is ThreadViewPostReplieUnion.Unknown -> GetPostThreadResponseThreadUnion.Unknown(
+                        replyUnion.value
+                    )
                 },
                 level = level + 1
             )

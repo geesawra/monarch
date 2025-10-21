@@ -67,9 +67,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -306,7 +306,6 @@ private fun InnerTimelineView(
                                             model = timelineViewModel.uiState.feedAvatar,
                                             modifier = Modifier
                                                 .size(40.dp)
-                                                .shadow(10.dp, CircleShape)
                                                 .clip(CircleShape),
                                             contentDescription = "Feed avatar",
                                         )
@@ -337,6 +336,34 @@ private fun InnerTimelineView(
                                 TabBarDestinations.NOTIFICATIONS -> {}
                             }
                         },
+                        actions = {
+                            when (currentDestination) {
+                                TabBarDestinations.TIMELINE -> {
+                                    if (timelineViewModel.uiState.user == null) {
+                                        return@LargeTopAppBar
+                                    }
+
+                                    val user = timelineViewModel.uiState.user!!
+
+                                    IconButton(onClick = {}) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(user.avatar?.uri)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = "${user.displayName ?: user.handle.handle}'s avatar",
+                                            contentScale = ContentScale.Crop,
+                                            modifier =
+                                                Modifier
+                                                    .size(55.dp)
+                                                    .clip(CircleShape)
+                                        )
+                                    }
+                                }
+
+                                TabBarDestinations.NOTIFICATIONS -> {}
+                            }
+                        }
                     )
                 },
                 floatingActionButton = {
