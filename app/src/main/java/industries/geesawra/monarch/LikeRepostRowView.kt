@@ -221,7 +221,12 @@ fun LikeRepostRowView(
                             Icons.Default.Repeat
                         }
                     },
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
+                    colorFilter = ColorFilter.tint(
+                        when (data.kind) {
+                            RepeatableNotification.Like -> MaterialTheme.colorScheme.error
+                            RepeatableNotification.Repost -> MaterialTheme.colorScheme.inverseSurface
+                        }
+                    ),
                     contentDescription = "${
                         when (data.kind) {
                             RepeatableNotification.Like -> "Like"
