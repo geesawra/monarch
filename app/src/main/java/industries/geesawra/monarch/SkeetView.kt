@@ -231,7 +231,6 @@ fun Embeds(context: Context, nested: Boolean, embed: PostViewEmbedUnion?) {
 private fun ImageView(img: List<ImagesViewImage>) {
     OutlinedCard(
         modifier = Modifier
-            .fillMaxWidth()
             .padding(top = 8.dp, bottom = 8.dp),
     ) {
         PostImageGallery(
@@ -241,6 +240,7 @@ private fun ImageView(img: List<ImagesViewImage>) {
                 Image(
                     url = it.thumb.uri,
                     alt = it.alt,
+                    fullSize = it.fullsize.uri,
                     width = it.aspectRatio?.width,
                     height = it.aspectRatio?.height
                 )

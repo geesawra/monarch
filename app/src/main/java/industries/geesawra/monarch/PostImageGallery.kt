@@ -31,6 +31,7 @@ import coil3.request.crossfade
 
 data class Image(
     val url: String,
+    val fullSize: String = "",
     val alt: String,
     val width: Long? = null,
     val height: Long? = null,
@@ -64,17 +65,21 @@ fun PostImageGallery(
 
     when (imagesToDisplay.size) {
         1 -> {
-            Row(
-                modifier = modifier
-                    .fillMaxWidth()
-            ) {
-                DeletableImageView(
-                    modifier = Modifier.weight(1f),
-                    image = imagesToDisplay[0],
-                    originalIndex = 0,
-                    onCrossClick = onCrossClick,
-                    onMediaClick = { galleryVisible.value = 0 })
+            val img = imagesToDisplay[0]
+
+            val aspectRatio = if (img.width != null && img.height != null) {
+                img.width.toFloat() / img.height.toFloat()
+            } else {
+                null
             }
+
+            DeletableImageView(
+                image = img,
+                originalIndex = 0,
+                onCrossClick = onCrossClick,
+                onMediaClick = { galleryVisible.value = 0 },
+                aspectRatio = aspectRatio
+            )
         }
 
         2 -> {
@@ -195,12 +200,19 @@ fun PostImageGallery(
 private fun DeletableImageView(
     modifier: Modifier = Modifier,
     image: Image,
+    aspectRatio: Float? = null,
     originalIndex: Int,
     onCrossClick: ((Int) -> Unit)? = null,
     onMediaClick: (Int) -> Unit,
 ) {
     DeletableMediaView(
-        modifier = modifier,
+        modifier = run {
+            if (aspectRatio != null) {
+                modifier
+            } else {
+                modifier.aspectRatio(1f)
+            }
+        },
         originalIndex = originalIndex,
         onCrossClick = onCrossClick,
         onMediaClick = onMediaClick,
@@ -212,10 +224,16 @@ private fun DeletableImageView(
                 .build(),
             contentDescription = image.alt,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .aspectRatio(1f) // Changed from fillMaxSize() to make it square
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { onMediaClick(originalIndex) }
+            modifier = if (aspectRatio != null) {
+                Modifier
+                    .aspectRatio(aspectRatio)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onMediaClick(originalIndex) }
+            } else {
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onMediaClick(originalIndex) }
+            }
         )
     }
 }
@@ -230,7 +248,6 @@ fun DeletableMediaView(
 ) {
     Box(
         modifier = modifier
-            .aspectRatio(1f) // Changed from fillMaxSize() to make it square
             .clip(RoundedCornerShape(12.dp))
             .clickable { onMediaClick(originalIndex) }
     ) {

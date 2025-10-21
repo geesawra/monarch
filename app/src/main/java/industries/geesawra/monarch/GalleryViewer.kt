@@ -58,7 +58,7 @@ fun GalleryViewer(
                             )
                         )
                     ),
-                    model = imageUrls[page].url,
+                    model = imageUrls[page].fullSize,
                     contentDescription = imageUrls[page].alt,
                     modifier = Modifier
                         .fillMaxSize(),
