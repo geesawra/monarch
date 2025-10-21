@@ -79,6 +79,11 @@ class TimelineViewModel @AssistedInject constructor(
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
 
+    init {
+        fetchTimeline(fresh = true)
+        fetchNotifications(fresh = true)
+    }
+
     fun loadSession() {
         viewModelScope.launch {
             if (!bskyConn.hasSession()) {
@@ -110,16 +115,6 @@ class TimelineViewModel @AssistedInject constructor(
         }.getOrThrow()
 
         return Result.success(ret)
-    }
-
-    fun fetchNewData(then: () -> Unit = {}) {
-        fetchTimeline(fresh = true)
-        fetchNotifications(fresh = true)
-        viewModelScope.launch {
-            timelineFetchJob?.join()
-            notificationsFetchJob?.join()
-            then()
-        }
     }
 
     fun fetchTimeline(fresh: Boolean = false, then: () -> Unit = {}) {

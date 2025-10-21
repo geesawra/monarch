@@ -204,8 +204,9 @@ private fun InnerTimelineView(
     val drawerState = rememberDrawerState(
         initialValue = DrawerValue.Closed
     )
-    val isRefreshing = remember { mutableStateOf(true) }
-    val isScrollEnabled = !isRefreshing.value
+    val isRefreshing =
+        timelineViewModel.uiState.isFetchingMoreTimeline || timelineViewModel.uiState.isFetchingMoreNotifications
+    val isScrollEnabled = !isRefreshing
     val ctx = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -228,14 +229,12 @@ private fun InnerTimelineView(
     }
 
     PullToRefreshBox(
-        isRefreshing = isRefreshing.value,
+        isRefreshing = isRefreshing,
         onRefresh = {
-            isRefreshing.value = true
             when (currentDestination) {
                 TabBarDestinations.TIMELINE -> {
                     timelineViewModel.fetchTimeline(fresh = true) {
                         coroutineScope.launch {
-                            isRefreshing.value = false
                             timelineState.scrollToItem(0)
                         }
                     }
@@ -244,7 +243,6 @@ private fun InnerTimelineView(
                 TabBarDestinations.NOTIFICATIONS -> {
                     timelineViewModel.fetchNotifications(fresh = true) {
                         coroutineScope.launch {
-                            isRefreshing.value = false
                             notificationsState.scrollToItem(0)
                         }
                     }
@@ -258,14 +256,12 @@ private fun InnerTimelineView(
             drawerContent = {
                 FeedsDrawer(
                     { uri: String, displayName: String, avatar: String? ->
-                        isRefreshing.value = true
                         timelineViewModel.selectFeed(
                             uri,
                             displayName,
                             avatar
                         ) {
                             coroutineScope.launch {
-                                isRefreshing.value = false
                                 timelineState.scrollToItem(0)
                             }
                         }
@@ -474,12 +470,6 @@ private fun InnerTimelineView(
                     }
                 }
             ) { values ->
-                LaunchedEffect(Unit) {
-                    timelineViewModel.fetchNewData {
-                        isRefreshing.value = false
-                    }
-                }
-
                 LaunchedEffect(notificationsState.canScrollBackward) {
                     TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = 0
                 }
