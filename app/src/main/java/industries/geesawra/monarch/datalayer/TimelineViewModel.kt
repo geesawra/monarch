@@ -15,7 +15,6 @@ import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetPostThreadResponseThreadUnion
 import app.bsky.feed.Like
 import app.bsky.feed.Post
-import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.Repost
 import app.bsky.feed.ThreadViewPostReplieUnion
@@ -287,24 +286,8 @@ class TimelineViewModel @AssistedInject constructor(
                     ListNotificationsReason.Repost -> {
                         val p: Repost = it.record.decodeAs()
                         val rpp = posts[p.subject.uri]!!
-
-                        val pp = when (rpp.embed) {
-                            is PostEmbedUnion.Record -> {
-                                fetchRecord((rpp.embed as PostEmbedUnion.Record).value.record.uri).getOrThrow()
-                                    .decodeAs()
-
-                            }
-
-                            is PostEmbedUnion.RecordWithMedia -> {
-                                fetchRecord((rpp.embed as PostEmbedUnion.RecordWithMedia).value.record.record.uri).getOrThrow()
-                                    .decodeAs()
-                            }
-
-                            else -> rpp
-                        }
-
                         repeatable += Notification.RawRepost(
-                            pp,
+                            rpp,
                             it.author,
                             p.createdAt.toStdlibInstant()
                         )
