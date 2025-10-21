@@ -32,6 +32,8 @@ import coil3.request.crossfade
 data class Image(
     val url: String,
     val alt: String,
+    val width: Long? = null,
+    val height: Long? = null,
 )
 
 @Composable

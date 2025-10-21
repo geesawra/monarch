@@ -238,7 +238,12 @@ private fun ImageView(img: List<ImagesViewImage>) {
             modifier = Modifier
                 .fillMaxSize(),
             images = img.map {
-                Image(url = it.thumb.uri, alt = it.alt)
+                Image(
+                    url = it.thumb.uri,
+                    alt = it.alt,
+                    width = it.aspectRatio?.width,
+                    height = it.aspectRatio?.height
+                )
             },
         )
     }
