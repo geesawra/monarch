@@ -236,7 +236,7 @@ class TimelineViewModel @AssistedInject constructor(
                 when (it.reason) {
                     ListNotificationsReason.Follow -> {
                         val l: Follow = it.record.decodeAs()
-                        Notification.Follow(it.author, l.createdAt.toStdlibInstant())
+                        Notification.Follow(it.author, l.createdAt.toStdlibInstant(), !it.isRead)
                     }
 
                     ListNotificationsReason.Like -> {
@@ -247,7 +247,8 @@ class TimelineViewModel @AssistedInject constructor(
                         repeatable += Notification.RawLike(
                             lp,
                             it.author,
-                            l.createdAt.toStdlibInstant()
+                            l.createdAt.toStdlibInstant(),
+                            !it.isRead
                         )
 
                         null // repeatable, will be processed later
@@ -259,7 +260,8 @@ class TimelineViewModel @AssistedInject constructor(
                             Pair(it.cid, it.uri),
                             p,
                             it.author,
-                            p.createdAt.toStdlibInstant()
+                            p.createdAt.toStdlibInstant(),
+                            !it.isRead
                         )
                     }
 
@@ -269,7 +271,8 @@ class TimelineViewModel @AssistedInject constructor(
                             Pair(it.cid, it.uri),
                             p,
                             it.author,
-                            p.createdAt.toStdlibInstant()
+                            p.createdAt.toStdlibInstant(),
+                            !it.isRead
                         )
                     }
 
@@ -279,7 +282,8 @@ class TimelineViewModel @AssistedInject constructor(
                             Pair(it.cid, it.uri),
                             p,
                             it.author,
-                            p.createdAt.toStdlibInstant()
+                            p.createdAt.toStdlibInstant(),
+                            !it.isRead
                         )
                     }
 
@@ -289,7 +293,8 @@ class TimelineViewModel @AssistedInject constructor(
                         repeatable += Notification.RawRepost(
                             rpp,
                             it.author,
-                            p.createdAt.toStdlibInstant()
+                            p.createdAt.toStdlibInstant(),
+                            !it.isRead
                         )
 
                         null
@@ -309,7 +314,7 @@ class TimelineViewModel @AssistedInject constructor(
                 mutableMapOf<RepeatableNotification, MutableMap<Post, RepeatedNotification>>()
 
             val processRepeatable =
-                { kind: RepeatableNotification, list: MutableMap<Post, RepeatedNotification>, post: Post, author: ProfileView, createdAt: Instant ->
+                { kind: RepeatableNotification, list: MutableMap<Post, RepeatedNotification>, post: Post, author: ProfileView, createdAt: Instant, new: Boolean ->
                     if (list.contains(post)) {
                         val l = list[post]!!
                         l.authors += RepeatedAuthor(author, createdAt)
@@ -327,7 +332,8 @@ class TimelineViewModel @AssistedInject constructor(
                                 )
                             ),
                             post = post,
-                            timestamp = createdAt
+                            timestamp = createdAt,
+                            new = new,
                         )
                     }
                 }
@@ -344,7 +350,8 @@ class TimelineViewModel @AssistedInject constructor(
                             list,
                             it.post,
                             it.author,
-                            it.createdAt
+                            it.createdAt,
+                            it.new,
                         )
                     }
 
@@ -358,7 +365,8 @@ class TimelineViewModel @AssistedInject constructor(
                             list,
                             it.post,
                             it.author,
-                            it.createdAt
+                            it.createdAt,
+                            it.new
                         )
                     }
 
@@ -375,8 +383,9 @@ class TimelineViewModel @AssistedInject constructor(
                                     r.kind,
                                     r.post,
                                     r.authors.sortedByDescending { it.timestamp },
-                                    r.timestamp
-                                )
+                                    r.timestamp,
+                                ),
+                                new = r.new
                             )
                         }
                     }
@@ -389,7 +398,8 @@ class TimelineViewModel @AssistedInject constructor(
                                     r.post,
                                     r.authors.sortedByDescending { it.timestamp },
                                     r.timestamp
-                                )
+                                ),
+                                new = r.new
                             )
                         }
                     }
@@ -405,6 +415,19 @@ class TimelineViewModel @AssistedInject constructor(
             )
 
             then()
+        }
+    }
+
+    fun updateSeenNotifications() {
+        viewModelScope.launch {
+            bskyConn.updateSeenNotifications().onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                uiState = uiState.copy(unreadNotificationsAmt = 0)
+            }
         }
     }
 

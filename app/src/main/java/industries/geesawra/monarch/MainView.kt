@@ -133,6 +133,7 @@ fun MainView(
         sheetPeekHeight = 0.dp,
         sheetDragHandle = {},
         sheetSwipeEnabled = false,
+        sheetShadowElevation = 16.dp,
         sheetContent = {
             ComposeView(
                 context = LocalContext.current,
@@ -473,8 +474,7 @@ private fun InnerTimelineView(
                 LaunchedEffect(notificationsState.canScrollBackward) {
                     TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = 0
                 }
-
-
+                
                 when (currentDestination) {
                     TabBarDestinations.TIMELINE -> ShowSkeets(
                         viewModel = timelineViewModel,
@@ -489,9 +489,10 @@ private fun InnerTimelineView(
                     TabBarDestinations.NOTIFICATIONS -> NotificationsView(
                         viewModel = timelineViewModel,
                         state = notificationsState,
-                        modifier = Modifier.padding(values),
+                        modifier = Modifier,
                         isScrollEnabled = isScrollEnabled,
-                        onReplyTap = onReplyTap
+                        onReplyTap = onReplyTap,
+                        scaffoldPadding = values
                     )
                 }
             }

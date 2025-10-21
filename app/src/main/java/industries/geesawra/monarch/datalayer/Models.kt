@@ -532,32 +532,46 @@ data class SkeetData(
 }
 
 sealed class Notification {
-    data class RawLike(val post: Post, val author: ProfileView, val createdAt: Instant) :
+    data class RawLike(
+        val post: Post,
+        val author: ProfileView,
+        val createdAt: Instant,
+        val new: Boolean
+    ) :
         Notification()
 
-    data class RawRepost(val post: Post, val author: ProfileView, val createdAt: Instant) :
+    data class RawRepost(
+        val post: Post,
+        val author: ProfileView,
+        val createdAt: Instant,
+        val new: Boolean
+    ) :
         Notification()
 
-    data class Like(val data: RepeatedNotification) :
+    data class Like(val data: RepeatedNotification, val new: Boolean) :
         Notification()
 
-    data class Repost(val data: RepeatedNotification) :
+    data class Repost(val data: RepeatedNotification, val new: Boolean) :
         Notification()
 
     data class Reply(
         val parent: Pair<Cid, AtUri>,
         val reply: Post,
         val author: ProfileView,
-        val createdAt: Instant
+        val createdAt: Instant,
+        val new: Boolean
     ) :
         Notification()
 
-    data class Follow(val follow: ProfileView, val createdAt: Instant) : Notification()
+    data class Follow(val follow: ProfileView, val createdAt: Instant, val new: Boolean) :
+        Notification()
+
     data class Mention(
         val parent: Pair<Cid, AtUri>,
         val mention: Post,
         val author: ProfileView,
-        val createdAt: Instant
+        val createdAt: Instant,
+        val new: Boolean
     ) :
         Notification()
 
@@ -565,7 +579,8 @@ sealed class Notification {
         val parent: Pair<Cid, AtUri>,
         val quote: Post,
         val author: ProfileView,
-        val createdAt: Instant
+        val createdAt: Instant,
+        val new: Boolean
     ) :
         Notification()
 
@@ -581,6 +596,19 @@ sealed class Notification {
             is Repost -> this.data.timestamp
         }
     }
+
+    fun new(): Boolean {
+        return when (this) {
+            is RawLike -> this.new
+            is RawRepost -> this.new
+            is Follow -> this.new
+            is Like -> this.new
+            is Mention -> this.new
+            is Quote -> this.new
+            is Reply -> this.new
+            is Repost -> this.new
+        }
+    }
 }
 
 
@@ -593,7 +621,8 @@ data class RepeatedNotification(
     val kind: RepeatableNotification,
     val post: Post,
     var authors: List<RepeatedAuthor>,
-    var timestamp: Instant
+    var timestamp: Instant,
+    val new: Boolean,
 ) {
     fun sorted(): RepeatedNotification {
         return this.copy(kind, post, authors.sortedByDescending { it.timestamp }, timestamp)
@@ -603,4 +632,9 @@ data class RepeatedNotification(
 data class RepeatedAuthor(
     val author: ProfileView,
     val timestamp: Instant,
+)
+
+data class ThreadPost(
+    val post: SkeetData,
+    val replies: List<ThreadPost>
 )

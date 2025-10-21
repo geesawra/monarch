@@ -43,6 +43,7 @@ import app.bsky.labeler.GetServicesResponse
 import app.bsky.labeler.GetServicesResponseViewUnion
 import app.bsky.notification.ListNotificationsQueryParams
 import app.bsky.notification.ListNotificationsResponse
+import app.bsky.notification.UpdateSeenRequest
 import app.bsky.video.GetJobStatusQueryParams
 import app.bsky.video.GetJobStatusResponse
 import app.bsky.video.JobStatus
@@ -893,6 +894,25 @@ class BlueskyConn(val context: Context) {
             return when (ret) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch notifications: ${ret.error}"))
                 is AtpResponse.Success<ListNotificationsResponse> -> Result.success(ret.response)
+            }
+        }
+    }
+
+    suspend fun updateSeenNotifications(): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.updateSeen(
+                UpdateSeenRequest(
+                    seenAt = Clock.System.now().toDeprecatedInstant(),
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to update seen notifications: ${ret.error}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
             }
         }
     }
