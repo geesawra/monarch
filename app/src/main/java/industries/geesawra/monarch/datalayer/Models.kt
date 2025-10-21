@@ -408,7 +408,7 @@ data class SkeetData(
                             is FacetFeatureUnion.Link -> withLink(
                                 LinkAnnotation.Url(
                                     f.value.uri.uri,
-                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary))
                                 )
                             ) {
                                 append(content.content)
@@ -417,7 +417,7 @@ data class SkeetData(
                             is FacetFeatureUnion.Mention -> withLink(
                                 LinkAnnotation.Url(
                                     f.value.did.did,
-                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary))
                                 )
                             ) {
                                 append(
@@ -427,7 +427,7 @@ data class SkeetData(
 
                             is FacetFeatureUnion.Tag -> withStyle(
                                 SpanStyle(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             )
                             {
