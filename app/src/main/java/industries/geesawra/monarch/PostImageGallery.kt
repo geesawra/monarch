@@ -77,7 +77,9 @@ fun PostImageGallery(
 
         2 -> {
             Row(
-                modifier = modifier.fillMaxWidth(),
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 DeletableImageView(
@@ -98,7 +100,9 @@ fun PostImageGallery(
 
         3 -> {
             Column(
-                modifier = modifier.fillMaxWidth(),
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
@@ -141,7 +145,9 @@ fun PostImageGallery(
 
         else -> { // Handles 4 images
             Column(
-                modifier = modifier.fillMaxWidth(),
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(

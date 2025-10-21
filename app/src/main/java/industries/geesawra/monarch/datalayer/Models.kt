@@ -408,7 +408,7 @@ data class SkeetData(
                             is FacetFeatureUnion.Link -> withLink(
                                 LinkAnnotation.Url(
                                     f.value.uri.uri,
-                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface))
+                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant))
                                 )
                             ) {
                                 append(content.content)
@@ -417,7 +417,7 @@ data class SkeetData(
                             is FacetFeatureUnion.Mention -> withLink(
                                 LinkAnnotation.Url(
                                     f.value.did.did,
-                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface))
+                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant))
                                 )
                             ) {
                                 append(
@@ -623,11 +623,7 @@ data class RepeatedNotification(
     var authors: List<RepeatedAuthor>,
     var timestamp: Instant,
     val new: Boolean,
-) {
-    fun sorted(): RepeatedNotification {
-        return this.copy(kind, post, authors.sortedByDescending { it.timestamp }, timestamp)
-    }
-}
+)
 
 data class RepeatedAuthor(
     val author: ProfileView,

@@ -305,7 +305,7 @@ private fun InnerTimelineView(
                                         AsyncImage(
                                             model = timelineViewModel.uiState.feedAvatar,
                                             modifier = Modifier
-                                                .size(42.dp)
+                                                .size(40.dp)
                                                 .shadow(10.dp, CircleShape)
                                                 .clip(CircleShape),
                                             contentDescription = "Feed avatar",

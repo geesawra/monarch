@@ -95,8 +95,8 @@ fun ShowSkeets(
                                 VerticalDivider(
                                     thickness = 4.dp,
                                     modifier = Modifier
-                                        .height(50.dp)
-                                        .padding(start = (16 + 25).dp)
+                                        .height(48.dp)
+                                        .padding(start = (16 + 24).dp)
                                         .clip(RoundedCornerShape(12.dp))
                                 )
                             }

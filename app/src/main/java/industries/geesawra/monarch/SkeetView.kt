@@ -133,7 +133,7 @@ fun SkeetView(
                     TimelinePostActionsView(
                         onReplyTap = onReplyTap,
                         modifier = Modifier
-                            .height(50.dp)
+                            .height(48.dp)
                             .fillMaxWidth(),
                         timelineViewModel = viewModel,
                         skeet = skeet,
@@ -157,7 +157,7 @@ private fun SkeetContent(
     if (skeet.content.isNotEmpty()) {
         Text(
             text = skeet.annotatedContent(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyLarge,
         )
     }
@@ -236,8 +236,7 @@ private fun ImageView(img: List<ImagesViewImage>) {
     ) {
         PostImageGallery(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
+                .fillMaxSize(),
             images = img.map {
                 Image(url = it.thumb.uri, alt = it.alt)
             },
@@ -283,7 +282,6 @@ fun VideoView(uri: Uri) {
             repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
         )
     }
 }

@@ -64,11 +64,11 @@ private fun IconWithNumber(
         Icon(
             imageVector,
             contentDescription = contentDescription,
-            modifier = Modifier.size(15.dp),
+            modifier = Modifier.size(16.dp),
             tint = tint
         )
         Text(
-            modifier = Modifier.padding(start = 2.dp),
+            modifier = Modifier.padding(start = 4.dp),
             text = number.longValue.toString(),
             color = tint,
             maxLines = 1,
@@ -115,7 +115,7 @@ fun TimelinePostActionsView(
             VerticalDivider(
                 thickness = 4.dp,
                 modifier = Modifier
-                    .padding(start = 25.dp, top = 4.dp)
+                    .padding(start = 24.dp, top = 4.dp)
                     .clip(RoundedCornerShape(12.dp))
             )
 
@@ -135,7 +135,7 @@ fun TimelinePostActionsView(
             }
         ) {
             Icon(
-                modifier = Modifier.size(15.dp),
+                modifier = Modifier.size(16.dp),
                 imageVector = Icons.Default.Share,
                 contentDescription = "Share",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
