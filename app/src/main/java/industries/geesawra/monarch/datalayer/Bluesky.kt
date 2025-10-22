@@ -643,7 +643,7 @@ class BlueskyConn(val context: Context) {
     )
 
     private suspend fun uploadImages(images: List<Uri>): Result<List<MediaBlob>> {
-        val maxImageSize = 1000000
+        val maxImageSize = 950000 // ~950kb
 
         return runCatching {
             create().onFailure {

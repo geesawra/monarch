@@ -197,7 +197,7 @@ private fun InnerTimelineView(
     onSeeMoreTap: (SkeetData) -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
     )
     val timelineState = rememberLazyListState()
@@ -207,12 +207,8 @@ private fun InnerTimelineView(
     )
     val isRefreshing =
         timelineViewModel.uiState.isFetchingMoreTimeline || timelineViewModel.uiState.isFetchingMoreNotifications
-    val isScrollEnabled = !isRefreshing
+    val isScrollEnabled = true
     val ctx = LocalContext.current
-
-    LaunchedEffect(Unit) {
-        timelineViewModel.feeds()
-    }
 
 
     LaunchedEffect(timelineViewModel.uiState.loginError) {
@@ -232,23 +228,33 @@ private fun InnerTimelineView(
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = {
-            when (currentDestination) {
-                TabBarDestinations.TIMELINE -> {
-                    timelineViewModel.fetchTimeline(fresh = true) {
-                        coroutineScope.launch {
-                            timelineState.scrollToItem(0)
-                        }
+            timelineViewModel.fetchAllNewData() {
+                coroutineScope.launch {
+                    launch {
+                        timelineState.scrollToItem(0)
                     }
-                }
-
-                TabBarDestinations.NOTIFICATIONS -> {
-                    timelineViewModel.fetchNotifications(fresh = true) {
-                        coroutineScope.launch {
-                            notificationsState.scrollToItem(0)
-                        }
+                    launch {
+                        notificationsState.scrollToItem(0)
                     }
                 }
             }
+//            when (currentDestination) {
+//                TabBarDestinations.TIMELINE -> {
+//                    timelineViewModel.fetchTimeline(fresh = true) {
+//                        coroutineScope.launch {
+//                            timelineState.scrollToItem(0)
+//                        }
+//                    }
+//                }
+//
+//                TabBarDestinations.NOTIFICATIONS -> {
+//                    timelineViewModel.fetchNotifications(fresh = true) {
+//                        coroutineScope.launch {
+//                            notificationsState.scrollToItem(0)
+//                        }
+//                    }
+//                }
+//            }
         },
     ) {
         ModalNavigationDrawer(
@@ -263,12 +269,13 @@ private fun InnerTimelineView(
                             avatar
                         ) {
                             coroutineScope.launch {
-                                timelineState.scrollToItem(0)
+                                launch {
+                                    timelineState.scrollToItem(0)
+                                }
+                                launch {
+                                    drawerState.close()
+                                }
                             }
-                        }
-
-                        coroutineScope.launch {
-                            drawerState.close()
                         }
                     },
                     timelineViewModel

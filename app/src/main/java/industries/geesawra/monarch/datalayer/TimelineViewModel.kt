@@ -26,6 +26,7 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toStdlibInstant
 import sh.christian.ozone.api.AtUri
@@ -80,9 +81,7 @@ class TimelineViewModel @AssistedInject constructor(
     private var notificationsFetchJob: Job? = null
 
     init {
-        fetchTimeline(fresh = true)
-        fetchNotifications(fresh = true)
-        fetchSelf()
+        fetchAllNewData()
     }
 
     fun loadSession() {
@@ -93,6 +92,18 @@ class TimelineViewModel @AssistedInject constructor(
             }
 
             uiState = uiState.copy(authenticated = true, sessionChecked = true)
+        }
+    }
+
+    fun fetchAllNewData(then: () -> Unit = {}) {
+        fetchTimeline(fresh = true)
+        fetchNotifications(fresh = true)
+        val fsJob = fetchSelf()
+        val fJob = feeds()
+
+        viewModelScope.launch {
+            joinAll(timelineFetchJob!!, notificationsFetchJob!!, fsJob, fJob)
+            then()
         }
     }
 
@@ -118,8 +129,8 @@ class TimelineViewModel @AssistedInject constructor(
         return Result.success(ret)
     }
 
-    fun fetchSelf() {
-        viewModelScope.launch {
+    fun fetchSelf(): Job {
+        return viewModelScope.launch {
             val ret = bskyConn.fetchSelf().onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
@@ -462,8 +473,8 @@ class TimelineViewModel @AssistedInject constructor(
         ) // TODO: maybe refactor this to use uistate.Error?
     }
 
-    fun feeds() {
-        viewModelScope.launch {
+    fun feeds(): Job {
+        return viewModelScope.launch {
             bskyConn.feeds().onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
