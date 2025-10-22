@@ -81,6 +81,7 @@ private fun cdnVideoPlaylist(authorDid: Did, blob: Blob?): Uri? {
 
 data class SkeetData(
     val nestingLevel: Int = 0,
+    val isReplyToRoot: Boolean = false,
     val likes: Long? = null,
     val reposts: Long? = null,
     val replies: Long? = null,
@@ -637,7 +638,7 @@ data class ThreadPost(
 ) {
     fun flatten(): List<SkeetData> {
         val list = mutableListOf<SkeetData>()
-        list.add(post.copy(nestingLevel = level))
+        list.add(post.copy(nestingLevel = level, isReplyToRoot = level == 1))
         replies.forEach { reply ->
             list.addAll(reply.flatten())
         }
