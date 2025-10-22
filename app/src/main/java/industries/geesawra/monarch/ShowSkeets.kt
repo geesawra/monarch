@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -43,10 +43,10 @@ fun ShowSkeets(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        items(
+        itemsIndexed(
             items = data.filter { !it.replyToNotFollowing },
-            key = { it.key() }
-        ) { skeet ->
+            key = { _, skeet -> skeet.key() }
+        ) { idx, skeet ->
             Card(
                 modifier = Modifier.padding(start = (skeet.nestingLevel * 16).dp)
             ) {
@@ -66,12 +66,12 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
-//                                onShowThread = {
-//                                    if (onSeeMoreTap != null) {
-//                                        viewModel.setThread(root)
-//                                        onSeeMoreTap(root)
-//                                    }
-//                                }
+                                onShowThread = {
+                                    if (onSeeMoreTap != null) {
+                                        viewModel.setThread(root)
+                                        onSeeMoreTap(root)
+                                    }
+                                }
                             )
                         }
 
@@ -101,29 +101,28 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
-//                                onShowThread = {
-//                                    if (onSeeMoreTap != null) {
-//                                        viewModel.setThread(parent)
-//                                        onSeeMoreTap(parent)
-//                                    }
-//                                }
+                                onShowThread = {
+                                    if (onSeeMoreTap != null) {
+                                        viewModel.setThread(parent)
+                                        onSeeMoreTap(parent)
+                                    }
+                                }
                             )
                         }
                     }
                 }
-
 
                 SkeetView(
                     viewModel = viewModel,
                     skeet = skeet,
                     onReplyTap = onReplyTap,
                     showInReplyTo = parent == null,
-//                    onShowThread = {
-//                        if (onSeeMoreTap != null) {
-//                            viewModel.setThread(skeet)
-//                            onSeeMoreTap(skeet)
-//                        }
-//                    }
+                    onShowThread = {
+                        if (onSeeMoreTap != null) {
+                            viewModel.setThread(skeet)
+                            onSeeMoreTap(skeet)
+                        }
+                    }
                 )
             }
         }
