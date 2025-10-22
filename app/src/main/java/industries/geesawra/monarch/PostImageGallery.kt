@@ -231,6 +231,7 @@ private fun DeletableImageView(
                     .clickable { onMediaClick(originalIndex) }
             } else {
                 Modifier
+                    .aspectRatio(1f)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onMediaClick(originalIndex) }
             }
