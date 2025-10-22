@@ -395,10 +395,6 @@ data class SkeetData(
             }
         }
 
-
-
-
-
         return buildAnnotatedString {
             content.forEach { content ->
                 when (content) {
