@@ -109,6 +109,7 @@ import kotlin.time.ExperimentalTime
 enum class AuthData {
     PDSHost,
     SessionData,
+    AppViewProxy,
 }
 
 class LoginException(message: String?) : Exception(message)
@@ -162,6 +163,7 @@ class BlueskyConn(val context: Context) {
         private val Context.dataStore by preferencesDataStore("bluesky")
         private val SESSION = stringPreferencesKey(AuthData.SessionData.name)
         private val PDSHOST = stringPreferencesKey(AuthData.PDSHost.name)
+        private val APPVIEW_PROXY = stringPreferencesKey(AuthData.AppViewProxy.name)
 
         suspend fun pdsForHandle(handle: String): Result<String> {
             return runCatching {
@@ -235,10 +237,11 @@ class BlueskyConn(val context: Context) {
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
 
-    suspend fun storeSessionData(pdsURL: String, session: SessionData) {
+    suspend fun storeSessionData(pdsURL: String, appviewProxy: String, session: SessionData) {
         context.dataStore.edit { settings ->
             settings[SESSION] = session.encodeToJson()
             settings[PDSHOST] = pdsURL
+            settings[APPVIEW_PROXY] = appviewProxy
         }
     }
 
@@ -246,6 +249,7 @@ class BlueskyConn(val context: Context) {
         context.dataStore.edit { settings ->
             settings.remove(SESSION)
             settings.remove(PDSHOST)
+            settings.remove(APPVIEW_PROXY)
         }
     }
 
@@ -256,14 +260,24 @@ class BlueskyConn(val context: Context) {
         val sessionDataStringFlow: Flow<String> = context.dataStore.data.map { settings ->
             settings[SESSION] ?: ""
         }
+        val appviewProxyStringFlow: Flow<String> = context.dataStore.data.map { settings ->
+            settings[APPVIEW_PROXY] ?: ""
+        }
 
         val pdsURL = pdsURLFlow.first()
         val sessionDataString = sessionDataStringFlow.first()
+        val appviewProxy = appviewProxyStringFlow.first()
 
-        return !(pdsURL.isEmpty() || sessionDataString.isEmpty())
+
+        return !(pdsURL.isEmpty() || sessionDataString.isEmpty() || appviewProxy.isEmpty())
     }
 
-    suspend fun login(pdsURL: String, handle: String, password: String): Result<Unit> {
+    suspend fun login(
+        pdsURL: String,
+        handle: String,
+        password: String,
+        appviewProxy: String
+    ): Result<Unit> {
         createMutex.lock()
         val httpClient = HttpClient(OkHttp) {
             defaultRequest {
@@ -296,7 +310,11 @@ class BlueskyConn(val context: Context) {
             is AtpResponse.Success<CreateSessionResponse> -> s.response
         }
 
-        storeSessionData(pdsURL, SessionData.fromCreateSessionResponse(sessionResponse))
+        storeSessionData(
+            pdsURL,
+            appviewProxy,
+            SessionData.fromCreateSessionResponse(sessionResponse)
+        )
         session = null
         this.client = null
 
@@ -312,6 +330,7 @@ class BlueskyConn(val context: Context) {
 
     private fun mkClient(
         pds: String,
+        appviewProxy: String,
         sessionData: SessionData,
         labelers: List<String> = listOf()
     ): AuthenticatedXrpcBlueskyApi {
@@ -319,6 +338,7 @@ class BlueskyConn(val context: Context) {
             defaultRequest {
                 url(pds)
                 headers["atproto-accept-labelers"] = labelers.joinToString()
+                headers["atproto-proxy"] = appviewProxy
             }
             install(HttpTimeout) {
                 requestTimeoutMillis = 15000
@@ -335,6 +355,7 @@ class BlueskyConn(val context: Context) {
 
     private suspend fun refreshIfNeeded(
         pdsURL: String,
+        appviewProxy: String,
         token: SessionData,
     ): Result<Unit> {
         return runCatching {
@@ -397,7 +418,7 @@ class BlueskyConn(val context: Context) {
                         )
 
                     this.session = SessionData.fromRefreshSessionResponse(rs)
-                    storeSessionData(pdsURL, this.session!!)
+                    storeSessionData(pdsURL, appviewProxy, this.session!!)
                     return Result.success(Unit)
                 }
 
@@ -432,18 +453,22 @@ class BlueskyConn(val context: Context) {
             val sessionDataStringFlow: Flow<String> = context.dataStore.data.map { settings ->
                 settings[SESSION] ?: ""
             }
+            val appviewProxyFlow: Flow<String> = context.dataStore.data.map { settings ->
+                settings[APPVIEW_PROXY] ?: ""
+            }
 
             val pdsURL = pdsURLFlow.first()
             val sessionDataString = sessionDataStringFlow.first()
+            val appviewProxy = appviewProxyFlow.first()
 
-            if (pdsURL.isEmpty() || sessionDataString.isEmpty()) {
+            if (pdsURL.isEmpty() || sessionDataString.isEmpty() || appviewProxy.isEmpty()) {
                 createMutex.unlock()
                 return Result.failure(Exception("No session data found"))
             }
 
             val sessionData = SessionData.decodeFromJson(sessionDataString)
 
-            refreshIfNeeded(pdsURL, sessionData).onFailure {
+            refreshIfNeeded(pdsURL, appviewProxy, sessionData).onFailure {
                 createMutex.unlock()
                 return Result.failure(it)
             }
@@ -451,12 +476,14 @@ class BlueskyConn(val context: Context) {
 
             this.client = mkClient(
                 pdsURL,
+                appviewProxy,
                 sessionData,
             )
 
             val labelers = this.subscribedLabelers().getOrThrow().keys.mapNotNull { it?.did }
             this.client = mkClient(
                 pdsURL,
+                appviewProxy,
                 sessionData,
                 labelers
             )

@@ -12,6 +12,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.christian.ozone.api.Handle
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginView(
     modifier: Modifier = Modifier,
@@ -135,11 +141,60 @@ fun LoginView(
                 .onFocusChanged { focusState -> isPasswordFocused = focusState.isFocused }
         )
 
+
+        val proxies = listOf(
+            "Bluesky Appview" to "did:web:api.bsky.app#bsky_appview",
+            "Blacksky Appview" to "did:web:api.blacksky.community#bsky_appview"
+        )
+
+        val expanded = remember { mutableStateOf(false) }
+        val selectedProxyPretty = remember { mutableStateOf(proxies.first().first) }
+        val selectedProxy = remember { mutableStateOf(proxies.first().second) }
+
+
+        ExposedDropdownMenuBox(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            expanded = expanded.value,
+            onExpandedChange = {
+                expanded.value = !expanded.value
+            }
+        ) {
+            TextField(
+                value = selectedProxyPretty.value,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
+                modifier = Modifier
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                    .fillMaxWidth()
+            )
+
+            ExposedDropdownMenu(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                expanded = expanded.value,
+                onDismissRequest = { expanded.value = false }
+            ) {
+                proxies.forEach { item ->
+                    DropdownMenuItem(
+                        text = { Text(text = item.first) },
+                        onClick = {
+                            selectedProxyPretty.value = item.first
+                            selectedProxy.value = item.second
+                            expanded.value = false
+                        }
+                    )
+                }
+            }
+        }
+
         Button(
             onClick = {
                 scope.launch {
                     loggingIn.value = true
-                    bc.login(currentPDS, handle, password).onSuccess {
+                    bc.login(currentPDS, handle, password, selectedProxy.value).onSuccess {
                         navigate()
                     }.onFailure {
                         Log.e("LoginView", "Login failed", it)
@@ -157,10 +212,10 @@ fun LoginView(
 
         var pdsString = "I'll look up your PDS automatically :^)"
         if (currentPDS != "") {
-            if (currentPDS.endsWith("bsky.network")) {
-                pdsString = "Your PDS: bsky.app"
+            pdsString = if (currentPDS.endsWith("bsky.network")) {
+                "Your PDS: bsky.app"
             } else {
-                pdsString = "Your PDS: $currentPDS"
+                "Your PDS: $currentPDS"
             }
         }
         if (lookingUpPDS) {
