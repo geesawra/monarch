@@ -116,6 +116,7 @@ fun MainView(
     coroutineScope: CoroutineScope,
     onLoginError: () -> Unit,
     onThreadTap: (SkeetData) -> Unit,
+    onFirstLoad: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
     val scaffoldState = rememberBottomSheetScaffoldState(
@@ -125,6 +126,10 @@ fun MainView(
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
     val isQuotePost = remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        onFirstLoad()
+    }
 
     BottomSheetScaffold(
         modifier = Modifier

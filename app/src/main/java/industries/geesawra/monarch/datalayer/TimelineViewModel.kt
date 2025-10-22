@@ -80,10 +80,6 @@ class TimelineViewModel @AssistedInject constructor(
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
 
-    init {
-        fetchAllNewData()
-    }
-
     fun loadSession() {
         viewModelScope.launch {
             if (!bskyConn.hasSession()) {
