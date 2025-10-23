@@ -68,10 +68,10 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
-                                onShowThread = {
+                                onShowThread = { skeet ->
                                     if (onSeeMoreTap != null) {
-                                        viewModel.setThread(root)
-                                        onSeeMoreTap(root)
+                                        viewModel.setThread(skeet)
+                                        onSeeMoreTap(skeet)
                                     }
                                 }
                             )
@@ -103,10 +103,10 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
-                                onShowThread = {
+                                onShowThread = { skeet ->
                                     if (onSeeMoreTap != null) {
-                                        viewModel.setThread(parent)
-                                        onSeeMoreTap(parent)
+                                        viewModel.setThread(skeet)
+                                        onSeeMoreTap(skeet)
                                     }
                                 }
                             )
@@ -119,7 +119,7 @@ fun ShowSkeets(
                     skeet = skeet,
                     onReplyTap = onReplyTap,
                     showInReplyTo = parent == null,
-                    onShowThread = {
+                    onShowThread = { skeet ->
                         if (onSeeMoreTap != null) {
                             viewModel.setThread(skeet)
                             onSeeMoreTap(skeet)

@@ -4,6 +4,7 @@ package industries.geesawra.monarch
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -91,6 +92,7 @@ fun SkeetView(
                 .padding(top = 8.dp, start = 16.dp, end = 16.dp)
                 .background(Color.Transparent)
                 .clickable {
+                    Log.d("SkeetView", skeet.content)
                     onShowThread(skeet)
                 }
     ) {
@@ -127,7 +129,7 @@ fun SkeetView(
                     SkeetHeader(modifier = Modifier.padding(start = 16.dp), skeet = skeet)
                 }
 
-                SkeetContent(skeet, nested, disableEmbeds)
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread)
 
                 if (!nested && !disableEmbeds) {
                     TimelinePostActionsView(
@@ -151,6 +153,7 @@ private fun SkeetContent(
     skeet: SkeetData,
     nested: Boolean = false,
     disableEmbeds: Boolean = false,
+    onShowThread: (SkeetData) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -166,11 +169,16 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed)
+    Embeds(context, nested, skeet.embed, onShowThread)
 }
 
 @Composable
-fun Embeds(context: Context, nested: Boolean, embed: PostViewEmbedUnion?) {
+fun Embeds(
+    context: Context,
+    nested: Boolean,
+    embed: PostViewEmbedUnion?,
+    onShowThread: (SkeetData) -> Unit
+) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
             ImageView(embed.value.images)
@@ -194,7 +202,8 @@ fun Embeds(context: Context, nested: Boolean, embed: PostViewEmbedUnion?) {
             ) {
                 RecordView(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                    embed.value
+                    embed.value,
+                    onShowThread = onShowThread,
                 )
             }
         }
@@ -211,14 +220,15 @@ fun Embeds(context: Context, nested: Boolean, embed: PostViewEmbedUnion?) {
                 is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
             }
 
-            Embeds(context, false, mediaValue)
+            Embeds(context, false, mediaValue, onShowThread)
 
             OutlinedCard(
                 modifier = Modifier.padding(top = 8.dp)
             ) {
                 RecordWithMediaView(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                    embed.value
+                    embed.value,
+                    onShowThread = onShowThread,
                 )
             }
         }
@@ -356,16 +366,20 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
 @Composable
 private fun RecordView(
     modifier: Modifier = Modifier,
-    rv: RecordView
+    rv: RecordView,
+    onShowThread: (SkeetData) -> Unit
 ) {
     val rv = rv.record
     when (rv) {
+        is RecordViewRecordUnion.ViewBlocked -> SkeetData(blocked = true)
+        is RecordViewRecordUnion.ViewNotFound -> SkeetData(notFound = true)
         is RecordViewRecordUnion.ViewRecord -> {
+            val s = SkeetData.fromRecordView(rv.value)
             SkeetView(
-                modifier = modifier,
                 viewModel = null,
-                skeet = SkeetData.fromRecordView(rv.value),
-                nested = true
+                skeet = s,
+                nested = true,
+                onShowThread = onShowThread
             )
         }
 
@@ -376,7 +390,8 @@ private fun RecordView(
 @Composable
 private fun RecordWithMediaView(
     modifier: Modifier = Modifier,
-    rv: RecordWithMediaView
+    rv: RecordWithMediaView,
+    onShowThread: (SkeetData) -> Unit
 ) {
     val rv = rv.record.record
     val record = when (rv) {
@@ -393,10 +408,10 @@ private fun RecordWithMediaView(
 
     record?.let {
         SkeetView(
-            modifier = modifier,
             viewModel = null,
             skeet = record,
-            nested = true
+            nested = true,
+            onShowThread = onShowThread
         )
     }
 }
