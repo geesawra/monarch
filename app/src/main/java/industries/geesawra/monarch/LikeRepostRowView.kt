@@ -82,6 +82,33 @@ fun LikeRepostRowView(
             .animateContentSize()
     ) {
 
+        val authors = data.authors
+        val firstAuthor = authors.first()
+        val firstAuthorName = name(firstAuthor.author)
+        val remainingCount = authors.size - 1
+        val reasonLine = when {
+            remainingCount > 1 -> "$firstAuthorName and $remainingCount others ${
+                when (data.kind) {
+                    RepeatableNotification.Like -> "liked"
+                    RepeatableNotification.Repost -> "reposted"
+                }
+            } this"
+
+            remainingCount == 1 -> "$firstAuthorName and 1 other ${
+                when (data.kind) {
+                    RepeatableNotification.Like -> "liked"
+                    RepeatableNotification.Repost -> "reposted"
+                }
+            } this"
+
+            else -> "$firstAuthorName ${
+                when (data.kind) {
+                    RepeatableNotification.Like -> "liked"
+                    RepeatableNotification.Repost -> "reposted"
+                }
+            } this"
+        }
+
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -166,43 +193,53 @@ fun LikeRepostRowView(
                         }
                     }
 
-                    false -> Box(
-                        modifier = Modifier
-                            .clickable {
-                                if (data.authors.count() > 1) {
-                                    showAvatars.value = !showAvatars.value
+                    false -> Column {
+                        Box(
+                            modifier = Modifier
+                                .clickable {
+                                    if (data.authors.count() > 1) {
+                                        showAvatars.value = !showAvatars.value
+                                    }
                                 }
+                                .fillMaxWidth()
+                        ) {
+                            data.authors.take(8).reversed().forEachIndexed { idx, it ->
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(it.author.avatar?.uri)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Avatar",
+                                    modifier = Modifier
+                                        .size(
+                                            when (data.kind) {
+                                                RepeatableNotification.Like -> minSize + 8.dp
+                                                RepeatableNotification.Repost -> minSize
+                                            }
+                                        )
+                                        .offset(
+                                            x = when (idx) {
+                                                0 -> 0.dp
+                                                else -> (idx * 16).dp
+                                            }
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = CircleShape
+                                        )
+                                        .clip(CircleShape)
+                                )
                             }
-                            .fillMaxWidth()
-                    ) {
-                        data.authors.take(8).forEachIndexed { idx, it ->
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(it.author.avatar?.uri)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = "Avatar",
-                                modifier = Modifier
-                                    .size(
-                                        when (data.kind) {
-                                            RepeatableNotification.Like -> minSize + 8.dp
-                                            RepeatableNotification.Repost -> minSize
-                                        }
-                                    )
-                                    .offset(
-                                        x = when (idx) {
-                                            0 -> 0.dp
-                                            else -> (idx * 16).dp
-                                        }
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.surface,
-                                        shape = CircleShape
-                                    )
-                                    .clip(CircleShape)
-                            )
                         }
+
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = reasonLine,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+
                     }
                 }
             }
@@ -240,44 +277,11 @@ fun LikeRepostRowView(
                         .size(minSize)
                 )
 
-                val authors = data.authors
-                val firstAuthor = authors.first()
-                val firstAuthorName = name(firstAuthor.author)
-                val remainingCount = authors.size - 1
-                val text = when {
-                    remainingCount > 1 -> "$firstAuthorName and $remainingCount others ${
-                        when (data.kind) {
-                            RepeatableNotification.Like -> "liked"
-                            RepeatableNotification.Repost -> "reposted"
-                        }
-                    } this"
-
-                    remainingCount == 1 -> "$firstAuthorName and 1 other ${
-                        when (data.kind) {
-                            RepeatableNotification.Like -> "liked"
-                            RepeatableNotification.Repost -> "reposted"
-                        }
-                    } this"
-
-                    else -> "$firstAuthorName ${
-                        when (data.kind) {
-                            RepeatableNotification.Like -> "liked"
-                            RepeatableNotification.Repost -> "reposted"
-                        }
-                    } this"
-                }
-
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .padding(start = 16.dp)
                 ) {
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
                     Text(
                         text = HumanReadable.timeAgo(data.timestamp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
