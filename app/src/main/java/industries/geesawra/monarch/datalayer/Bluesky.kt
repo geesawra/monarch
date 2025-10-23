@@ -44,6 +44,7 @@ import app.bsky.labeler.GetServicesResponseViewUnion
 import app.bsky.notification.ListNotificationsQueryParams
 import app.bsky.notification.ListNotificationsResponse
 import app.bsky.notification.UpdateSeenRequest
+import app.bsky.richtext.Facet
 import app.bsky.video.GetJobStatusQueryParams
 import app.bsky.video.GetJobStatusResponse
 import app.bsky.video.JobStatus
@@ -548,7 +549,8 @@ class BlueskyConn(val context: Context) {
         images: List<Uri>? = null,
         video: Uri? = null,
         replyRef: PostReplyRef? = null,
-        quotePostRef: StrongRef? = null
+        quotePostRef: StrongRef? = null,
+        facets: List<Facet> = listOf(),
     ): Result<Unit> {
         return runCatching {
             create().onFailure {
@@ -595,7 +597,8 @@ class BlueskyConn(val context: Context) {
                     text = content,
                     createdAt = Clock.System.now().toDeprecatedInstant(),
                     embed = postEmbed,
-                    reply = replyRef
+                    reply = replyRef,
+                    facets = facets,
                 )
             )
 

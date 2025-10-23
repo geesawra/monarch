@@ -72,7 +72,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEachIndexed
+import app.bsky.richtext.Facet
+import app.bsky.richtext.FacetByteSlice
+import app.bsky.richtext.FacetFeatureUnion
+import app.bsky.richtext.FacetLink
+import app.bsky.richtext.FacetTag
 import com.atproto.repo.StrongRef
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -97,6 +101,7 @@ fun ComposeView(
     val wasEdited = remember { mutableStateOf(false) }
     val maxChars = 300
     val composeFieldState = remember { mutableStateOf(TextFieldValue("")) }
+    val facets = remember { mutableListOf<Facet>() }
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
 
@@ -243,8 +248,11 @@ fun ComposeView(
                         .contentReceiver(receiveContentListener),
                     value = composeFieldState.value,
                     onValueChange = {
+                        val a = annotated(it.text, urlColor)
+                        facets.clear()
+                        facets.addAll(a.facets)
                         composeFieldState.value =
-                            it.copy(annotatedString = annotated(it.text, urlColor))
+                            it.copy(annotatedString = a.annotated)
                     },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
@@ -279,7 +287,8 @@ fun ComposeView(
                     timelineViewModel,
                     scaffoldState,
                     inReplyTo.value,
-                    isQuotePost.value
+                    isQuotePost.value,
+                    facets = facets
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -342,6 +351,7 @@ fun ActionRow(
     scaffoldState: BottomSheetScaffoldState,
     inReplyToData: SkeetData? = null,
     isQuotePost: Boolean = false,
+    facets: List<Facet> = listOf()
 ) {
 
     Row(
@@ -376,6 +386,7 @@ fun ActionRow(
                         uploadingPost.value = true // Show progress immediately
                         timelineViewModel.post(
                             content = postText,
+                            facets = facets,
                             images = if (!mediaSelectedIsVideo.value) mediaSelected.value
                                 .ifEmpty { null } else null,
                             video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
@@ -423,26 +434,92 @@ fun ActionRow(
     }
 }
 
-fun annotated(data: String, urlColor: Color): AnnotatedString {
-    return buildAnnotatedString {
-        val split = data.split(" ")
-        split.fastForEachIndexed { idx, s ->
-            if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s) || s.startsWith("#") || s.startsWith("@")) {
-                withStyle(
-                    SpanStyle(
-                        color = urlColor
+private data class FacetString(
+    val annotated: AnnotatedString,
+    val facets: List<Facet>
+)
+
+private fun annotated(data: String, urlColor: Color): FacetString {
+    val facets = mutableListOf<Facet>()
+    val annotatedString = buildAnnotatedString {
+        val tokens = Regex("(\\S+)").findAll(data)
+        var lastIndex = 0
+
+        for (token in tokens) {
+            if (token.range.first > lastIndex) {
+                append(data.substring(lastIndex, token.range.first))
+            }
+
+            val s = token.value
+            val startByte =
+                data.substring(0, token.range.first).encodeToByteArray().size
+            val endByte =
+                data.substring(0, token.range.last + 1).encodeToByteArray().size
+
+            if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) {
+                withStyle(SpanStyle(color = urlColor)) { append(s) }
+                facets.add(
+                    Facet(
+                        index = FacetByteSlice(startByte.toLong(), endByte.toLong()),
+                        features = listOf(
+                            FacetFeatureUnion.Link(
+                                value = FacetLink(
+                                    uri = sh.christian.ozone.api.Uri(s)
+                                )
+                            )
+                        )
                     )
                 )
-                {
-                    append(s)
+            } else if (s.startsWith("#") && s.length > 1) {
+                withStyle(SpanStyle(color = urlColor)) { append(s) }
+                val tag = s.substring(1)
+                if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
+                    facets.add(
+                        Facet(
+                            index = FacetByteSlice(
+                                startByte.toLong(),
+                                endByte.toLong()
+                            ),
+                            features = listOf(
+                                FacetFeatureUnion.Tag(
+                                    value = FacetTag(
+                                        tag = s.removePrefix("#"),
+                                    )
+                                )
+                            )
+                        )
+                    )
                 }
+            } else if (s.startsWith("@") && s.length > 1) {
+                withStyle(SpanStyle(color = urlColor)) { append(s) }
+                // TODO: mentions go here, need DID resolution
+//                val tag = s.substring(1)
+//                if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
+//                    facets.add(
+//                        Facet(
+//                            index = FacetByteSlice(
+//                                startByte.toLong(),
+//                                endByte.toLong()
+//                            ),
+//                            features = listOf(
+//                                FacetFeatureUnion.Mention(
+//                                    value = FacetMention(
+//                                        tag = s,
+//                                    )
+//                                )
+//                            )
+//                        )
+//                    )
+//                }
             } else {
                 append(s)
             }
+            lastIndex = token.range.last + 1
+        }
 
-            if (idx < split.size - 1) {
-                append(" ")
-            }
+        if (lastIndex < data.length) {
+            append(data.substring(lastIndex))
         }
     }
+    return FacetString(annotated = annotatedString, facets = facets)
 }

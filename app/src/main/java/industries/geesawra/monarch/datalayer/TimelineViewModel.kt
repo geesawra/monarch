@@ -20,6 +20,7 @@ import app.bsky.feed.Repost
 import app.bsky.feed.ThreadViewPostReplieUnion
 import app.bsky.graph.Follow
 import app.bsky.notification.ListNotificationsReason
+import app.bsky.richtext.Facet
 import com.atproto.repo.StrongRef
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -459,13 +460,15 @@ class TimelineViewModel @AssistedInject constructor(
         video: Uri? = null,
         replyRef: PostReplyRef? = null,
         quotePostRef: StrongRef? = null,
+        facets: List<Facet> = listOf(),
     ): Result<Unit> {
         return bskyConn.post(
             content,
             images,
             video,
             replyRef,
-            quotePostRef
+            quotePostRef,
+            facets
         ) // TODO: maybe refactor this to use uistate.Error?
     }
 
