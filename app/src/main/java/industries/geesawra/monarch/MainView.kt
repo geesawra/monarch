@@ -32,6 +32,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -51,6 +52,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -189,7 +192,7 @@ fun MainView(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun InnerTimelineView(
     modifier: Modifier = Modifier,
@@ -230,8 +233,17 @@ private fun InnerTimelineView(
         }
     }
 
+    val pullToRefreshState = rememberPullToRefreshState()
     PullToRefreshBox(
+        state = pullToRefreshState,
         isRefreshing = isRefreshing,
+        indicator = {
+            LoadingIndicator(
+                modifier = Modifier.align(Alignment.TopCenter),
+                isRefreshing = isRefreshing,
+                state = pullToRefreshState,
+            )
+        },
         onRefresh = {
             timelineViewModel.fetchAllNewData() {
                 coroutineScope.launch {
@@ -243,23 +255,6 @@ private fun InnerTimelineView(
                     }
                 }
             }
-//            when (currentDestination) {
-//                TabBarDestinations.TIMELINE -> {
-//                    timelineViewModel.fetchTimeline(fresh = true) {
-//                        coroutineScope.launch {
-//                            timelineState.scrollToItem(0)
-//                        }
-//                    }
-//                }
-//
-//                TabBarDestinations.NOTIFICATIONS -> {
-//                    timelineViewModel.fetchNotifications(fresh = true) {
-//                        coroutineScope.launch {
-//                            notificationsState.scrollToItem(0)
-//                        }
-//                    }
-//                }
-//            }
         },
     ) {
         ModalNavigationDrawer(
