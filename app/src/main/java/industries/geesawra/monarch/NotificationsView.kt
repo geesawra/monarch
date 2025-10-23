@@ -29,6 +29,7 @@ fun NotificationsView(
     modifier: Modifier = Modifier,
     isScrollEnabled: Boolean,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onSeeMoreTap: ((SkeetData) -> Unit)? = null,
     scaffoldPadding: PaddingValues
 ) {
     LaunchedEffect(Unit) {
@@ -58,7 +59,13 @@ fun NotificationsView(
                 RenderNotification(
                     viewModel = viewModel,
                     notification = notif,
-                    onReplyTap = onReplyTap
+                    onReplyTap = onReplyTap,
+                    onShowThread = { skeet ->
+                        if (onSeeMoreTap != null) {
+                            viewModel.setThread(skeet)
+                            onSeeMoreTap(skeet)
+                        }
+                    }
                 )
             }
         }
@@ -90,6 +97,7 @@ private fun RenderNotification(
     viewModel: TimelineViewModel,
     notification: Notification,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onShowThread: (SkeetData) -> Unit = {},
 ) {
     when (notification) {
         is Notification.Follow -> SkeetView(
@@ -103,6 +111,7 @@ private fun RenderNotification(
 
         is Notification.Like -> LikeRepostRowView(
             data = notification.data,
+            onShowThread = onShowThread,
         )
 
         is Notification.Mention -> SkeetView(
@@ -137,6 +146,7 @@ private fun RenderNotification(
 
         is Notification.Repost -> LikeRepostRowView(
             data = notification.data,
+            onShowThread = onShowThread,
         )
 
 

@@ -540,7 +540,8 @@ private fun InnerTimelineView(
                         modifier = Modifier,
                         isScrollEnabled = isScrollEnabled,
                         onReplyTap = onReplyTap,
-                        scaffoldPadding = values
+                        scaffoldPadding = values,
+                        onSeeMoreTap = onSeeMoreTap
                     )
                 }
             }

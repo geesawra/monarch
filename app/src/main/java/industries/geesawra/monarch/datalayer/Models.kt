@@ -284,6 +284,96 @@ data class SkeetData(
             )
         }
 
+        fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileViewBasic): SkeetData {
+            return SkeetData(
+                cid = parent.first,
+                uri = parent.second,
+                authorAvatarURL = author.avatar?.uri,
+                authorName = author.displayName,
+                authorHandle = author.handle,
+                authorLabels = author.labels,
+                content = post.text,
+                embed = when (post.embed) {
+                    is PostEmbedUnion.External -> {
+                        val c = (post.embed as PostEmbedUnion.External)
+                        PostViewEmbedUnion.ExternalView(
+                            ExternalView(
+                                ExternalViewExternal(
+                                    uri = c.value.external.uri,
+                                    title = c.value.external.title,
+                                    description = c.value.external.description,
+                                    thumb = cdnBlobURL(
+                                        author.did,
+                                        c.value.external.thumb,
+                                        CDNImageSize.Thumb
+                                    )
+                                )
+                            )
+                        )
+                    }
+
+                    is PostEmbedUnion.Images -> {
+                        val c = (post.embed as PostEmbedUnion.Images)
+                        PostViewEmbedUnion.ImagesView(
+                            ImagesView(c.value.images.map {
+                                ImagesViewImage(
+                                    fullsize = cdnBlobURL(
+                                        author.did,
+                                        it.image,
+                                        CDNImageSize.Full
+                                    )!!,
+                                    thumb = cdnBlobURL(
+                                        author.did,
+                                        it.image,
+                                        CDNImageSize.Thumb
+                                    )!!,
+                                    alt = it.alt,
+                                    aspectRatio = it.aspectRatio,
+                                )
+                            })
+                        )
+                    }
+
+                    // Record need to be hydrated before being rendered!
+
+//                    is PostEmbedUnion.Record -> {
+//                        val c = (post.embed as PostEmbedUnion.Record).value
+//
+//                        PostViewEmbedUnion.RecordView(
+//                            RecordView(post.embed.value.record)
+//                        )
+//                    }
+//
+//                    is PostEmbedUnion.RecordWithMedia -> PostViewEmbedUnion.RecordWithMediaView(
+//                        RecordWithMediaView(
+//                            post.embed.value.record,
+//                            post.embed.value.media
+//                        )
+//                    )
+//
+//                    is PostEmbedUnion.Unknown -> PostViewEmbedUnion.Unknown(post.embed.value)
+                    is PostEmbedUnion.Video -> {
+                        val c = (post.embed as PostEmbedUnion.Video).value
+                        PostViewEmbedUnion.VideoView(
+                            VideoView(
+                                playlist = cdnVideoPlaylist(author.did, c.video)!!,
+                                thumbnail = cdnVideoThumb(author.did, c.video),
+                                alt = c.alt,
+                                aspectRatio = c.aspectRatio,
+                                cid = parent.first
+                            )
+                        )
+                    }
+
+                    null -> null
+                    else -> null
+                },
+                // TODO: fix embeds
+                createdAt = post.createdAt.toStdlibInstant(),
+                facets = post.facets,
+            )
+        }
+
         fun fromPost(
             parent: Pair<Cid, AtUri>,
             post: Post,
@@ -530,7 +620,8 @@ data class SkeetData(
 
 sealed class Notification {
     data class RawLike(
-        val post: Post,
+        val subject: StrongRef,
+        val post: SkeetData,
         val author: ProfileView,
         val createdAt: Instant,
         val new: Boolean
@@ -538,7 +629,8 @@ sealed class Notification {
         Notification()
 
     data class RawRepost(
-        val post: Post,
+        val subject: StrongRef,
+        val post: SkeetData,
         val author: ProfileView,
         val createdAt: Instant,
         val new: Boolean
@@ -609,14 +701,14 @@ sealed class Notification {
 }
 
 
-enum class RepeatableNotification(val u: Unit) {
-    Like(Unit),
-    Repost(Unit)
+enum class RepeatableNotification() {
+    Like,
+    Repost
 }
 
 data class RepeatedNotification(
     val kind: RepeatableNotification,
-    val post: Post,
+    val post: SkeetData,
     var authors: List<RepeatedAuthor>,
     var timestamp: Instant,
     val new: Boolean,

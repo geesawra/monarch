@@ -249,9 +249,15 @@ class TimelineViewModel @AssistedInject constructor(
                 }
             }
 
-            val posts = postsToFetch.chunked(25).fold(mapOf<AtUri, Post>()) { acc, chunk ->
+            val posts = postsToFetch.chunked(25).fold(mapOf<AtUri, SkeetData>()) { acc, chunk ->
                 acc + bskyConn.getPosts(chunk).getOrThrow()
-                    .associate { it.uri to it.record.decodeAs<Post>() }
+                    .associate {
+                        it.uri to SkeetData.fromPost(
+                            (it.cid to it.uri),
+                            it.record.decodeAs<Post>(),
+                            it.author
+                        )
+                    }
             }
 
             // we could bulk request posts here and avoid much of the network IO
@@ -266,8 +272,8 @@ class TimelineViewModel @AssistedInject constructor(
                         val l: Like = it.record.decodeAs()
                         val lp = posts[l.subject.uri]!!
 
-
                         repeatable += Notification.RawLike(
+                            l.subject,
                             lp,
                             it.author,
                             l.createdAt.toStdlibInstant(),
@@ -314,6 +320,7 @@ class TimelineViewModel @AssistedInject constructor(
                         val p: Repost = it.record.decodeAs()
                         val rpp = posts[p.subject.uri]!!
                         repeatable += Notification.RawRepost(
+                            p.subject,
                             rpp,
                             it.author,
                             p.createdAt.toStdlibInstant(),
@@ -334,10 +341,10 @@ class TimelineViewModel @AssistedInject constructor(
             }
 
             val processedRepeatable =
-                mutableMapOf<RepeatableNotification, MutableMap<Post, RepeatedNotification>>()
+                mutableMapOf<RepeatableNotification, MutableMap<SkeetData, RepeatedNotification>>()
 
             val processRepeatable =
-                { kind: RepeatableNotification, list: MutableMap<Post, RepeatedNotification>, post: Post, author: ProfileView, createdAt: Instant, new: Boolean ->
+                { kind: RepeatableNotification, list: MutableMap<SkeetData, RepeatedNotification>, ref: StrongRef, post: SkeetData, author: ProfileView, createdAt: Instant, new: Boolean ->
                     if (list.contains(post)) {
                         val l = list[post]!!
                         l.authors += RepeatedAuthor(author, createdAt)
@@ -371,6 +378,7 @@ class TimelineViewModel @AssistedInject constructor(
                         processRepeatable(
                             RepeatableNotification.Like,
                             list,
+                            it.subject,
                             it.post,
                             it.author,
                             it.createdAt,
@@ -386,6 +394,7 @@ class TimelineViewModel @AssistedInject constructor(
                         processRepeatable(
                             RepeatableNotification.Repost,
                             list,
+                            it.subject,
                             it.post,
                             it.author,
                             it.createdAt,

@@ -71,6 +71,7 @@ fun SkeetView(
     disableEmbeds: Boolean = false,
     inThread: Boolean = false,
     showInReplyTo: Boolean = true,
+    showLabels: Boolean = true,
     onShowThread: (SkeetData) -> Unit = {},
 ) {
     if (skeet.blocked) {
@@ -126,7 +127,11 @@ fun SkeetView(
                             .clip(CircleShape)
                     )
 
-                    SkeetHeader(modifier = Modifier.padding(start = 16.dp), skeet = skeet)
+                    SkeetHeader(
+                        modifier = Modifier.padding(start = 16.dp),
+                        skeet = skeet,
+                        showLabels
+                    )
                 }
 
                 SkeetContent(skeet, nested, disableEmbeds, onShowThread)
@@ -364,7 +369,7 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
 }
 
 @Composable
-private fun RecordView(
+fun RecordView(
     modifier: Modifier = Modifier,
     rv: RecordView,
     onShowThread: (SkeetData) -> Unit
@@ -470,7 +475,7 @@ private fun SkeetReason(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData) {
+private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean) {
     val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
 
     Column(modifier = modifier) {
@@ -487,29 +492,31 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData) {
             style = MaterialTheme.typography.bodySmall,
         )
 
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(top = 4.dp)
-        ) {
-            skeet.authorLabels.forEach {
-                it.neg?.let { it ->
-                    if (!it) {
+        if (showLabels) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = 4.dp)
+            ) {
+                skeet.authorLabels.forEach {
+                    it.neg?.let { it ->
+                        if (!it) {
+                            return@forEach
+                        }
+                    }
+                    if (it.`val`.startsWith("!")) {
                         return@forEach
                     }
-                }
-                if (it.`val`.startsWith("!")) {
-                    return@forEach
-                }
 
-                OutlinedCard(
-                    modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
-                    shape = CircleShape
-                ) {
-                    Text(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        text = it.`val`,
-                        style = TextStyle(fontSize = 12.sp),
-                    )
+                    OutlinedCard(
+                        modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            text = it.`val`,
+                            style = TextStyle(fontSize = 12.sp),
+                        )
+                    }
                 }
             }
         }

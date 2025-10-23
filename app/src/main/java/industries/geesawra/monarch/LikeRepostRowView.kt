@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +50,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import industries.geesawra.monarch.datalayer.RepeatableNotification
 import industries.geesawra.monarch.datalayer.RepeatedNotification
+import industries.geesawra.monarch.datalayer.SkeetData
 import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.ExperimentalTime
 
@@ -66,7 +68,8 @@ fun name(p: ProfileView): String {
 @Composable
 fun LikeRepostRowView(
     modifier: Modifier = Modifier,
-    data: RepeatedNotification
+    data: RepeatedNotification,
+    onShowThread: (SkeetData) -> Unit = {},
 ) {
     val minSize = 24.dp
     val showAvatars = remember { mutableStateOf(false) }
@@ -282,12 +285,19 @@ fun LikeRepostRowView(
                         textAlign = TextAlign.End,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = data.post.text,
-                        color = MaterialTheme.colorScheme.secondary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+
+                    OutlinedCard(
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        SkeetView(
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            viewModel = null,
+                            skeet = data.post,
+                            nested = true,
+                            showLabels = false,
+                            onShowThread = onShowThread,
+                        )
+                    }
                 }
             }
         }
