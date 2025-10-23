@@ -2,6 +2,7 @@ package industries.geesawra.monarch
 
 import android.content.Context
 import android.net.Uri
+import android.webkit.URLUtil
 import android.widget.Toast
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,9 +33,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.clearText
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -66,9 +64,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastForEachIndexed
 import com.atproto.repo.StrongRef
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -92,16 +96,14 @@ fun ComposeView(
     val charCount = remember { mutableIntStateOf(0) }
     val wasEdited = remember { mutableStateOf(false) }
     val maxChars = 300
-    val composeFieldState = rememberTextFieldState(
-        ""
-    )
+    val composeFieldState = remember { mutableStateOf(TextFieldValue("")) }
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
 
     LaunchedEffect(scaffoldState.bottomSheetState.targetValue) {
         when (scaffoldState.bottomSheetState.targetValue) {
             SheetValue.Hidden -> {
-                composeFieldState.clearText()
+                composeFieldState.value = TextFieldValue("")
                 keyboardController?.hide()
                 focusManager.clearFocus()
                 charCount.intValue = 0
@@ -222,14 +224,16 @@ fun ComposeView(
                     }
                 }
 
-                LaunchedEffect(composeFieldState.text) {
-                    if (composeFieldState.text.isEmpty()) {
+                LaunchedEffect(composeFieldState.value.text) {
+                    if (composeFieldState.value.text.isEmpty()) {
                         wasEdited.value = false
                     } else {
                         wasEdited.value = true
-                        charCount.intValue = composeFieldState.text.length
+                        charCount.intValue = composeFieldState.value.text.length
                     }
                 }
+
+                val urlColor = MaterialTheme.colorScheme.primary
 
                 OutlinedTextField(
                     modifier = Modifier
@@ -237,6 +241,11 @@ fun ComposeView(
                         .heightIn(min = 250.dp)
                         .focusRequester(focusRequester)
                         .contentReceiver(receiveContentListener),
+                    value = composeFieldState.value,
+                    onValueChange = {
+                        composeFieldState.value =
+                            it.copy(annotatedString = annotated(it.text, urlColor))
+                    },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         autoCorrectEnabled = true,
@@ -246,7 +255,7 @@ fun ComposeView(
                         if (wasEdited.value) {
                             Text(
                                 text = "${maxChars - charCount.intValue}",
-                                color = if (composeFieldState.text.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                color = if (composeFieldState.value.text.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                             )
                         } else {
                             Text(
@@ -254,16 +263,15 @@ fun ComposeView(
                             )
                         }
                     },
-                    isError = composeFieldState.text.length > maxChars,
-                    lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 10),
-                    state = composeFieldState
+                    isError = composeFieldState.value.text.length > maxChars,
+                    maxLines = 10,
                 )
 
                 ActionRow(
                     context,
                     uploadingPost,
                     pickMedia,
-                    composeFieldState.text.toString(),
+                    composeFieldState.value.text,
                     mediaSelected,
                     mediaSelectedIsVideo,
                     coroutineScope,
@@ -411,6 +419,30 @@ fun ActionRow(
             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
             Text("Skeet")
+        }
+    }
+}
+
+fun annotated(data: String, urlColor: Color): AnnotatedString {
+    return buildAnnotatedString {
+        val split = data.split(" ")
+        split.fastForEachIndexed { idx, s ->
+            if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s) || s.startsWith("#") || s.startsWith("@")) {
+                withStyle(
+                    SpanStyle(
+                        color = urlColor
+                    )
+                )
+                {
+                    append(s)
+                }
+            } else {
+                append(s)
+            }
+
+            if (idx < split.size - 1) {
+                append(" ")
+            }
         }
     }
 }
