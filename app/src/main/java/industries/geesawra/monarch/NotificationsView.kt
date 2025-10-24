@@ -1,19 +1,32 @@
 package industries.geesawra.monarch
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.unit.dp
 import industries.geesawra.monarch.datalayer.Notification
 import industries.geesawra.monarch.datalayer.SkeetData
@@ -100,14 +113,55 @@ private fun RenderNotification(
     onShowThread: (SkeetData) -> Unit = {},
 ) {
     when (notification) {
-        is Notification.Follow -> SkeetView(
-            skeet = SkeetData(
-                authorName = (notification.follow.displayName
-                    ?: notification.follow.handle).toString() + " followed you!",
-                authorAvatarURL = notification.follow.avatar.toString(),
-            ),
-            nested = true
-        )
+        is Notification.Follow -> {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.Start,
+                    modifier = Modifier
+                        .padding(
+                            top = 16.dp,
+                            start = 16.dp,
+                            end = 16.dp,
+                            bottom = 4.dp
+                        )
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                ) {
+                    Image(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "New follower icon",
+                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.inverseSurface),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = (notification.follow.displayName
+                            ?: notification.follow.handle).toString() + " followed you!",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+                OutlinedCard(
+                    modifier = Modifier.padding(
+                        top = 8.dp,
+                        start = 40.dp,
+                        end = 16.dp,
+                        bottom = 8.dp
+                    ),
+                ) {
+                    SkeetView(
+                        skeet = SkeetData(
+                            authorName = (notification.follow.displayName
+                                ?: notification.follow.handle).toString(),
+                            authorAvatarURL = notification.follow.avatar?.uri,
+                            authorHandle = notification.follow.handle,
+                            content = notification.follow.description ?: ""
+                        ),
+                        nested = true
+                    )
+                }
+            }
+        }
 
         is Notification.Like -> LikeRepostRowView(
             data = notification.data,
@@ -129,7 +183,8 @@ private fun RenderNotification(
             skeet = SkeetData.fromPost(
                 notification.parent,
                 notification.quote,
-                notification.author
+                notification.author,
+                notification.quotedPost
             ),
             onReplyTap = onReplyTap,
         )

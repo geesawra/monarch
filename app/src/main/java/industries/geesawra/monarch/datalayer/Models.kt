@@ -87,6 +87,7 @@ data class SkeetData(
     val replies: Long? = null,
     val uri: AtUri = AtUri(""),
     val cid: Cid = Cid(""),
+    val did: Did? = null,
     val didRepost: Boolean = false,
     val didLike: Boolean = false,
     val authorAvatarURL: String? = null,
@@ -129,6 +130,7 @@ data class SkeetData(
                 createdAt = content.createdAt.toStdlibInstant(),
                 following = post.post.author.viewer?.following != null,
                 follower = post.post.author.viewer?.followedBy != null,
+                did = post.post.author.did,
             )
 
             sd.replyToNotFollowing = run {
@@ -191,6 +193,7 @@ data class SkeetData(
                 createdAt = content.createdAt.toStdlibInstant(),
                 following = author.viewer?.following != null,
                 follower = author.viewer?.followedBy != null,
+                did = author.did,
             )
         }
 
@@ -202,6 +205,7 @@ data class SkeetData(
                 authorName = author.displayName,
                 authorHandle = author.handle,
                 authorLabels = author.labels,
+                did = author.did,
                 content = post.text,
                 embed = when (post.embed) {
                     is PostEmbedUnion.External -> {
@@ -371,6 +375,7 @@ data class SkeetData(
                 // TODO: fix embeds
                 createdAt = post.createdAt.toStdlibInstant(),
                 facets = post.facets,
+                did = author.did,
             )
         }
 
@@ -380,18 +385,9 @@ data class SkeetData(
             author: ProfileView,
             embed: PostViewEmbedUnion?
         ): SkeetData {
-            return SkeetData(
-                cid = parent.first,
-                uri = parent.second,
-                authorAvatarURL = author.avatar?.uri,
-                authorName = author.displayName,
-                authorHandle = author.handle,
-                authorLabels = author.labels,
-                content = post.text,
-                embed = embed,
-                createdAt = post.createdAt.toStdlibInstant(),
-                facets = post.facets,
-            )
+            val sd = fromPost(parent, post, author)
+            sd.embed = embed
+            return sd
         }
 
 
@@ -433,6 +429,7 @@ data class SkeetData(
                 reply = null,
                 createdAt = content.createdAt.toStdlibInstant(),
                 facets = content.facets,
+                did = post.author.did,
             )
         }
     }
@@ -667,6 +664,7 @@ sealed class Notification {
     data class Quote(
         val parent: Pair<Cid, AtUri>,
         val quote: Post,
+        val quotedPost: PostViewEmbedUnion,
         val author: ProfileView,
         val createdAt: Instant,
         val new: Boolean

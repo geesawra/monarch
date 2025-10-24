@@ -10,12 +10,18 @@ import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.bsky.actor.ProfileView
+import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
+import app.bsky.embed.RecordView
+import app.bsky.embed.RecordViewRecord
+import app.bsky.embed.RecordViewRecordUnion
 import app.bsky.feed.GeneratorView
 import app.bsky.feed.GetPostThreadResponseThreadUnion
 import app.bsky.feed.Like
 import app.bsky.feed.Post
+import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
+import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.Repost
 import app.bsky.feed.ThreadViewPostReplieUnion
 import app.bsky.graph.Follow
@@ -30,11 +36,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toStdlibInstant
+import kotlinx.serialization.json.Json
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.JsonContent
+import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -245,20 +253,38 @@ class TimelineViewModel @AssistedInject constructor(
                         l.subject.uri
                     }
 
+                    ListNotificationsReason.Quote -> {
+                        val l: Post = it.record.decodeAs()
+                        val e = l.embed
+                        when (e) {
+                            is PostEmbedUnion.Record -> {
+                                e.value.record.uri
+                            }
+
+                            is PostEmbedUnion.RecordWithMedia -> {
+                                e.value.record.record.uri
+                            }
+
+                            else -> null
+                        }
+                    }
+
                     else -> null
                 }
             }
 
-            val posts = postsToFetch.chunked(25).fold(mapOf<AtUri, SkeetData>()) { acc, chunk ->
-                acc + bskyConn.getPosts(chunk).getOrThrow()
-                    .associate {
-                        it.uri to SkeetData.fromPost(
-                            (it.cid to it.uri),
-                            it.record.decodeAs<Post>(),
-                            it.author
-                        )
-                    }
-            }
+            val posts =
+                postsToFetch.chunked(25).fold(mapOf<AtUri, Pair<SkeetData, Post>>()) { acc, chunk ->
+                    acc + bskyConn.getPosts(chunk).getOrThrow()
+                        .associate {
+                            val record = it.record.decodeAs<Post>()
+                            it.uri to (SkeetData.fromPost(
+                                (it.cid to it.uri),
+                                record,
+                                it.author
+                            ) to record)
+                        }
+                }
 
             // we could bulk request posts here and avoid much of the network IO
             var notifs = rawNotifs.notifications.mapNotNull {
@@ -274,7 +300,7 @@ class TimelineViewModel @AssistedInject constructor(
 
                         repeatable += Notification.RawLike(
                             l.subject,
-                            lp,
+                            lp.first,
                             it.author,
                             l.createdAt.toStdlibInstant(),
                             !it.isRead
@@ -296,9 +322,55 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Quote -> {
                         val p: Post = it.record.decodeAs()
+                        val quotedUrl = when (p.embed) {
+                            is PostEmbedUnion.Record -> {
+                                (p.embed as PostEmbedUnion.Record).value.record.uri
+                            }
+
+                            is PostEmbedUnion.RecordWithMedia -> {
+                                (p.embed as PostEmbedUnion.RecordWithMedia).value.record.record.uri
+                            }
+
+                            else -> null
+
+                        }
+
+                        if (quotedUrl == null) {
+                            throw Exception("quote notification without a record or record media!")
+                        }
+                        val lp = posts[quotedUrl]!!
+                        val skeetData = lp.first
+                        val post = lp.second
                         Notification.Quote(
                             Pair(it.cid, it.uri),
                             p,
+                            PostViewEmbedUnion.RecordView(
+                                value = RecordView(
+                                    record = RecordViewRecordUnion.ViewRecord(
+                                        value = RecordViewRecord(
+                                            uri = skeetData.uri,
+                                            cid = skeetData.cid,
+                                            author = ProfileViewBasic(
+                                                did = skeetData.did!!,
+                                                handle = skeetData.authorHandle!!,
+                                                displayName = skeetData.authorName,
+                                                avatar = skeetData.authorAvatarURL?.let { uri ->
+                                                    sh.christian.ozone.api.Uri(
+                                                        uri
+                                                    )
+                                                },
+                                                associated = it.author.associated,
+                                                viewer = it.author.viewer,
+                                                labels = it.author.labels,
+                                                createdAt = it.author.createdAt,
+                                                verification = it.author.verification,
+                                            ),
+                                            value = Json.encodeAsJsonContent(post),
+                                            indexedAt = post.createdAt
+                                        )
+                                    )
+                                )
+                            ), // TODO: handle recordwithmedia
                             it.author,
                             p.createdAt.toStdlibInstant(),
                             !it.isRead
@@ -321,7 +393,7 @@ class TimelineViewModel @AssistedInject constructor(
                         val rpp = posts[p.subject.uri]!!
                         repeatable += Notification.RawRepost(
                             p.subject,
-                            rpp,
+                            rpp.first,
                             it.author,
                             p.createdAt.toStdlibInstant(),
                             !it.isRead
