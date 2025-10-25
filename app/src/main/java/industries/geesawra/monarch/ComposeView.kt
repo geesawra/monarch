@@ -377,13 +377,7 @@ fun ActionRow(
         val postButtonEnabled = remember(postText, mediaSelected.value) {
             (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars
         }
-
-//        val hasEmbeds = if (!mediaSelectedIsVideo.value) mediaSelected.value
-//            .ifEmpty { false } else false
-//        video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
-
-        val hasEmbeds = mediaSelected.value.isNotEmpty()
-
+        
         Button(
             onClick = {
                     coroutineScope.launch {
