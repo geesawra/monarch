@@ -42,8 +42,9 @@ import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -131,7 +132,6 @@ fun ComposeView(
             when (transferableContent.hasMediaType(MediaType.Image)) {
                 true -> transferableContent.consume {
                     val uri = it.uri
-                    val mimeType: String? = context.contentResolver.getType(uri)
                     mediaSelected.value = listOf(uri)
                     true
                 }
@@ -335,7 +335,7 @@ fun ComposeView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ActionRow(
     context: Context,
@@ -352,7 +352,6 @@ fun ActionRow(
     isQuotePost: Boolean = false,
     facets: List<Facet> = listOf()
 ) {
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -370,16 +369,15 @@ fun ActionRow(
             Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
         }
 
-        if (uploadingPost.value) {
-            CircularProgressIndicator()
-        }
-
         val postButtonEnabled = remember(postText, mediaSelected.value) {
             (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars
         }
-        
-        Button(
-            onClick = {
+
+        if (uploadingPost.value) {
+            CircularWavyProgressIndicator()
+        } else {
+            Button(
+                onClick = {
                     coroutineScope.launch {
                         uploadingPost.value = true // Show progress immediately
                         timelineViewModel.post(
@@ -420,13 +418,14 @@ fun ActionRow(
                             uploadingPost.value = false // Hide progress after completion
                         }
                     }
-            },
-            modifier = Modifier.padding(end = 8.dp),
-            enabled = postButtonEnabled && !uploadingPost.value // Disable while uploading
-        ) {
-            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
-            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-            Text("Skeet")
+                },
+                modifier = Modifier.padding(end = 8.dp),
+                enabled = postButtonEnabled && !uploadingPost.value // Disable while uploading
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Skeet")
+            }
         }
     }
 }
