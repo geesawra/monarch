@@ -33,6 +33,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -65,13 +70,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import app.bsky.richtext.Facet
 import app.bsky.richtext.FacetByteSlice
@@ -101,7 +102,7 @@ fun ComposeView(
     val charCount = remember { mutableIntStateOf(0) }
     val wasEdited = remember { mutableStateOf(false) }
     val maxChars = 300
-    val composeFieldState = remember { mutableStateOf(TextFieldValue("")) }
+    val textfieldState = rememberTextFieldState()
     val facets = remember { mutableListOf<Facet>() }
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
@@ -109,7 +110,7 @@ fun ComposeView(
     LaunchedEffect(scaffoldState.bottomSheetState.targetValue) {
         when (scaffoldState.bottomSheetState.targetValue) {
             SheetValue.Hidden -> {
-                composeFieldState.value = TextFieldValue("")
+                textfieldState.clearText()
                 keyboardController?.hide()
                 focusManager.clearFocus()
                 charCount.intValue = 0
@@ -229,16 +230,32 @@ fun ComposeView(
                     }
                 }
 
-                LaunchedEffect(composeFieldState.value.text) {
-                    if (composeFieldState.value.text.isEmpty()) {
+                LaunchedEffect(textfieldState.text) {
+                    if (textfieldState.text.isEmpty()) {
                         wasEdited.value = false
                     } else {
                         wasEdited.value = true
-                        charCount.intValue = composeFieldState.value.text.length
+                        charCount.intValue = textfieldState.text.length
                     }
                 }
 
                 val urlColor = MaterialTheme.colorScheme.primary
+
+                class FacetTextTransform() : OutputTransformation {
+                    override fun TextFieldBuffer.transformOutput() {
+                        val a = readFacets(originalText.toString())
+                        facets.clear()
+                        facets.addAll(a)
+
+                        facets.forEach {
+                            addStyle(
+                                SpanStyle(color = urlColor),
+                                it.index.byteStart.toInt(),
+                                it.index.byteEnd.toInt()
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     modifier = Modifier
@@ -246,23 +263,16 @@ fun ComposeView(
                         .heightIn(min = 250.dp)
                         .focusRequester(focusRequester)
                         .contentReceiver(receiveContentListener),
-                    value = composeFieldState.value,
-                    onValueChange = {
-                        val a = annotated(it.text, urlColor)
-                        facets.clear()
-                        facets.addAll(a.facets)
-                        composeFieldState.value =
-                            it.copy(annotatedString = a.annotated)
-                    },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
-                        keyboardType = KeyboardType.Text,
+                        autoCorrectEnabled = true,
+                        keyboardType = KeyboardType.Email,
                     ),
                     label = {
                         if (wasEdited.value) {
                             Text(
                                 text = "${maxChars - charCount.intValue}",
-                                color = if (composeFieldState.value.text.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                color = if (textfieldState.text.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                             )
                         } else {
                             Text(
@@ -270,15 +280,51 @@ fun ComposeView(
                             )
                         }
                     },
-                    isError = composeFieldState.value.text.length > maxChars,
-                    maxLines = 10,
+                    isError = textfieldState.text.length > maxChars,
+                    lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 10),
+                    state = textfieldState,
+                    outputTransformation = FacetTextTransform(),
                 )
+
+//                OutlinedTextField(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .heightIn(min = 250.dp)
+//                        .focusRequester(focusRequester)
+//                        .contentReceiver(receiveContentListener),
+//                    value = composeFieldState.value,
+//                    onValueChange = {
+//                        val a = annotated(it.text, urlColor)
+//                        facets.clear()
+//                        facets.addAll(a.facets)
+//                        composeFieldState.value =
+//                            it.copy(annotatedString = a.annotated)
+//                    },
+//                    keyboardOptions = KeyboardOptions(
+//                        capitalization = KeyboardCapitalization.Sentences,
+//                        keyboardType = KeyboardType.Text,
+//                    ),
+//                    label = {
+//                        if (wasEdited.value) {
+//                            Text(
+//                                text = "${maxChars - charCount.intValue}",
+//                                color = if (composeFieldState.value.text.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+//                            )
+//                        } else {
+//                            Text(
+//                                text = "Less cringe this time, okay?",
+//                            )
+//                        }
+//                    },
+//                    isError = composeFieldState.value.text.length > maxChars,
+//                    maxLines = 10,
+//                )
 
                 ActionRow(
                     context,
                     uploadingPost,
                     pickMedia,
-                    composeFieldState.value.text,
+                    textfieldState.text.toString(),
                     mediaSelected,
                     mediaSelectedIsVideo,
                     coroutineScope,
@@ -430,65 +476,53 @@ fun ActionRow(
     }
 }
 
-private data class FacetString(
-    val annotated: AnnotatedString,
-    val facets: List<Facet>
-)
+val tokensRegexp = Regex("(\\S+)")
 
-private fun annotated(data: String, urlColor: Color): FacetString {
+
+private fun readFacets(data: String): List<Facet> {
     val facets = mutableListOf<Facet>()
-    val annotatedString = buildAnnotatedString {
-        val tokens = Regex("(\\S+)").findAll(data)
-        var lastIndex = 0
 
-        for (token in tokens) {
-            if (token.range.first > lastIndex) {
-                append(data.substring(lastIndex, token.range.first))
-            }
+    for (token in tokensRegexp.findAll(data)) {
+        val s = token.value
+        val startByte =
+            data.substring(0, token.range.first).encodeToByteArray().size
+        val endByte =
+            data.substring(0, token.range.last + 1).encodeToByteArray().size
 
-            val s = token.value
-            val startByte =
-                data.substring(0, token.range.first).encodeToByteArray().size
-            val endByte =
-                data.substring(0, token.range.last + 1).encodeToByteArray().size
-
-            if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) {
-                withStyle(SpanStyle(color = urlColor)) { append(s) }
+        if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) {
+            facets.add(
+                Facet(
+                    index = FacetByteSlice(startByte.toLong(), endByte.toLong()),
+                    features = listOf(
+                        FacetFeatureUnion.Link(
+                            value = FacetLink(
+                                uri = sh.christian.ozone.api.Uri(s)
+                            )
+                        )
+                    )
+                )
+            )
+        } else if (s.startsWith("#") && s.length > 1) {
+            val tag = s.substring(1)
+            if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
                 facets.add(
                     Facet(
-                        index = FacetByteSlice(startByte.toLong(), endByte.toLong()),
+                        index = FacetByteSlice(
+                            startByte.toLong(),
+                            endByte.toLong()
+                        ),
                         features = listOf(
-                            FacetFeatureUnion.Link(
-                                value = FacetLink(
-                                    uri = sh.christian.ozone.api.Uri(s)
+                            FacetFeatureUnion.Tag(
+                                value = FacetTag(
+                                    tag = s.removePrefix("#"),
                                 )
                             )
                         )
                     )
                 )
-            } else if (s.startsWith("#") && s.length > 1) {
-                withStyle(SpanStyle(color = urlColor)) { append(s) }
-                val tag = s.substring(1)
-                if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
-                    facets.add(
-                        Facet(
-                            index = FacetByteSlice(
-                                startByte.toLong(),
-                                endByte.toLong()
-                            ),
-                            features = listOf(
-                                FacetFeatureUnion.Tag(
-                                    value = FacetTag(
-                                        tag = s.removePrefix("#"),
-                                    )
-                                )
-                            )
-                        )
-                    )
-                }
-            } else if (s.startsWith("@") && s.length > 1) {
-                withStyle(SpanStyle(color = urlColor)) { append(s) }
-                // TODO: mentions go here, need DID resolution
+            }
+        } else if (s.startsWith("@") && s.length > 1) {
+            // TODO: mentions go here, need DID resolution
 //                val tag = s.substring(1)
 //                if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
 //                    facets.add(
@@ -507,15 +541,8 @@ private fun annotated(data: String, urlColor: Color): FacetString {
 //                        )
 //                    )
 //                }
-            } else {
-                append(s)
-            }
-            lastIndex = token.range.last + 1
-        }
-
-        if (lastIndex < data.length) {
-            append(data.substring(lastIndex))
         }
     }
-    return FacetString(annotated = annotatedString, facets = facets)
+
+    return facets
 }
