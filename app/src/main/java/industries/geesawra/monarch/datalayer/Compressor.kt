@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
@@ -81,17 +82,10 @@ class Compressor(
 
                 ensureActive()
 
-                val compressFormat = when (mimeType) {
-                    "image/png" -> Bitmap.CompressFormat.PNG
-                    "image/jpeg" -> Bitmap.CompressFormat.JPEG
-                    "image/webp" ->
-                        Bitmap.CompressFormat.WEBP_LOSSLESS
-
-                    else -> Bitmap.CompressFormat.JPEG
-                }
-
+                val compressFormat = Bitmap.CompressFormat.JPEG
                 var outputBytes: ByteArray
                 var quality = 90
+                val ogSize = inputBytes.size
 
                 do {
                     ByteArrayOutputStream().use { outputStream ->
@@ -101,11 +95,12 @@ class Compressor(
                     }
                 } while (isActive &&
                     outputBytes.size > compressionThreshold &&
-                    quality > 5 &&
-                    compressFormat != Bitmap.CompressFormat.PNG
+                    quality > 5
                 )
 
                 val ob = BitmapFactory.decodeByteArray(outputBytes, 0, outputBytes.size)
+
+                Log.d("Compressor", "before: $ogSize, after: ${outputBytes.size}")
 
                 CompressedImage(
                     data = outputBytes,
