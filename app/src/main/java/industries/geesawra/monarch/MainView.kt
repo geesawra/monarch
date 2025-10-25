@@ -39,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.ModalWideNavigationRail
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -306,7 +307,7 @@ private fun InnerTimelineView(
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 topBar = {
-                    LargeTopAppBar(
+                    MediumFlexibleTopAppBar(
                         colors = TopAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                             scrolledContainerColor = MaterialTheme.colorScheme.background,
@@ -360,7 +361,7 @@ private fun InnerTimelineView(
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> {
                                     if (timelineViewModel.uiState.user == null) {
-                                        return@LargeTopAppBar
+                                        return@MediumFlexibleTopAppBar
                                     }
 
                                     val user = timelineViewModel.uiState.user!!
