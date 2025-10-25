@@ -72,6 +72,8 @@ fun SkeetView(
     inThread: Boolean = false,
     showInReplyTo: Boolean = true,
     showLabels: Boolean = true,
+    renderingReplyNotif: Boolean = false,
+    renderingMention: Boolean = false,
     onShowThread: (SkeetData) -> Unit = {},
 ) {
     if (skeet.blocked) {
@@ -108,7 +110,13 @@ fun SkeetView(
                     .sizeIn(minHeight = minSize),
             ) {
 
-                SkeetReason(modifier = Modifier.padding(start = 4.dp), skeet = skeet, showInReplyTo)
+                SkeetReason(
+                    modifier = Modifier.padding(start = 4.dp),
+                    skeet = skeet,
+                    showInReplyTo,
+                    renderingReplyNotif,
+                    renderingMention
+                )
 
                 Row(
                     modifier = Modifier
@@ -425,9 +433,36 @@ private fun RecordWithMediaView(
 private fun SkeetReason(
     modifier: Modifier = Modifier,
     skeet: SkeetData,
-    showInReplyTo: Boolean = true
+    showInReplyTo: Boolean = true,
+    renderingReplyNotif: Boolean = false,
+    renderingMention: Boolean = false,
 ) {
     Column(modifier = modifier) {
+        if (renderingMention) {
+            Text(
+                text = "Mentioned you",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 4.dp),
+                fontWeight = FontWeight.Bold
+            )
+            return@Column
+        }
+        if (renderingReplyNotif) {
+            Text(
+                text = "Replied to you",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 4.dp),
+                fontWeight = FontWeight.Bold
+            )
+            return@Column
+        }
+
         var isRepost = false
         skeet.reason?.let {
             it

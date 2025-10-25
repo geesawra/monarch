@@ -173,9 +173,10 @@ private fun RenderNotification(
             skeet = SkeetData.fromPost(
                 notification.parent,
                 notification.mention,
-                notification.author
+                notification.author,
             ),
             onReplyTap = onReplyTap,
+            renderingMention = true,
         )
 
         is Notification.Quote -> SkeetView(
@@ -197,6 +198,7 @@ private fun RenderNotification(
                 notification.author
             ),
             onReplyTap = onReplyTap,
+            renderingReplyNotif = true,
         )
 
         is Notification.Repost -> LikeRepostRowView(
