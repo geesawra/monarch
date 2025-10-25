@@ -378,9 +378,14 @@ fun ActionRow(
             (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars
         }
 
+//        val hasEmbeds = if (!mediaSelectedIsVideo.value) mediaSelected.value
+//            .ifEmpty { false } else false
+//        video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
+
+        val hasEmbeds = mediaSelected.value.isNotEmpty()
+
         Button(
             onClick = {
-                if (postText.isNotBlank() && postText.length <= maxChars) {
                     coroutineScope.launch {
                         uploadingPost.value = true // Show progress immediately
                         timelineViewModel.post(
@@ -421,7 +426,6 @@ fun ActionRow(
                             uploadingPost.value = false // Hide progress after completion
                         }
                     }
-                }
             },
             modifier = Modifier.padding(end = 8.dp),
             enabled = postButtonEnabled && !uploadingPost.value // Disable while uploading
