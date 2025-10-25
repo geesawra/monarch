@@ -143,30 +143,39 @@ data class SkeetData(
                         val (parent, _) = sd.parent()
                         val root = sd.root()
 
-                        if (parent?.authorHandle == sd.authorHandle && (root == null || root.authorHandle == sd.authorHandle)) {
-                            return@run false
+                        if (parent == null) {
+                            return@run false // no parent AND no root, this is a single post
                         }
 
-                        parent?.let {
 
-                            val parentFollowing = parent.following
-                            val rootFollowing = root?.following ?: false
-
-                            if (root?.authorHandle == sd.authorHandle && parentFollowing) {
-                                return@run false
-                            }
-
-
-                            if (!parentFollowing && root == null) {
-                                return@run false
-                            }
-
-                            val res = parentFollowing || rootFollowing
-                            return@run !res
+                        if (root == null) {
+                            return@run !parent.following // just parent, this is a single reply
                         }
 
-                        return@run false
+                        if (!parent.following) {
+                            return@run true // I don't follow whoever sd is replying to, don't care
+                        }
+
+                        // Simplify everything:
+                        // - 3 post threads: if we follow parent and root, we show
+                        // - 4+ post threads: if we follow parent, root, and grandfather, we show
+
+                        // from now on, we know both parent and root are non-null,
+                        // hence we might be in a 3+ post threads.
+
+                        val parentsParent = sd.parentsParentRef()!!
+                        if (parentsParent.uri == root.uri) {
+                            // parent's root == root, this is a 3 post thread
+                            return@run !root.following
+                        }
+
+                        val grandfather = sd.grandparentAuthor()
+
+                        // base case: parent, root and grandfather all followed
+                        return@run !(root.following && grandfather?.viewer?.following?.isNotEmpty() ?: false)
                     }
+
+
                 }
             }
 
@@ -547,6 +556,21 @@ data class SkeetData(
         )
     }
 
+    fun parentsParentRef(): StrongRef? {
+        val rawParent = this.reply?.parent
+        return when (rawParent) {
+            is ReplyRefParentUnion.PostView -> {
+                val content: Post = (rawParent.value.record.decodeAs())
+                when (content.reply) {
+                    is PostReplyRef -> content.reply!!.parent
+                    else -> null
+                }
+            }
+
+            else -> null
+        }
+    }
+
     fun parent(): Pair<SkeetData?, StrongRef?> {
         val rawParent = this.reply?.parent
         return when (rawParent) {
@@ -564,13 +588,18 @@ data class SkeetData(
 
             is ReplyRefParentUnion.PostView -> {
                 val content: Post = (rawParent.value.record.decodeAs())
-                fromPostView(
-                    rawParent.value, rawParent.value.author
+                fromPost(
+                    (rawParent.value.cid to rawParent.value.uri),
+                    content, rawParent.value.author
                 ) to content.reply?.parent
             }
 
             else -> null to null
         }
+    }
+
+    fun grandparentAuthor(): ProfileViewBasic? {
+        return this.reply?.grandparentAuthor
     }
 
     fun root(): SkeetData? {
