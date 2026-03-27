@@ -496,15 +496,32 @@ private fun SkeetReason(
             it
             when (it) {
                 is FeedViewPostReasonUnion.ReasonRepost -> {
-                    Text(
-                        text = "Reposted by ${it.value.by.displayName ?: it.value.by.handle.toString()}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium,
+                    Row(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(bottom = 4.dp),
-                        fontWeight = FontWeight.Bold
-                    )
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        it.value.by.avatar?.let { avatarUri ->
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(avatarUri.uri)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = "Reposted by ${it.value.by.displayName ?: it.value.by.handle.toString()}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     isRepost = true
                 }
 
