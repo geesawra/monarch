@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Shield
@@ -573,13 +574,26 @@ private fun labelDefinition(rawValue: String): LabelDefinition {
 private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }, labelDescription: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
     val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
 
+    val isBot = skeet.authorLabels.any { it.`val` == "bot" }
+
     Column(modifier = modifier) {
-        Text(
-            text = authorName,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = authorName,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            if (isBot) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Filled.SmartToy,
+                    contentDescription = "Bot account",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         Text(
             text = "@" + skeet.authorHandle,
@@ -598,7 +612,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                             return@forEach
                         }
                     }
-                    if (it.`val`.startsWith("!")) {
+                    if (it.`val`.startsWith("!") || it.`val` == "bot") {
                         return@forEach
                     }
 
