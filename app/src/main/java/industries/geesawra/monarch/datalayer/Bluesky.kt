@@ -245,8 +245,9 @@ class BlueskyConn(val context: Context) {
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
 
-    // Label cache: maps "labelerDid:labelVal" -> display name, and labelerDid -> avatar URL
+    // Label cache: maps "labelerDid:labelVal" -> display name/description, and labelerDid -> avatar URL
     private var labelDisplayNames: Map<String, String> = emptyMap()
+    private var labelDescriptions: Map<String, String> = emptyMap()
     private var labelerAvatars: Map<String, String> = emptyMap()
     private var labelCacheFetchCount: Int = 0
     private val labelCacheRefreshInterval: Int = 12
@@ -254,6 +255,11 @@ class BlueskyConn(val context: Context) {
     fun labelDisplayName(label: Label): String {
         val key = "${label.src.did}:${label.`val`}"
         return labelDisplayNames[key] ?: label.`val`
+    }
+
+    fun labelDescription(label: Label): String? {
+        val key = "${label.src.did}:${label.`val`}"
+        return labelDescriptions[key]
     }
 
     fun labelerAvatar(label: Label): String? {
@@ -271,16 +277,20 @@ class BlueskyConn(val context: Context) {
         labelers: Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>
     ) {
         val names = mutableMapOf<String, String>()
+        val descriptions = mutableMapOf<String, String>()
         val avatars = mutableMapOf<String, String>()
         for ((did, detailed) in labelers) {
             if (did == null || detailed == null) continue
-            detailed.value.creator.avatar?.let { avatars[did.did] = it }
+            detailed.value.creator.avatar?.let { avatars[did.did] = it.uri }
             for (defn in detailed.value.policies.labelValueDefinitions) {
-                val displayName = defn.locales.firstOrNull()?.name ?: continue
-                names["${did.did}:${defn.identifier}"] = displayName
+                val locale = defn.locales.firstOrNull() ?: continue
+                val key = "${did.did}:${defn.identifier}"
+                names[key] = locale.name
+                if (locale.description.isNotEmpty()) descriptions[key] = locale.description
             }
         }
         labelDisplayNames = names
+        labelDescriptions = descriptions
         labelerAvatars = avatars
     }
 

@@ -31,12 +31,17 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -151,11 +156,12 @@ fun SkeetView(
                         skeet = skeet,
                         showLabels = showLabels,
                         labelDisplayName = { viewModel?.labelDisplayName(it) },
+                        labelDescription = { viewModel?.labelDescription(it) },
                         labelerAvatar = { viewModel?.labelerAvatar(it) }
                     )
                 }
 
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread)
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
 
                 if (!nested && !disableEmbeds) {
                     TimelinePostActionsView(
@@ -179,7 +185,8 @@ private fun SkeetContent(
     skeet: SkeetData,
     nested: Boolean = false,
     disableEmbeds: Boolean = false,
-    onShowThread: (SkeetData) -> Unit
+    onShowThread: (SkeetData) -> Unit,
+    viewModel: TimelineViewModel? = null,
 ) {
     val context = LocalContext.current
 
@@ -195,7 +202,7 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed, onShowThread)
+    Embeds(context, nested, skeet.embed, onShowThread, viewModel)
 }
 
 @Composable
@@ -203,7 +210,8 @@ fun Embeds(
     context: Context,
     nested: Boolean,
     embed: PostViewEmbedUnion?,
-    onShowThread: (SkeetData) -> Unit
+    onShowThread: (SkeetData) -> Unit,
+    viewModel: TimelineViewModel? = null,
 ) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
@@ -230,6 +238,7 @@ fun Embeds(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                     embed.value,
                     onShowThread = onShowThread,
+                    viewModel = viewModel,
                 )
             }
         }
@@ -246,7 +255,7 @@ fun Embeds(
                 is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
             }
 
-            Embeds(context, false, mediaValue, onShowThread)
+            Embeds(context, false, mediaValue, onShowThread, viewModel)
 
             OutlinedCard(
                 modifier = Modifier.padding(top = 8.dp)
@@ -255,6 +264,7 @@ fun Embeds(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                     embed.value,
                     onShowThread = onShowThread,
+                    viewModel = viewModel,
                 )
             }
         }
@@ -393,7 +403,8 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
 fun RecordView(
     modifier: Modifier = Modifier,
     rv: RecordView,
-    onShowThread: (SkeetData) -> Unit
+    onShowThread: (SkeetData) -> Unit,
+    viewModel: TimelineViewModel? = null,
 ) {
     val rv = rv.record
     when (rv) {
@@ -402,7 +413,7 @@ fun RecordView(
         is RecordViewRecordUnion.ViewRecord -> {
             val s = SkeetData.fromRecordView(rv.value)
             SkeetView(
-                viewModel = null,
+                viewModel = viewModel,
                 skeet = s,
                 nested = true,
                 onShowThread = onShowThread
@@ -417,7 +428,8 @@ fun RecordView(
 private fun RecordWithMediaView(
     modifier: Modifier = Modifier,
     rv: RecordWithMediaView,
-    onShowThread: (SkeetData) -> Unit
+    onShowThread: (SkeetData) -> Unit,
+    viewModel: TimelineViewModel? = null,
 ) {
     val rv = rv.record.record
     val record = when (rv) {
@@ -434,7 +446,7 @@ private fun RecordWithMediaView(
 
     record?.let {
         SkeetView(
-            viewModel = null,
+            viewModel = viewModel,
             skeet = record,
             nested = true,
             onShowThread = onShowThread
@@ -554,9 +566,9 @@ private fun labelDefinition(rawValue: String): LabelDefinition {
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
+private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }, labelDescription: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
     val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
 
     Column(modifier = modifier) {
@@ -594,40 +606,56 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                     } else {
                         labelDefinition(it.`val`)
                     }
-                    OutlinedCard(
-                        modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
-                        shape = CircleShape
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    val description = labelDescription(it)
+
+                    val labelCard = @Composable {
+                        OutlinedCard(
+                            modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
+                            shape = CircleShape
                         ) {
-                            val avatarUrl = labelerAvatar(it)
-                            if (avatarUrl != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(avatarUrl)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = definition.plaintext,
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = definition.icon,
-                                    contentDescription = definition.plaintext,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val avatarUrl = labelerAvatar(it)
+                                if (avatarUrl != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(avatarUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = definition.plaintext,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clip(CircleShape)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = definition.icon,
+                                        contentDescription = definition.plaintext,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = definition.plaintext,
+                                    style = MaterialTheme.typography.labelSmall,
                                 )
                             }
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = definition.plaintext,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
                         }
+                    }
+
+                    if (description != null) {
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = { PlainTooltip { Text(description) } },
+                            state = rememberTooltipState()
+                        ) {
+                            labelCard()
+                        }
+                    } else {
+                        labelCard()
                     }
                 }
             }
