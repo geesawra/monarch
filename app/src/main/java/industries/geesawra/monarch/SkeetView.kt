@@ -46,10 +46,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -108,14 +109,14 @@ fun SkeetView(
 
     val minSize = 55.dp
 
-    Surface(
-        color = Color.Transparent,
-        onClick = {
-            Log.d("SkeetView", skeet.content)
-            onShowThread(skeet)
-        },
+    Column(
         modifier =
             modifier
+                .clip(MaterialTheme.shapes.medium)
+                .clickable {
+                    Log.d("SkeetView", skeet.content)
+                    onShowThread(skeet)
+                }
                 .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
     ) {
         Row(
@@ -628,9 +629,9 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
         )
 
         if (showLabels) {
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(top = 6.dp)
             ) {
                 skeet.authorLabels.forEach {
@@ -756,6 +757,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                         labelCard()
                     }
                 }
+            }
             }
         }
 
