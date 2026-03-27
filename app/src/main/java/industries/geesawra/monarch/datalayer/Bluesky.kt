@@ -76,6 +76,7 @@ import industries.geesawra.monarch.rkey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -401,6 +402,16 @@ class BlueskyConn(val context: Context) {
                 requestTimeoutMillis = 15000
                 connectTimeoutMillis = 15000
                 socketTimeoutMillis = 15000
+            }
+            install(HttpRequestRetry) {
+                maxRetries = 5
+                retryIf { _, response ->
+                    response.status.value == 503
+                }
+                retryOnExceptionIf { _, cause ->
+                    cause.message?.contains("upstream service unavailable", ignoreCase = true) == true
+                }
+                exponentialDelay()
             }
         }
 
