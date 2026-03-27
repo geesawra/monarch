@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -61,14 +62,15 @@ private fun IconWithNumber(
         Icon(
             imageVector,
             contentDescription = contentDescription,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(18.dp),
             tint = tint
         )
         Text(
             modifier = Modifier.padding(start = 4.dp),
             text = number.longValue.toString(),
             color = tint,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
         )
     }
@@ -99,7 +101,8 @@ fun TimelinePostActionsView(
     val replies = remember { mutableLongStateOf(skeet.replies ?: 0) }
 
     Row(
-        horizontalArrangement = Arrangement.End,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier,
     ) {
         val ctx = LocalContext.current
@@ -128,7 +131,7 @@ fun TimelinePostActionsView(
             }
         ) {
             Icon(
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(18.dp),
                 imageVector = Icons.Default.Share,
                 contentDescription = "Share",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant

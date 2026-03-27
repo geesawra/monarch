@@ -172,8 +172,8 @@ fun SkeetView(
                     TimelinePostActionsView(
                         onReplyTap = onReplyTap,
                         modifier = Modifier
-                            .height(48.dp)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
                         timelineViewModel = viewModel,
                         skeet = skeet,
                         inThread = inThread
@@ -639,6 +639,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.padding(top = 6.dp)
             ) {
                 skeet.authorLabels.forEach {
@@ -771,10 +772,12 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
         skeet.createdAt?.let {
             Text(
                 text = HumanReadable.timeAgo(it),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
             )
         }
     }
