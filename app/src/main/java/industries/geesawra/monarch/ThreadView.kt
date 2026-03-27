@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
+import sh.christian.ozone.api.Did
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +32,8 @@ fun ThreadView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel,
     backButton: () -> Unit,
-    coroutineScope: CoroutineScope
+    coroutineScope: CoroutineScope,
+    onProfileTap: ((Did) -> Unit)? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         rememberTopAppBarState()
@@ -89,6 +91,7 @@ fun ThreadView(
                     data = timelineViewModel.uiState.currentlyShownThread.flatten(),
                     shouldFetchMoreData = false,
                     isShowingThread = true,
+                    onProfileTap = onProfileTap,
                 )
             }
         }

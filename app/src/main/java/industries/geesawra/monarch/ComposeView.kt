@@ -418,7 +418,7 @@ fun ComposeView(
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         autoCorrectEnabled = true,
-                        keyboardType = KeyboardType.Email,
+                        keyboardType = KeyboardType.Text,
                     ),
                     label = {
                         if (wasEdited.value) {

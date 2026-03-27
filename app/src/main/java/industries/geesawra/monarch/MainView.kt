@@ -88,6 +88,7 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import sh.christian.ozone.api.Did
 import kotlin.time.ExperimentalTime
 
 enum class TabBarDestinations(
@@ -121,6 +122,7 @@ fun MainView(
     coroutineScope: CoroutineScope,
     onLoginError: () -> Unit,
     onThreadTap: (SkeetData) -> Unit,
+    onProfileTap: (Did) -> Unit,
     onFirstLoad: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
@@ -165,6 +167,7 @@ fun MainView(
                 modifier = Modifier.padding(paddingValues),
                 coroutineScope = coroutineScope,
                 timelineViewModel = timelineViewModel,
+                onProfileTap = onProfileTap,
                 fobOnClick = {
                     coroutineScope.launch {
                         scaffoldState.bottomSheetState.expand()
@@ -201,6 +204,7 @@ private fun InnerTimelineView(
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onProfileTap: (Did) -> Unit = {},
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
     onError: (String) -> Unit,
@@ -368,7 +372,7 @@ private fun InnerTimelineView(
 
                                     val user = timelineViewModel.uiState.user!!
 
-                                    IconButton(onClick = {}) {
+                                    IconButton(onClick = { onProfileTap(user.did) }) {
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalContext.current)
                                                 .data(user.avatar?.uri)
@@ -535,7 +539,8 @@ private fun InnerTimelineView(
                         onReplyTap = onReplyTap,
                         data = timelineViewModel.uiState.skeets,
                         isScrollEnabled = isScrollEnabled,
-                        onSeeMoreTap = onSeeMoreTap
+                        onSeeMoreTap = onSeeMoreTap,
+                        onProfileTap = onProfileTap,
                     )
 
                     TabBarDestinations.NOTIFICATIONS -> NotificationsView(

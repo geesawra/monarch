@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
+import app.bsky.feed.GetAuthorFeedFilter
 import app.bsky.embed.RecordView
 import app.bsky.embed.RecordViewRecord
 import app.bsky.embed.RecordViewRecordUnion
@@ -72,6 +73,14 @@ data class TimelineUiState(
 
     val loginError: String? = null,
     val error: String? = null,
+
+    // Profile viewer state
+    val profileUser: ProfileViewDetailed? = null,
+    val profilePosts: List<SkeetData> = listOf(),
+    val profileFeedCursor: String? = null,
+    val profileFeedFilter: GetAuthorFeedFilter? = null,
+    val isFetchingProfile: Boolean = false,
+    val isFetchingProfileFeed: Boolean = false,
 )
 
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
@@ -722,6 +731,164 @@ class TimelineViewModel @AssistedInject constructor(
                     currentlyShownThread = asd
                 )
                 then()
+            }
+        }
+    }
+
+    fun openProfile(did: Did) {
+        uiState = uiState.copy(
+            profileUser = null,
+            profilePosts = listOf(),
+            profileFeedCursor = null,
+            profileFeedFilter = null,
+            isFetchingProfile = true,
+            isFetchingProfileFeed = true,
+        )
+
+        viewModelScope.launch {
+            bskyConn.fetchActor(did).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message, isFetchingProfile = false)
+                    else -> uiState.copy(error = it.message, isFetchingProfile = false)
+                }
+            }.onSuccess {
+                uiState = uiState.copy(profileUser = it, isFetchingProfile = false)
+            }
+        }
+
+        fetchProfileFeed(did, fresh = true)
+    }
+
+    fun fetchProfileFeed(did: Did? = null, fresh: Boolean = false) {
+        val profileDid = did ?: uiState.profileUser?.did ?: return
+        uiState = uiState.copy(isFetchingProfileFeed = true)
+
+        viewModelScope.launch {
+            bskyConn.getAuthorFeed(
+                did = profileDid,
+                cursor = if (fresh) null else uiState.profileFeedCursor,
+                filter = uiState.profileFeedFilter,
+            ).onFailure {
+                if (it is CancellationException) return@onFailure
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message, isFetchingProfileFeed = false)
+                    else -> uiState.copy(error = it.message, isFetchingProfileFeed = false)
+                }
+            }.onSuccess { timeline ->
+                val newPosts = timeline.feed.map {
+                    SkeetData.fromFeedViewPost(it, bskyConn.session?.did)
+                }.distinctBy { it.cid }
+
+                uiState = uiState.copy(
+                    profilePosts = if (fresh) newPosts else (uiState.profilePosts + newPosts).distinctBy { it.cid },
+                    profileFeedCursor = timeline.cursor,
+                    isFetchingProfileFeed = false,
+                )
+            }
+        }
+    }
+
+    fun setProfileFeedFilter(filter: GetAuthorFeedFilter?) {
+        uiState = uiState.copy(
+            profileFeedFilter = filter,
+            profilePosts = listOf(),
+            profileFeedCursor = null,
+        )
+        fetchProfileFeed(fresh = true)
+    }
+
+    fun followProfile() {
+        val profile = uiState.profileUser ?: return
+        viewModelScope.launch {
+            bskyConn.follow(profile.did).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                // Re-fetch profile to get updated viewer state
+                bskyConn.fetchActor(profile.did).onSuccess {
+                    uiState = uiState.copy(profileUser = it)
+                }
+            }
+        }
+    }
+
+    fun unfollowProfile() {
+        val profile = uiState.profileUser ?: return
+        val followUri = profile.viewer?.following ?: return
+        viewModelScope.launch {
+            bskyConn.unfollow(followUri).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                bskyConn.fetchActor(profile.did).onSuccess {
+                    uiState = uiState.copy(profileUser = it)
+                }
+            }
+        }
+    }
+
+    fun muteProfile() {
+        val profile = uiState.profileUser ?: return
+        viewModelScope.launch {
+            bskyConn.muteActor(profile.did).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                bskyConn.fetchActor(profile.did).onSuccess {
+                    uiState = uiState.copy(profileUser = it)
+                }
+            }
+        }
+    }
+
+    fun unmuteProfile() {
+        val profile = uiState.profileUser ?: return
+        viewModelScope.launch {
+            bskyConn.unmuteActor(profile.did).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                bskyConn.fetchActor(profile.did).onSuccess {
+                    uiState = uiState.copy(profileUser = it)
+                }
+            }
+        }
+    }
+
+    fun isOwnProfile(): Boolean {
+        return uiState.profileUser?.did == bskyConn.session?.did
+    }
+
+    fun updateProfile(
+        displayName: String?,
+        description: String?,
+        avatarUri: android.net.Uri? = null,
+        bannerUri: android.net.Uri? = null,
+        then: (Boolean) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            bskyConn.updateProfile(displayName, description, avatarUri, bannerUri).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+                then(false)
+            }.onSuccess {
+                // Refresh both the profile view and the self user data
+                val did = uiState.profileUser?.did ?: bskyConn.session?.did ?: return@onSuccess
+                bskyConn.fetchActor(did).onSuccess {
+                    uiState = uiState.copy(profileUser = it)
+                }
+                fetchSelf()
+                then(true)
             }
         }
     }

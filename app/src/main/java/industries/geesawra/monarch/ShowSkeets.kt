@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import sh.christian.ozone.api.Did
 
 @Composable
 fun ShowSkeets(
@@ -44,6 +45,7 @@ fun ShowSkeets(
     shouldFetchMoreData: Boolean = true,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onSeeMoreTap: ((SkeetData) -> Unit)? = null,
+    onProfileTap: ((Did) -> Unit)? = null,
 ) {
     LazyColumn(
         state = state,
@@ -76,6 +78,7 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
+                                onAvatarTap = onProfileTap,
                                 onShowThread = { skeet ->
                                     if (onSeeMoreTap != null) {
                                         viewModel.setThread(skeet)
@@ -128,6 +131,7 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
+                                onAvatarTap = onProfileTap,
                                 onShowThread = { skeet ->
                                     if (onSeeMoreTap != null) {
                                         viewModel.setThread(skeet)
@@ -144,6 +148,7 @@ fun ShowSkeets(
                     skeet = skeet,
                     onReplyTap = onReplyTap,
                     showInReplyTo = parent == null,
+                    onAvatarTap = onProfileTap,
                     onShowThread = { skeet ->
                         if (onSeeMoreTap != null) {
                             viewModel.setThread(skeet)

@@ -15,6 +15,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.actor.GetProfileQueryParams
 import app.bsky.actor.GetProfileResponse
 import app.bsky.actor.PreferencesUnion
+import app.bsky.actor.Profile
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.SearchActorsTypeaheadQueryParams
@@ -1192,6 +1193,190 @@ class BlueskyConn(val context: Context) {
             return when (res) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Typeahead search failed: ${res.error?.message}"))
                 is AtpResponse.Success<SearchActorsTypeaheadResponse> -> Result.success(res.response.actors)
+            }
+        }
+    }
+
+    suspend fun getAuthorFeed(
+        did: Did,
+        cursor: String? = null,
+        filter: app.bsky.feed.GetAuthorFeedFilter? = null,
+    ): Result<Timeline> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.getAuthorFeed(
+                app.bsky.feed.GetAuthorFeedQueryParams(
+                    actor = did,
+                    limit = 25,
+                    cursor = cursor,
+                    filter = filter,
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch author feed: ${ret.error}"))
+                is AtpResponse.Success<app.bsky.feed.GetAuthorFeedResponse> -> Result.success(
+                    Timeline(ret.response.cursor, ret.response.feed)
+                )
+            }
+        }
+    }
+
+    suspend fun follow(did: Did): Result<RKey> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val follow = BlueskyJson.encodeAsJsonContent(
+                app.bsky.graph.Follow(
+                    subject = did,
+                    createdAt = Clock.System.now().toDeprecatedInstant(),
+                )
+            )
+
+            val followRes = client!!.createRecord(
+                CreateRecordRequest(
+                    repo = session!!.handle,
+                    collection = Nsid("app.bsky.graph.follow"),
+                    record = follow,
+                )
+            )
+
+            return when (followRes) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not follow: ${followRes.error?.message}"))
+                is AtpResponse.Success<CreateRecordResponse> -> Result.success(
+                    RKey(followRes.response.uri.atUri.toUri().lastPathSegment!!)
+                )
+            }
+        }
+    }
+
+    suspend fun unfollow(followUri: AtUri): Result<Unit> {
+        return deleteRecord(followUri.rkey(), "app.bsky.graph.follow")
+    }
+
+    suspend fun muteActor(did: Did): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.muteActor(
+                app.bsky.graph.MuteActorRequest(actor = did)
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not mute: ${ret.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun getProfileRecord(): Result<Profile> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.getRecord(
+                GetRecordQueryParams(
+                    repo = session!!.did,
+                    collection = Nsid("app.bsky.actor.profile"),
+                    rkey = RKey("self"),
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed fetching profile record: ${ret.error}"))
+                is AtpResponse.Success<GetRecordResponse> -> Result.success(
+                    ret.response.value.decodeAs()
+                )
+            }
+        }
+    }
+
+    suspend fun updateProfile(
+        displayName: String?,
+        description: String?,
+        avatarUri: Uri? = null,
+        bannerUri: Uri? = null,
+    ): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            // First get the current profile to preserve fields we don't change
+            val currentProfile = getProfileRecord().getOrThrow()
+
+            var avatarBlob = currentProfile.avatar
+            var bannerBlob = currentProfile.banner
+
+            if (avatarUri != null) {
+                val compressor = Compressor(context)
+                val compressed = compressor.compressImage(avatarUri, 950000)
+                val uploaded = client!!.uploadBlob(compressed.data)
+                avatarBlob = when (uploaded) {
+                    is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading avatar: ${uploaded.error}"))
+                    is AtpResponse.Success<UploadBlobResponse> -> uploaded.response.blob
+                }
+            }
+
+            if (bannerUri != null) {
+                val compressor = Compressor(context)
+                val compressed = compressor.compressImage(bannerUri, 950000)
+                val uploaded = client!!.uploadBlob(compressed.data)
+                bannerBlob = when (uploaded) {
+                    is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading banner: ${uploaded.error}"))
+                    is AtpResponse.Success<UploadBlobResponse> -> uploaded.response.blob
+                }
+            }
+
+            val updatedProfile = Profile(
+                displayName = displayName ?: currentProfile.displayName,
+                description = description ?: currentProfile.description,
+                avatar = avatarBlob,
+                banner = bannerBlob,
+                labels = currentProfile.labels,
+                pinnedPost = currentProfile.pinnedPost,
+                createdAt = currentProfile.createdAt,
+            )
+
+            val record = BlueskyJson.encodeAsJsonContent(updatedProfile)
+
+            val ret = client!!.putRecord(
+                com.atproto.repo.PutRecordRequest(
+                    repo = session!!.did,
+                    collection = Nsid("app.bsky.actor.profile"),
+                    rkey = RKey("self"),
+                    record = record,
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed updating profile: ${ret.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun unmuteActor(did: Did): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.unmuteActor(
+                app.bsky.graph.UnmuteActorRequest(actor = did)
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not unmute: ${ret.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
             }
         }
     }

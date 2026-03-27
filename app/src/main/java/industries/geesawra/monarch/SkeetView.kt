@@ -80,6 +80,7 @@ import coil3.request.crossfade
 import com.atproto.label.Label
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import sh.christian.ozone.api.Did
 import io.sanghun.compose.video.RepeatMode
 import io.sanghun.compose.video.VideoPlayer
 import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
@@ -102,6 +103,7 @@ fun SkeetView(
     renderingReplyNotif: Boolean = false,
     renderingMention: Boolean = false,
     onShowThread: (SkeetData) -> Unit = {},
+    onAvatarTap: ((Did) -> Unit)? = null,
 ) {
     if (skeet.blocked) {
         ConditionalCard(text = "Blocked :(", wrapWithCard = !nested)
@@ -150,6 +152,11 @@ fun SkeetView(
                     modifier = Modifier
                         .size(minSize)
                         .clip(CircleShape)
+                        .then(
+                            if (onAvatarTap != null && skeet.did != null)
+                                Modifier.clickable { onAvatarTap(skeet.did!!) }
+                            else Modifier
+                        )
                 )
 
                 SkeetHeader(
@@ -193,6 +200,11 @@ fun SkeetView(
                     modifier = Modifier
                         .size(minSize)
                         .clip(CircleShape)
+                        .then(
+                            if (onAvatarTap != null && skeet.did != null)
+                                Modifier.clickable { onAvatarTap(skeet.did!!) }
+                            else Modifier
+                        )
                 )
                 if (inThread) {
                     VerticalDivider(

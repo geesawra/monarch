@@ -40,6 +40,7 @@ import dagger.hilt.android.HiltAndroidApp
 import industries.geesawra.monarch.datalayer.BlueskyConn
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.ui.theme.MonarchTheme
+import sh.christian.ozone.api.Did
 
 
 @HiltAndroidApp
@@ -49,6 +50,7 @@ enum class ViewList() {
     Login,
     Main,
     ShowThread,
+    Profile,
 }
 
 @AndroidEntryPoint
@@ -135,6 +137,10 @@ class MainActivity : ComponentActivity() {
                                 onThreadTap = {
                                     navController.navigate(ViewList.ShowThread.name)
                                 },
+                                onProfileTap = { did ->
+                                    timelineViewModel.openProfile(did)
+                                    navController.navigate(ViewList.Profile.name)
+                                },
                                 onFirstLoad = {
                                     if (firstLoadDone.value) {
                                         return@MainView
@@ -152,7 +158,27 @@ class MainActivity : ComponentActivity() {
                                 coroutineScope = rememberCoroutineScope(),
                                 backButton = {
                                     navController.popBackStack()
-                                }
+                                },
+                                onProfileTap = { did ->
+                                    timelineViewModel.openProfile(did)
+                                    navController.navigate(ViewList.Profile.name)
+                                },
+                            )
+                        }
+                        composable(route = ViewList.Profile.name) {
+                            ProfileView(
+                                timelineViewModel = timelineViewModel,
+                                coroutineScope = rememberCoroutineScope(),
+                                backButton = {
+                                    navController.popBackStack()
+                                },
+                                onThreadTap = {
+                                    navController.navigate(ViewList.ShowThread.name)
+                                },
+                                onProfileTap = { did ->
+                                    timelineViewModel.openProfile(did)
+                                    navController.navigate(ViewList.Profile.name)
+                                },
                             )
                         }
 

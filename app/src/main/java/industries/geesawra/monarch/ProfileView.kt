@@ -1,0 +1,724 @@
+@file:OptIn(ExperimentalTime::class)
+
+package industries.geesawra.monarch
+
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import kotlinx.coroutines.launch
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import app.bsky.actor.ProfileViewDetailed
+import app.bsky.actor.VerifiedStatus
+import app.bsky.feed.GetAuthorFeedFilter
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import industries.geesawra.monarch.datalayer.SkeetData
+import industries.geesawra.monarch.datalayer.TimelineViewModel
+import kotlinx.coroutines.CoroutineScope
+import sh.christian.ozone.api.Did
+import kotlin.time.ExperimentalTime
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileView(
+    modifier: Modifier = Modifier,
+    timelineViewModel: TimelineViewModel,
+    coroutineScope: CoroutineScope,
+    backButton: () -> Unit,
+    onThreadTap: (SkeetData) -> Unit,
+    onProfileTap: (Did) -> Unit,
+) {
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val listState = rememberLazyListState()
+    val profile = timelineViewModel.uiState.profileUser
+    val isLoading = timelineViewModel.uiState.isFetchingProfile
+
+    PullToRefreshBox(
+        modifier = modifier.windowInsetsPadding(WindowInsets.statusBars),
+        isRefreshing = isLoading,
+        onRefresh = {
+            profile?.did?.let { timelineViewModel.openProfile(it) }
+        },
+    ) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                        actionIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = backButton) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Go back"
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = profile?.displayName ?: profile?.handle?.handle ?: "",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    scrollBehavior = scrollBehavior,
+                    actions = {
+                        if (profile != null && !timelineViewModel.isOwnProfile()) {
+                            ProfileOverflowMenu(timelineViewModel, profile)
+                        }
+                    }
+                )
+            },
+        ) { padding ->
+            if (profile == null && isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+                return@Scaffold
+            }
+
+            if (profile == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Profile not found")
+                }
+                return@Scaffold
+            }
+
+            ProfileContent(
+                modifier = Modifier.padding(padding),
+                profile = profile,
+                timelineViewModel = timelineViewModel,
+                listState = listState,
+                onThreadTap = onThreadTap,
+                onProfileTap = onProfileTap,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileOverflowMenu(
+    timelineViewModel: TimelineViewModel,
+    profile: ProfileViewDetailed,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val isMuted = profile.viewer?.muted == true
+
+    IconButton(onClick = { expanded = true }) {
+        Icon(Icons.Default.MoreVert, contentDescription = "More options")
+    }
+
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(
+            text = { Text(if (isMuted) "Unmute" else "Mute") },
+            onClick = {
+                expanded = false
+                if (isMuted) timelineViewModel.unmuteProfile()
+                else timelineViewModel.muteProfile()
+            }
+        )
+    }
+}
+
+@Composable
+private fun ProfileContent(
+    modifier: Modifier = Modifier,
+    profile: ProfileViewDetailed,
+    timelineViewModel: TimelineViewModel,
+    listState: LazyListState,
+    onThreadTap: (SkeetData) -> Unit,
+    onProfileTap: (Did) -> Unit,
+) {
+    val posts = timelineViewModel.uiState.profilePosts
+
+    LazyColumn(
+        state = listState,
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Profile header as first item
+        item(key = "profile_header") {
+            ProfileHeader(
+                profile = profile,
+                timelineViewModel = timelineViewModel,
+            )
+        }
+
+        // Feed filter chips
+        item(key = "filter_chips") {
+            ProfileFeedFilters(timelineViewModel)
+        }
+
+        // Posts
+        itemsIndexed(
+            items = posts,
+            key = { _, skeet -> "post_${skeet.key()}" }
+        ) { _, skeet ->
+            Card {
+                SkeetView(
+                    viewModel = timelineViewModel,
+                    skeet = skeet,
+                    onReplyTap = { _, _ -> },
+                    onShowThread = { s ->
+                        timelineViewModel.setThread(s)
+                        onThreadTap(s)
+                    }
+                )
+            }
+        }
+
+        if (timelineViewModel.uiState.isFetchingProfileFeed) {
+            item(key = "loading") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        }
+    }
+
+    // Pagination
+    val endOfListReached by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            if (layoutInfo.totalItemsCount == 0) {
+                false
+            } else {
+                val lastVisibleItem = visibleItemsInfo.lastOrNull()
+                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
+            }
+        }
+    }
+
+    LaunchedEffect(endOfListReached) {
+        if (endOfListReached && posts.isNotEmpty()) {
+            timelineViewModel.fetchProfileFeed()
+        }
+    }
+}
+
+@Composable
+private fun ProfileHeader(
+    profile: ProfileViewDetailed,
+    timelineViewModel: TimelineViewModel,
+) {
+    Column {
+        // Banner image
+        if (profile.banner != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(profile.banner?.uri)
+                    .crossfade(true)
+                    .build(),
+                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                contentDescription = "Profile banner",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .clip(MaterialTheme.shapes.medium)
+            )
+        } else {
+            Spacer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+            )
+        }
+
+        // Avatar + follow button row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = (-32).dp)
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(profile.avatar?.uri)
+                    .crossfade(true)
+                    .build(),
+                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                contentDescription = "${profile.displayName ?: profile.handle.handle}'s avatar",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+            )
+
+            if (timelineViewModel.isOwnProfile()) {
+                EditProfileButton(profile, timelineViewModel)
+            } else {
+                FollowButton(profile, timelineViewModel)
+            }
+        }
+
+        // Name + handle + verification
+        Column(
+            modifier = Modifier
+                .offset(y = (-20).dp)
+                .padding(horizontal = 8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = profile.displayName ?: profile.handle.handle,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+
+                val isVerified = when (profile.verification?.verifiedStatus) {
+                    is VerifiedStatus.Valid -> true
+                    else -> false
+                }
+                if (isVerified) {
+                    Icon(
+                        imageVector = Icons.Default.Verified,
+                        contentDescription = "Verified",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+
+                val isBot = profile.labels.any { it.`val` == "bot" }
+                if (isBot) {
+                    Icon(
+                        imageVector = Icons.Filled.SmartToy,
+                        contentDescription = "Bot account",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+
+            Text(
+                text = "@${profile.handle.handle}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // "Follows you" badge
+            if (profile.viewer?.followedBy != null) {
+                Text(
+                    text = "Follows you",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+
+            // Bio
+            if (!profile.description.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = profile.description!!,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            // Stats row
+            Spacer(modifier = Modifier.height(12.dp))
+            ProfileStats(profile)
+        }
+    }
+}
+
+@Composable
+private fun FollowButton(
+    profile: ProfileViewDetailed,
+    timelineViewModel: TimelineViewModel,
+) {
+    val isFollowing = profile.viewer?.following != null
+
+    if (isFollowing) {
+        FilledTonalButton(
+            onClick = { timelineViewModel.unfollowProfile() },
+        ) {
+            Icon(
+                Icons.Default.PersonRemove,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text("Following")
+        }
+    } else {
+        Button(
+            onClick = { timelineViewModel.followProfile() },
+        ) {
+            Icon(
+                Icons.Default.PersonAdd,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text("Follow")
+        }
+    }
+}
+
+@Composable
+private fun ProfileStats(profile: ProfileViewDetailed) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        StatItem(count = profile.followersCount ?: 0, label = "followers")
+        StatItem(count = profile.followsCount ?: 0, label = "following")
+        StatItem(count = profile.postsCount ?: 0, label = "posts")
+    }
+}
+
+@Composable
+private fun StatItem(count: Long, label: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = formatCount(count),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun formatCount(count: Long): String {
+    return when {
+        count >= 1_000_000 -> String.format("%.1fM", count / 1_000_000.0)
+        count >= 10_000 -> String.format("%.1fK", count / 1_000.0)
+        count >= 1_000 -> String.format("%.1fK", count / 1_000.0)
+        else -> count.toString()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditProfileButton(
+    profile: ProfileViewDetailed,
+    timelineViewModel: TimelineViewModel,
+) {
+    var showEditor by remember { mutableStateOf(false) }
+
+    OutlinedButton(onClick = { showEditor = true }) {
+        Text("Edit Profile")
+    }
+
+    if (showEditor) {
+        EditProfileSheet(
+            profile = profile,
+            timelineViewModel = timelineViewModel,
+            onDismiss = { showEditor = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditProfileSheet(
+    profile: ProfileViewDetailed,
+    timelineViewModel: TimelineViewModel,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    var displayName by remember { mutableStateOf(profile.displayName ?: "") }
+    var description by remember { mutableStateOf(profile.description ?: "") }
+    var avatarUri by remember { mutableStateOf<Uri?>(null) }
+    var bannerUri by remember { mutableStateOf<Uri?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val avatarPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { avatarUri = it } }
+
+    val bannerPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { bannerUri = it } }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "Edit Profile",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+
+            // Banner picker
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable { bannerPicker.launch("image/*") },
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = bannerUri ?: profile.banner?.uri,
+                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    contentDescription = "Banner",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(MaterialTheme.shapes.medium),
+                )
+                FilledTonalIconButton(onClick = { bannerPicker.launch("image/*") }) {
+                    Icon(Icons.Default.CameraAlt, "Change banner")
+                }
+            }
+
+            // Avatar picker
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    AsyncImage(
+                        model = avatarUri ?: profile.avatar?.uri,
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        contentDescription = "Avatar",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .clickable { avatarPicker.launch("image/*") },
+                    )
+                    FilledTonalIconButton(
+                        onClick = { avatarPicker.launch("image/*") },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.CameraAlt,
+                            "Change avatar",
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
+
+            // Display name
+            OutlinedTextField(
+                value = displayName,
+                onValueChange = { displayName = it },
+                label = { Text("Display Name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                ),
+            )
+
+            // Description / Bio
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Bio") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                ),
+            )
+
+            // Save / Cancel buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                            onDismiss()
+                        }
+                    },
+                    enabled = !isSaving,
+                ) {
+                    Text("Cancel")
+                }
+
+                Button(
+                    onClick = {
+                        isSaving = true
+                        timelineViewModel.updateProfile(
+                            displayName = displayName,
+                            description = description,
+                            avatarUri = avatarUri,
+                            bannerUri = bannerUri,
+                        ) { success ->
+                            isSaving = false
+                            if (success) {
+                                scope.launch {
+                                    sheetState.hide()
+                                    onDismiss()
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isSaving,
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text("Save")
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProfileFeedFilters(timelineViewModel: TimelineViewModel) {
+    val currentFilter = timelineViewModel.uiState.profileFeedFilter
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(vertical = 4.dp),
+    ) {
+        FilterChip(
+            selected = currentFilter == null,
+            onClick = { timelineViewModel.setProfileFeedFilter(null) },
+            label = { Text("Posts") },
+        )
+        FilterChip(
+            selected = currentFilter == GetAuthorFeedFilter.PostsWithReplies,
+            onClick = { timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithReplies) },
+            label = { Text("Replies") },
+        )
+        FilterChip(
+            selected = currentFilter == GetAuthorFeedFilter.PostsWithMedia,
+            onClick = { timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithMedia) },
+            label = { Text("Media") },
+        )
+        FilterChip(
+            selected = currentFilter == GetAuthorFeedFilter.PostsWithVideo,
+            onClick = { timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithVideo) },
+            label = { Text("Video") },
+        )
+    }
+}
