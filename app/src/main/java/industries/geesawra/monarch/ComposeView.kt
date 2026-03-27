@@ -98,6 +98,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import industries.geesawra.monarch.datalayer.LinkPreviewData
 import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
+import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
@@ -488,6 +489,7 @@ fun ComposeView(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(profile.avatar?.uri)
                                             .build(),
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentDescription = "${profile.displayName ?: profile.handle.handle}'s avatar",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
@@ -545,6 +547,7 @@ fun ComposeView(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(imgUrl)
                                             .build(),
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentScale = ContentScale.Crop,
                                         contentDescription = "Link preview thumbnail",
                                         modifier = Modifier

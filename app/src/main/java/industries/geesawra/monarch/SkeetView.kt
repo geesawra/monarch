@@ -73,6 +73,7 @@ import app.bsky.embed.RecordWithMediaViewMediaUnion
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.ReplyRefParentUnion
+import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -144,6 +145,7 @@ fun SkeetView(
                         .data(skeet.authorAvatarURL)
                         .crossfade(true)
                         .build(),
+                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(minSize)
@@ -186,6 +188,7 @@ fun SkeetView(
                         .data(skeet.authorAvatarURL)
                         .crossfade(true)
                         .build(),
+                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(minSize)
@@ -426,6 +429,7 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
                         .data(it.uri)
                         .crossfade(true)
                         .build(),
+                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
                     contentDescription = "External link thumbnail",
@@ -599,6 +603,7 @@ private fun SkeetReason(
                                     .data(avatarUri.uri)
                                     .crossfade(true)
                                     .build(),
+                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(18.dp)
@@ -758,6 +763,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                                             .data(avatarUrl)
                                             .crossfade(true)
                                             .build(),
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentDescription = definition.plaintext,
                                         modifier = Modifier
                                             .size(14.dp)
@@ -823,6 +829,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                                             .data(avatarUrl)
                                             .crossfade(true)
                                             .build(),
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentDescription = definition.plaintext,
                                         modifier = Modifier
                                             .size(14.dp)

@@ -25,6 +25,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -212,6 +214,7 @@ private fun DeletableImageView(
                 .data(image.url)
                 .crossfade(true)
                 .build(),
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             contentDescription = image.alt,
             contentScale = ContentScale.Crop,
             modifier = if (aspectRatio != null) {

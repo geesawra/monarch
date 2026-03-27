@@ -47,6 +47,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.WideNavigationRailItem
@@ -79,6 +80,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -205,7 +207,7 @@ private fun InnerTimelineView(
     onSeeMoreTap: (SkeetData) -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         rememberTopAppBarState()
     )
     val timelineState = rememberLazyListState()
@@ -307,14 +309,13 @@ private fun InnerTimelineView(
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 topBar = {
-                    MediumFlexibleTopAppBar(
-                        colors = TopAppBarColors(
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                             scrolledContainerColor = MaterialTheme.colorScheme.background,
-                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground, // Ensuring correct contrast
+                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
                             titleContentColor = MaterialTheme.colorScheme.onBackground,
                             actionIconContentColor = MaterialTheme.colorScheme.onBackground,
-                            subtitleContentColor = MaterialTheme.colorScheme.onBackground
                         ),
                         title = {
                             when (currentDestination) {
@@ -325,6 +326,7 @@ private fun InnerTimelineView(
                                     if (timelineViewModel.uiState.feedAvatar != null) {
                                         AsyncImage(
                                             model = timelineViewModel.uiState.feedAvatar,
+                                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                             modifier = Modifier
                                                 .size(40.dp)
                                                 .clip(CircleShape),
@@ -361,7 +363,7 @@ private fun InnerTimelineView(
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> {
                                     if (timelineViewModel.uiState.user == null) {
-                                        return@MediumFlexibleTopAppBar
+                                        return@TopAppBar
                                     }
 
                                     val user = timelineViewModel.uiState.user!!
@@ -372,6 +374,7 @@ private fun InnerTimelineView(
                                                 .data(user.avatar?.uri)
                                                 .crossfade(true)
                                                 .build(),
+                                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                             contentDescription = "${user.displayName ?: user.handle.handle}'s avatar",
                                             contentScale = ContentScale.Crop,
                                             modifier =
@@ -592,6 +595,7 @@ fun FeedsDrawer(
                             .data(feed.avatar?.uri)
                             .crossfade(true)
                             .build(),
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                         modifier = Modifier
                             .size(20.dp)
                             .clip(CircleShape),

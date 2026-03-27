@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.bsky.actor.ProfileView
+import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -165,6 +166,7 @@ fun LikeRepostRowView(
                                         .data(it.author.avatar?.uri)
                                         .crossfade(true)
                                         .build(),
+                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     contentDescription = "Avatar",
                                     modifier = Modifier
                                         .size(
@@ -209,6 +211,7 @@ fun LikeRepostRowView(
                                         .data(it.author.avatar?.uri)
                                         .crossfade(true)
                                         .build(),
+                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     contentDescription = "Avatar",
                                     modifier = Modifier
                                         .size(
