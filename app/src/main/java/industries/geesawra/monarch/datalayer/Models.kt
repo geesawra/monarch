@@ -45,6 +45,12 @@ import sh.christian.ozone.api.model.Blob
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
+enum class ReplyFilterMode {
+    None,
+    OnlyFilterDeepThreads,
+    Strict
+}
+
 enum class CDNImageSize(
     val size: String
 ) {
@@ -109,7 +115,7 @@ data class SkeetData(
     var replyToNotFollowing: Boolean = false,
 ) {
     companion object {
-        fun fromFeedViewPost(post: FeedViewPost, currentUserDid: Did? = null): SkeetData {
+        fun fromFeedViewPost(post: FeedViewPost, currentUserDid: Did? = null, replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads): SkeetData {
             val content: Post = (post.post.record.decodeAs())
 
             val sd = SkeetData(
@@ -137,6 +143,7 @@ data class SkeetData(
             )
 
             sd.replyToNotFollowing = run {
+                if (replyFilterMode == ReplyFilterMode.None) return@run false
                 if (currentUserDid != null && sd.did == currentUserDid) return@run false
 
                 when (sd.reason) {
@@ -155,42 +162,57 @@ data class SkeetData(
                         }
 
                         if (parent == null) {
-                            return@run false // no parent AND no root, this is a single post
+                            return@run false // single post, no parent
                         }
 
-                        if (root == null) {
-                            return@run !isFollowedOrSelf(parent) // just parent, this is a single reply
+                        when (replyFilterMode) {
+                            ReplyFilterMode.OnlyFilterDeepThreads -> {
+                                // Show direct replies from followed accounts freely.
+                                // Only filter 4+ deep threads where root/grandfather are unfollowed.
+                                if (root == null) return@run false // direct reply, always show
+
+                                val parentsParent = sd.parentsParentRef()
+                                if (parentsParent != null && parentsParent.uri == root.uri) {
+                                    return@run false // 3-post thread, always show
+                                }
+
+                                // 4+ deep: require root and grandfather to be followed
+                                if (!isFollowedOrSelf(parent)) return@run true
+
+                                val grandfather = sd.grandparentAuthor()
+                                val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
+                                    true
+                                } else {
+                                    grandfather?.viewer?.following?.isNotEmpty() ?: false
+                                }
+                                return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
+                            }
+
+                            ReplyFilterMode.Strict -> {
+                                // Require all thread participants to be followed
+                                if (root == null) {
+                                    return@run !isFollowedOrSelf(parent)
+                                }
+
+                                if (!isFollowedOrSelf(parent)) return@run true
+
+                                val parentsParent = sd.parentsParentRef()
+                                if (parentsParent != null && parentsParent.uri == root.uri) {
+                                    return@run !isFollowedOrSelf(root)
+                                }
+
+                                val grandfather = sd.grandparentAuthor()
+                                val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
+                                    true
+                                } else {
+                                    grandfather?.viewer?.following?.isNotEmpty() ?: false
+                                }
+                                return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
+                            }
+
+                            else -> return@run false
                         }
-
-                        if (!isFollowedOrSelf(parent)) {
-                            return@run true // I don't follow whoever sd is replying to, don't care
-                        }
-
-                        // Simplify everything:
-                        // - 3 post threads: if we follow parent and root, we show
-                        // - 4+ post threads: if we follow parent, root, and grandfather, we show
-
-                        // from now on, we know both parent and root are non-null,
-                        // hence we might be in a 3+ post threads.
-
-                        val parentsParent = sd.parentsParentRef()!!
-                        if (parentsParent.uri == root.uri) {
-                            // parent's root == root, this is a 3 post thread
-                            return@run !isFollowedOrSelf(root)
-                        }
-
-                        val grandfather = sd.grandparentAuthor()
-                        val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
-                            true
-                        } else {
-                            grandfather?.viewer?.following?.isNotEmpty() ?: false
-                        }
-
-                        // base case: parent, root and grandfather all followed
-                        return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
                     }
-
-
                 }
             }
 
