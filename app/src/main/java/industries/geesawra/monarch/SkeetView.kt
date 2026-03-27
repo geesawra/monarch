@@ -718,8 +718,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                         }
 
                         OutlinedCard(
-                            modifier = Modifier
-                                .clickable { showSheet = true },
+                            onClick = { showSheet = true },
                             shape = CircleShape
                         ) {
                             Row(
