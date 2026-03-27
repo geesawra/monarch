@@ -105,7 +105,14 @@ fun ProfileView(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listState = rememberLazyListState()
     val profile = timelineViewModel.uiState.profileUser
-    val isLoading = timelineViewModel.uiState.isFetchingProfile
+    val isLoading = timelineViewModel.uiState.isFetchingProfile || timelineViewModel.uiState.isFetchingProfileFeed
+
+    // Show avatar in top bar once the header item is scrolled past
+    val showAvatarInBar by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0
+        }
+    }
 
     PullToRefreshBox(
         modifier = modifier.windowInsetsPadding(WindowInsets.statusBars),
@@ -137,11 +144,30 @@ fun ProfileView(
                         }
                     },
                     title = {
-                        Text(
-                            text = profile?.displayName ?: profile?.handle?.handle ?: "",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (showAvatarInBar && profile?.avatar != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(profile.avatar?.uri)
+                                        .crossfade(true)
+                                        .build(),
+                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                )
+                            }
+                            Text(
+                                text = profile?.displayName ?: profile?.handle?.handle ?: "",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     },
                     scrollBehavior = scrollBehavior,
                     actions = {
@@ -152,18 +178,6 @@ fun ProfileView(
                 )
             },
         ) { padding ->
-            if (profile == null && isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-                return@Scaffold
-            }
-
             if (profile == null) {
                 Box(
                     modifier = Modifier
@@ -562,35 +576,43 @@ private fun EditProfileSheet(
                 fontWeight = FontWeight.Bold,
             )
 
-            // Banner picker
+            // Banner + avatar overlapping
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .clickable { bannerPicker.launch("image/*") },
-                contentAlignment = Alignment.Center,
+                    .padding(bottom = 32.dp),
             ) {
-                AsyncImage(
-                    model = bannerUri ?: profile.banner?.uri,
-                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    contentDescription = "Banner",
-                    contentScale = ContentScale.Crop,
+                // Banner
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .clip(MaterialTheme.shapes.medium),
-                )
-                FilledTonalIconButton(onClick = { bannerPicker.launch("image/*") }) {
-                    Icon(Icons.Default.CameraAlt, "Change banner")
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .clickable { bannerPicker.launch("image/*") },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AsyncImage(
+                        model = bannerUri ?: profile.banner?.uri,
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        contentDescription = "Banner",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(MaterialTheme.shapes.medium),
+                    )
+                    FilledTonalIconButton(onClick = { bannerPicker.launch("image/*") }) {
+                        Icon(Icons.Default.CameraAlt, "Change banner")
+                    }
                 }
-            }
 
-            // Avatar picker
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Box(contentAlignment = Alignment.BottomEnd) {
+                // Avatar overlapping the banner
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 8.dp)
+                        .offset(y = 32.dp),
+                    contentAlignment = Alignment.BottomEnd,
+                ) {
                     AsyncImage(
                         model = avatarUri ?: profile.avatar?.uri,
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
