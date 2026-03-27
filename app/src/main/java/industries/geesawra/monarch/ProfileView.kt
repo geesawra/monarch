@@ -5,6 +5,11 @@ package industries.geesawra.monarch
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -148,10 +153,14 @@ fun ProfileView(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            if (showAvatarInBar && profile?.avatar != null) {
+                            AnimatedVisibility(
+                                visible = showAvatarInBar && profile?.avatar != null,
+                                enter = fadeIn() + expandHorizontally(),
+                                exit = fadeOut() + shrinkHorizontally(),
+                            ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
-                                        .data(profile.avatar?.uri)
+                                        .data(profile?.avatar?.uri)
                                         .crossfade(true)
                                         .build(),
                                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
