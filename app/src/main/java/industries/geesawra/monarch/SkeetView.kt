@@ -10,7 +10,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Repeat
@@ -38,6 +41,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -108,7 +112,7 @@ fun SkeetView(
         return
     }
 
-    val minSize = 55.dp
+    val minSize = 44.dp
 
     Column(
         modifier =
@@ -125,30 +129,58 @@ fun SkeetView(
                     bottom = 8.dp
                 )
     ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.Start,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .sizeIn(minHeight = minSize),
-            ) {
+        SkeetReason(
+            modifier = Modifier.padding(start = 4.dp),
+            skeet = skeet,
+            showInReplyTo,
+            renderingReplyNotif,
+            renderingMention
+        )
 
-                SkeetReason(
-                    modifier = Modifier.padding(start = 4.dp),
-                    skeet = skeet,
-                    showInReplyTo,
-                    renderingReplyNotif,
-                    renderingMention
+        if (nested) {
+            // Embedded posts: avatar + header in a row, content below
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(skeet.authorAvatarURL)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Avatar",
+                    modifier = Modifier
+                        .size(minSize)
+                        .clip(CircleShape)
                 )
 
-                Row(
+                SkeetHeader(
+                    modifier = Modifier.padding(start = 12.dp),
+                    skeet = skeet,
+                    showLabels = showLabels,
+                    labelDisplayName = { viewModel?.labelDisplayName(it) },
+                    labelDescription = { viewModel?.labelDescription(it) },
+                    labelerAvatar = { viewModel?.labelerAvatar(it) }
+                )
+            }
+
+            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
+        } else {
+            // Top-level posts: two-column layout with thread line for header,
+            // content and actions span full width below
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+            ) {
+                // Left column: avatar + thread line
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.Top
+                        .width(minSize)
+                        .fillMaxHeight()
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -160,32 +192,48 @@ fun SkeetView(
                             .size(minSize)
                             .clip(CircleShape)
                     )
+                    if (inThread) {
+                        VerticalDivider(
+                            thickness = 3.dp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
+                }
 
+                // Right column: header + content + actions
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp)
+                        .sizeIn(minHeight = minSize),
+                ) {
                     SkeetHeader(
-                        modifier = Modifier.padding(start = 16.dp),
                         skeet = skeet,
                         showLabels = showLabels,
                         labelDisplayName = { viewModel?.labelDisplayName(it) },
                         labelDescription = { viewModel?.labelDescription(it) },
                         labelerAvatar = { viewModel?.labelerAvatar(it) }
                     )
-                }
 
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
+                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
 
-                if (!nested && !disableEmbeds) {
-                    TimelinePostActionsView(
-                        onReplyTap = onReplyTap,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        timelineViewModel = viewModel,
-                        skeet = skeet,
-                        inThread = inThread
-                    )
+                    if (!disableEmbeds) {
+                        TimelinePostActionsView(
+                            onReplyTap = onReplyTap,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            timelineViewModel = viewModel,
+                            skeet = skeet,
+                            inThread = inThread
+                        )
+                    }
                 }
             }
-
         }
     }
 }

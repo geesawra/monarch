@@ -108,13 +108,6 @@ fun TimelinePostActionsView(
         val ctx = LocalContext.current
 
         if (inThread) {
-            VerticalDivider(
-                thickness = 4.dp,
-                modifier = Modifier
-                    .padding(start = 24.dp, top = 4.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            )
-
             Spacer(Modifier.weight(1f))
         }
 
