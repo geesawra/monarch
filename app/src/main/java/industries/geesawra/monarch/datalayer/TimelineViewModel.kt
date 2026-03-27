@@ -41,6 +41,7 @@ import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.RKey
+import com.atproto.label.Label
 import sh.christian.ozone.api.model.JsonContent
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import kotlin.coroutines.cancellation.CancellationException
@@ -88,6 +89,8 @@ class TimelineViewModel @AssistedInject constructor(
 
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
+
+    fun labelDisplayName(label: Label): String = bskyConn.labelDisplayName(label)
 
     fun loadSession() {
         viewModelScope.launch {
@@ -154,6 +157,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
 
         timelineFetchJob = viewModelScope.launch {
+            bskyConn.refreshLabelCacheIfNeeded()
 
             when (uiState.selectedFeed) {
                 "following" -> bskyConn.fetchTimeline(

@@ -62,6 +62,7 @@ import app.bsky.feed.ReplyRefParentUnion
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.atproto.label.Label
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import io.sanghun.compose.video.RepeatMode
@@ -148,7 +149,8 @@ fun SkeetView(
                     SkeetHeader(
                         modifier = Modifier.padding(start = 16.dp),
                         skeet = skeet,
-                        showLabels
+                        showLabels = showLabels,
+                        labelDisplayName = { viewModel?.labelDisplayName(it) }
                     )
                 }
 
@@ -553,7 +555,7 @@ private fun labelDefinition(rawValue: String): LabelDefinition {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean) {
+private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }) {
     val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
 
     Column(modifier = modifier) {
@@ -585,7 +587,12 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                         return@forEach
                     }
 
-                    val definition = labelDefinition(it.`val`)
+                    val resolvedName = labelDisplayName(it)
+                    val definition = if (resolvedName != null) {
+                        LabelDefinition(plaintext = resolvedName, icon = Icons.Filled.Visibility)
+                    } else {
+                        labelDefinition(it.`val`)
+                    }
                     OutlinedCard(
                         modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
                         shape = CircleShape

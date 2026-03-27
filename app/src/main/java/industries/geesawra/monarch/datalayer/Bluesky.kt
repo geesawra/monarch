@@ -46,6 +46,7 @@ import app.bsky.feed.Repost
 import app.bsky.labeler.GetServicesQueryParams
 import app.bsky.labeler.GetServicesResponse
 import app.bsky.labeler.GetServicesResponseViewUnion
+import com.atproto.label.Label
 import app.bsky.notification.ListNotificationsQueryParams
 import app.bsky.notification.ListNotificationsResponse
 import app.bsky.notification.UpdateSeenRequest
@@ -243,6 +244,37 @@ class BlueskyConn(val context: Context) {
     var session: SessionData? = null
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
+
+    // Label display name cache: maps "labelerDid:labelVal" -> display name
+    private var labelDisplayNames: Map<String, String> = emptyMap()
+    private var labelCacheFetchCount: Int = 0
+    private val labelCacheRefreshInterval: Int = 12
+
+    fun labelDisplayName(label: Label): String {
+        val key = "${label.src.did}:${label.`val`}"
+        return labelDisplayNames[key] ?: label.`val`
+    }
+
+    suspend fun refreshLabelCacheIfNeeded() {
+        labelCacheFetchCount++
+        if (labelCacheFetchCount < labelCacheRefreshInterval) return
+        labelCacheFetchCount = 0
+        subscribedLabelers().onSuccess { buildLabelDisplayNameCache(it) }
+    }
+
+    private fun buildLabelDisplayNameCache(
+        labelers: Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>
+    ) {
+        val names = mutableMapOf<String, String>()
+        for ((did, detailed) in labelers) {
+            if (did == null || detailed == null) continue
+            for (defn in detailed.value.policies.labelValueDefinitions) {
+                val displayName = defn.locales.firstOrNull()?.name ?: continue
+                names["${did.did}:${defn.identifier}"] = displayName
+            }
+        }
+        labelDisplayNames = names
+    }
 
     suspend fun storeSessionData(pdsURL: String, appviewProxy: String, session: SessionData) {
         context.dataStore.edit { settings ->
@@ -487,7 +519,10 @@ class BlueskyConn(val context: Context) {
                 sessionData,
             )
 
-            val labelers = this.subscribedLabelers().getOrThrow().keys.mapNotNull { it?.did }
+            val labelerMap = this.subscribedLabelers().getOrThrow()
+            buildLabelDisplayNameCache(labelerMap)
+            labelCacheFetchCount = 0
+            val labelers = labelerMap.keys.mapNotNull { it?.did }
             this.client = mkClient(
                 pdsURL,
                 appviewProxy,
