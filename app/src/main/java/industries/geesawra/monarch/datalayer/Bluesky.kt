@@ -244,7 +244,8 @@ class BlueskyConn(val context: Context) {
         val service: List<Service>
     )
 
-    var client: AuthenticatedXrpcBlueskyApi? = null
+    var client: AuthenticatedXrpcBlueskyApi? = null      // appview queries (has atproto-proxy)
+    var pdsClient: AuthenticatedXrpcBlueskyApi? = null   // PDS procedures (no atproto-proxy)
     var session: SessionData? = null
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
@@ -378,6 +379,7 @@ class BlueskyConn(val context: Context) {
         )
         session = null
         this.client = null
+        this.pdsClient = null
 
         createMutex.unlock()
         return Result.success(Unit)
@@ -400,6 +402,37 @@ class BlueskyConn(val context: Context) {
                 url(pds)
                 headers["atproto-accept-labelers"] = labelers.joinToString()
                 headers["atproto-proxy"] = appviewProxy
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 15000
+                connectTimeoutMillis = 15000
+                socketTimeoutMillis = 15000
+            }
+            install(HttpRequestRetry) {
+                maxRetries = 5
+                retryIf { _, response ->
+                    response.status.value == 503
+                }
+                retryOnExceptionIf { _, cause ->
+                    cause.message?.contains("upstream service unavailable", ignoreCase = true) == true
+                }
+                exponentialDelay()
+            }
+        }
+
+        return AuthenticatedXrpcBlueskyApi(
+            hc,
+            BlueskyAuthPlugin.Tokens(sessionData.accessJwt, sessionData.refreshJwt)
+        )
+    }
+
+    private fun mkPdsClient(
+        pds: String,
+        sessionData: SessionData,
+    ): AuthenticatedXrpcBlueskyApi {
+        val hc = HttpClient(OkHttp) {
+            defaultRequest {
+                url(pds)
             }
             install(HttpTimeout) {
                 requestTimeoutMillis = 15000
@@ -512,7 +545,7 @@ class BlueskyConn(val context: Context) {
     suspend fun create(): Result<Unit> {
         return runCatching {
             createMutex.lock()
-            if (session != null && client != null && pdsURL != null) {
+            if (session != null && client != null && pdsClient != null && pdsURL != null) {
                 createMutex.unlock()
                 return Result.success(Unit)
             }
@@ -545,6 +578,7 @@ class BlueskyConn(val context: Context) {
             }
             this.pdsURL = pdsURL
 
+            this.pdsClient = mkPdsClient(pdsURL, sessionData)
             this.client = mkClient(
                 pdsURL,
                 appviewProxy,
@@ -697,7 +731,7 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            val postRes = client!!.createRecord(
+            val postRes = pdsClient!!.createRecord(
                 CreateRecordRequest(
                     repo = session!!.handle, // Use handle from the session
                     collection = Nsid("app.bsky.feed.post"),
@@ -717,7 +751,7 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
 
-            val ret = client!!.getRecord(
+            val ret = pdsClient!!.getRecord(
                 GetRecordQueryParams(
                     repo = uri.did(),
                     collection = uri.collection(),
@@ -774,7 +808,7 @@ class BlueskyConn(val context: Context) {
         if (!response.status.isSuccess()) return null
         val bytes: ByteArray = response.body()
         httpClient.close()
-        val uploadResponse = client!!.uploadBlob(bytes)
+        val uploadResponse = pdsClient!!.uploadBlob(bytes)
         return when (uploadResponse) {
             is AtpResponse.Failure<*> -> null
             is AtpResponse.Success<UploadBlobResponse> -> uploadResponse.response.blob
@@ -806,7 +840,7 @@ class BlueskyConn(val context: Context) {
                         return@run c
                     }
 
-                    val blob = client!!.uploadBlob(compressedImage.data)
+                    val blob = pdsClient!!.uploadBlob(compressedImage.data)
                     when (blob) {
                         is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading image: ${blob.error}"))
                         is AtpResponse.Success<UploadBlobResponse> -> {
@@ -855,7 +889,7 @@ class BlueskyConn(val context: Context) {
 
             val did = Did("did:web:" + pdsURL!!.toUri().host!!)
 
-            val uploadVideoTicket = client!!.getServiceAuth(
+            val uploadVideoTicket = pdsClient!!.getServiceAuth(
                 GetServiceAuthQueryParams(
                     aud = did,
                     exp = Clock.System.now().plus(Duration.parse("30m")).epochSeconds,
@@ -976,7 +1010,7 @@ class BlueskyConn(val context: Context) {
             create().onFailure {
                 return Result.failure(LoginException(it.message))
             }
-            val prefs = client!!.getPreferences().requireResponse()
+            val prefs = pdsClient!!.getPreferences().requireResponse()
             val feedUris = (prefs.preferences.first {
                 when (it) {
                     is PreferencesUnion.SavedFeedsPrefV2 -> true
@@ -998,7 +1032,7 @@ class BlueskyConn(val context: Context) {
 
     suspend fun subscribedLabelers(): Result<Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>> {
         return runCatching {
-            val prefs = client!!.getPreferences().requireResponse()
+            val prefs = pdsClient!!.getPreferences().requireResponse()
             val labelers = (prefs.preferences.first {
                 when (it) {
                     is PreferencesUnion.LabelersPref -> true
@@ -1058,7 +1092,7 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
 
-            val ret = client!!.updateSeen(
+            val ret = pdsClient!!.updateSeen(
                 UpdateSeenRequest(
                     seenAt = Clock.System.now().toDeprecatedInstant(),
                 )
@@ -1104,7 +1138,7 @@ class BlueskyConn(val context: Context) {
             )
 
 
-            val likeRes = client!!.createRecord(
+            val likeRes = pdsClient!!.createRecord(
                 CreateRecordRequest(
                     repo = session!!.handle,
                     collection = Nsid("app.bsky.feed.like"),
@@ -1135,7 +1169,7 @@ class BlueskyConn(val context: Context) {
             )
 
 
-            val likeRes = client!!.createRecord(
+            val likeRes = pdsClient!!.createRecord(
                 CreateRecordRequest(
                     repo = session!!.handle,
                     collection = Nsid("app.bsky.feed.repost"),
@@ -1240,7 +1274,7 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            val followRes = client!!.createRecord(
+            val followRes = pdsClient!!.createRecord(
                 CreateRecordRequest(
                     repo = session!!.handle,
                     collection = Nsid("app.bsky.graph.follow"),
@@ -1267,7 +1301,7 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
 
-            val ret = client!!.muteActor(
+            val ret = pdsClient!!.muteActor(
                 app.bsky.graph.MuteActorRequest(actor = did)
             )
 
@@ -1284,7 +1318,7 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
 
-            val ret = client!!.getRecord(
+            val ret = pdsClient!!.getRecord(
                 GetRecordQueryParams(
                     repo = session!!.did,
                     collection = Nsid("app.bsky.actor.profile"),
@@ -1321,7 +1355,7 @@ class BlueskyConn(val context: Context) {
             if (avatarUri != null) {
                 val compressor = Compressor(context)
                 val compressed = compressor.compressImage(avatarUri, 950000)
-                val uploaded = client!!.uploadBlob(compressed.data)
+                val uploaded = pdsClient!!.uploadBlob(compressed.data)
                 avatarBlob = when (uploaded) {
                     is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading avatar: ${uploaded.error}"))
                     is AtpResponse.Success<UploadBlobResponse> -> uploaded.response.blob
@@ -1331,7 +1365,7 @@ class BlueskyConn(val context: Context) {
             if (bannerUri != null) {
                 val compressor = Compressor(context)
                 val compressed = compressor.compressImage(bannerUri, 950000)
-                val uploaded = client!!.uploadBlob(compressed.data)
+                val uploaded = pdsClient!!.uploadBlob(compressed.data)
                 bannerBlob = when (uploaded) {
                     is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading banner: ${uploaded.error}"))
                     is AtpResponse.Success<UploadBlobResponse> -> uploaded.response.blob
@@ -1350,7 +1384,7 @@ class BlueskyConn(val context: Context) {
 
             val record = BlueskyJson.encodeAsJsonContent(updatedProfile)
 
-            val ret = client!!.putRecord(
+            val ret = pdsClient!!.putRecord(
                 com.atproto.repo.PutRecordRequest(
                     repo = session!!.did,
                     collection = Nsid("app.bsky.actor.profile"),
@@ -1428,7 +1462,7 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
 
-            val ret = client!!.unmuteActor(
+            val ret = pdsClient!!.unmuteActor(
                 app.bsky.graph.UnmuteActorRequest(actor = did)
             )
 
@@ -1445,7 +1479,7 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
 
-            val delRes = client!!.deleteRecord(
+            val delRes = pdsClient!!.deleteRecord(
                 DeleteRecordRequest(
                     repo = session!!.handle,
                     collection = Nsid(collection),
