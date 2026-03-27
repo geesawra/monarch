@@ -472,7 +472,7 @@ private fun SkeetReason(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(bottom = 4.dp),
                 fontWeight = FontWeight.Bold
             )
@@ -484,7 +484,7 @@ private fun SkeetReason(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(bottom = 4.dp),
                 fontWeight = FontWeight.Bold
             )
@@ -498,7 +498,7 @@ private fun SkeetReason(
                 is FeedViewPostReasonUnion.ReasonRepost -> {
                     Row(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
                             .padding(bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -513,7 +513,7 @@ private fun SkeetReason(
                                     .size(16.dp)
                                     .clip(CircleShape)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
                         Text(
                             text = "Reposted by ${it.value.by.displayName ?: it.value.by.handle.toString()}",
@@ -540,7 +540,7 @@ private fun SkeetReason(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
                                 .padding(bottom = 4.dp),
                             fontWeight = FontWeight.Bold
                         )
@@ -602,7 +602,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                 fontWeight = FontWeight.Bold
             )
             if (isBot) {
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Icon(
                     imageVector = Icons.Filled.SmartToy,
                     contentDescription = "Bot account",
@@ -620,8 +620,9 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
 
         if (showLabels) {
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(top = 4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 6.dp)
             ) {
                 skeet.authorLabels.forEach {
                     it.neg?.let { it ->
@@ -643,7 +644,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
 
                     val labelCard = @Composable {
                         OutlinedCard(
-                            modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
+                            modifier = Modifier,
                             shape = CircleShape
                         ) {
                             Row(
@@ -709,7 +710,6 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
 
                         OutlinedCard(
                             modifier = Modifier
-                                .padding(end = 4.dp, bottom = 4.dp)
                                 .clickable { showSheet = true },
                             shape = CircleShape
                         ) {
