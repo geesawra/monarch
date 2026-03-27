@@ -81,6 +81,7 @@ data class TimelineUiState(
     val profileFeedFilter: GetAuthorFeedFilter? = null,
     val isFetchingProfile: Boolean = false,
     val isFetchingProfileFeed: Boolean = false,
+    val profileNotFound: Boolean = false,
 )
 
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
@@ -743,13 +744,14 @@ class TimelineViewModel @AssistedInject constructor(
             profileFeedFilter = null,
             isFetchingProfile = true,
             isFetchingProfileFeed = true,
+            profileNotFound = false,
         )
 
         viewModelScope.launch {
             bskyConn.fetchActor(did).onFailure {
                 uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message, isFetchingProfile = false)
-                    else -> uiState.copy(error = it.message, isFetchingProfile = false)
+                    is LoginException -> uiState.copy(loginError = it.message, isFetchingProfile = false, profileNotFound = true)
+                    else -> uiState.copy(error = it.message, isFetchingProfile = false, profileNotFound = true)
                 }
             }.onSuccess {
                 uiState = uiState.copy(profileUser = it, isFetchingProfile = false)

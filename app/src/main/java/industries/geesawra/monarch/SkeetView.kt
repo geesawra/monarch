@@ -169,7 +169,7 @@ fun SkeetView(
                 )
             }
 
-            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
+            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap)
         }
     } else {
         // Top-level posts: two-column layout, thread line spans full height
@@ -241,7 +241,7 @@ fun SkeetView(
                     labelerAvatar = { viewModel?.labelerAvatar(it) }
                 )
 
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap)
 
                 if (!disableEmbeds) {
                     TimelinePostActionsView(
@@ -266,12 +266,13 @@ private fun SkeetContent(
     disableEmbeds: Boolean = false,
     onShowThread: (SkeetData) -> Unit,
     viewModel: TimelineViewModel? = null,
+    onMentionClick: ((Did) -> Unit)? = null,
 ) {
     val context = LocalContext.current
 
     if (skeet.content.isNotEmpty()) {
         Text(
-            text = skeet.annotatedContent(),
+            text = skeet.annotatedContent(onMentionClick = onMentionClick),
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyLarge,
         )

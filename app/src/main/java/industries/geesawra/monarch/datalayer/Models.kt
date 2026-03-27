@@ -490,7 +490,7 @@ data class SkeetData(
     }
 
     @Composable
-    fun annotatedContent(): AnnotatedString {
+    fun annotatedContent(onMentionClick: ((Did) -> Unit)? = null): AnnotatedString {
         if (this.facets.isEmpty()) {
             return buildAnnotatedString {
                 append(this@SkeetData.content)
@@ -549,9 +549,10 @@ data class SkeetData(
                             }
 
                             is FacetFeatureUnion.Mention -> withLink(
-                                LinkAnnotation.Url(
-                                    f.value.did.did,
-                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary))
+                                LinkAnnotation.Clickable(
+                                    tag = f.value.did.did,
+                                    styles = TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary)),
+                                    linkInteractionListener = { onMentionClick?.invoke(f.value.did) },
                                 )
                             ) {
                                 append(
@@ -629,9 +630,8 @@ data class SkeetData(
 
             is ReplyRefParentUnion.PostView -> {
                 val content: Post = (rawParent.value.record.decodeAs())
-                fromPost(
-                    (rawParent.value.cid to rawParent.value.uri),
-                    content, rawParent.value.author
+                fromPostView(
+                    rawParent.value, rawParent.value.author
                 ) to content.reply?.parent
             }
 

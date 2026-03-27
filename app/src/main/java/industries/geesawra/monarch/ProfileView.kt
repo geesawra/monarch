@@ -190,13 +190,15 @@ fun ProfileView(
             },
         ) { padding ->
             if (profile == null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Profile not found")
+                if (timelineViewModel.uiState.profileNotFound) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Profile not found")
+                    }
                 }
                 return@Scaffold
             }
