@@ -298,7 +298,7 @@ class TimelineViewModel @AssistedInject constructor(
 
                     else -> null
                 }
-            }
+            }.distinct()
 
             val posts =
                 postsToFetch.chunked(25).fold(mapOf<AtUri, Pair<SkeetData, Post>>()) { acc, chunk ->
