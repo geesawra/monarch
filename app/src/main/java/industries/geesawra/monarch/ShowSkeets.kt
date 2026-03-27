@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
 import industries.geesawra.monarch.datalayer.SkeetData
+import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.Did
 
@@ -47,6 +48,22 @@ fun ShowSkeets(
     onSeeMoreTap: ((SkeetData) -> Unit)? = null,
     onProfileTap: ((Did) -> Unit)? = null,
 ) {
+    // Collect CIDs already shown as thread context (root/parent) to avoid duplicates
+    val threadContextCids = remember(data) {
+        if (isShowingThread) emptySet()
+        else {
+            val cids = mutableSetOf<Cid>()
+            data.forEach { skeet ->
+                val isRepost = skeet.reason is FeedViewPostReasonUnion.ReasonRepost
+                if (!isRepost) {
+                    skeet.root()?.cid?.let { cids.add(it) }
+                    skeet.parent().first?.cid?.let { cids.add(it) }
+                }
+            }
+            cids
+        }
+    }
+
     LazyColumn(
         state = state,
         userScrollEnabled = isScrollEnabled,
@@ -56,7 +73,7 @@ fun ShowSkeets(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         itemsIndexed(
-            items = data.filter { !it.replyToNotFollowing },
+            items = data.filter { !it.replyToNotFollowing && it.cid !in threadContextCids },
             key = { _, skeet -> skeet.key() }
         ) { idx, skeet ->
             Card(
