@@ -180,9 +180,9 @@ class TimelineViewModel @AssistedInject constructor(
                 )
             }.onSuccess { response ->
                 val newSkeets = if (fresh) {
-                    response.feed.map { SkeetData.fromFeedViewPost(it) }.distinctBy { it.cid }
+                    response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did) }.distinctBy { it.cid }
                 } else {
-                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it) }).distinctBy { it.cid }
+                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did) }).distinctBy { it.cid }
                 }
 
                 uiState = uiState.copy(

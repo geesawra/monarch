@@ -109,7 +109,7 @@ data class SkeetData(
     var replyToNotFollowing: Boolean = false,
 ) {
     companion object {
-        fun fromFeedViewPost(post: FeedViewPost): SkeetData {
+        fun fromFeedViewPost(post: FeedViewPost, currentUserDid: Did? = null): SkeetData {
             val content: Post = (post.post.record.decodeAs())
 
             val sd = SkeetData(
@@ -137,6 +137,8 @@ data class SkeetData(
             )
 
             sd.replyToNotFollowing = run {
+                if (currentUserDid != null && sd.did == currentUserDid) return@run false
+
                 when (sd.reason) {
                     is FeedViewPostReasonUnion.ReasonPin,
                     FeedViewPostReasonUnion.Unknown,
