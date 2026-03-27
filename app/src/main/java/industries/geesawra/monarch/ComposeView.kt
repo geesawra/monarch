@@ -84,8 +84,20 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import industries.geesawra.monarch.datalayer.LinkPreviewData
+import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import java.net.URI
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ComposeView(
     context: Context,
@@ -107,6 +119,11 @@ fun ComposeView(
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
 
+    val linkPreview = remember { mutableStateOf<LinkPreviewData?>(null) }
+    val linkPreviewLoading = remember { mutableStateOf(false) }
+    val linkPreviewDismissed = remember { mutableStateOf(false) }
+    val linkPreviewCache = remember { mutableMapOf<String, LinkPreviewData?>() }
+
     LaunchedEffect(scaffoldState.bottomSheetState.targetValue) {
         when (scaffoldState.bottomSheetState.targetValue) {
             SheetValue.Hidden -> {
@@ -118,6 +135,10 @@ fun ComposeView(
                 isQuotePost.value = false
                 mediaSelected.value = listOf()
                 mediaSelectedIsVideo.value = false
+                linkPreview.value = null
+                linkPreviewLoading.value = false
+                linkPreviewDismissed.value = false
+                linkPreviewCache.clear()
             }
 
             SheetValue.PartiallyExpanded, SheetValue.Expanded -> {
@@ -239,6 +260,48 @@ fun ComposeView(
                     }
                 }
 
+                // Debounced link preview fetching
+                LaunchedEffect(textfieldState.text.toString()) {
+                    val text = textfieldState.text.toString()
+                    val firstUrl = tokensRegexp.findAll(text)
+                        .map { it.value }
+                        .firstOrNull { URLUtil.isHttpUrl(it) || URLUtil.isHttpsUrl(it) }
+
+                    if (firstUrl == null) {
+                        linkPreview.value = null
+                        linkPreviewLoading.value = false
+                        linkPreviewDismissed.value = false
+                        return@LaunchedEffect
+                    }
+
+                    // If user dismissed this URL, do not re-fetch
+                    if (linkPreviewDismissed.value && linkPreview.value == null) {
+                        return@LaunchedEffect
+                    }
+
+                    // If already showing preview for same URL, skip
+                    if (linkPreview.value?.url == firstUrl) {
+                        return@LaunchedEffect
+                    }
+
+                    // Check cache
+                    if (linkPreviewCache.containsKey(firstUrl)) {
+                        linkPreview.value = linkPreviewCache[firstUrl]
+                        linkPreviewLoading.value = false
+                        return@LaunchedEffect
+                    }
+
+                    // Debounce 500ms
+                    delay(500)
+
+                    linkPreviewLoading.value = true
+                    val preview = LinkPreviewFetcher.fetch(firstUrl)
+                    linkPreviewCache[firstUrl] = preview
+                    linkPreview.value = preview
+                    linkPreviewLoading.value = false
+                    linkPreviewDismissed.value = false
+                }
+
                 val urlColor = MaterialTheme.colorScheme.primary
 
                 class FacetTextTransform() : OutputTransformation {
@@ -320,6 +383,103 @@ fun ComposeView(
 //                    maxLines = 10,
 //                )
 
+                // Link preview card
+                if (linkPreviewLoading.value) {
+                    OutlinedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularWavyProgressIndicator()
+                        }
+                    }
+                } else if (linkPreview.value != null && !linkPreviewDismissed.value) {
+                    val preview = linkPreview.value!!
+                    OutlinedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Box {
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                preview.imageUrl?.let { imgUrl ->
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(imgUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentScale = ContentScale.Crop,
+                                        contentDescription = "Link preview thumbnail",
+                                        modifier = Modifier
+                                            .height(150.dp)
+                                            .fillMaxWidth()
+                                    )
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                }
+                                preview.title?.let { title ->
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(
+                                            top = 8.dp, start = 8.dp, end = 8.dp, bottom = 4.dp
+                                        )
+                                    )
+                                }
+                                preview.description?.let { desc ->
+                                    Text(
+                                        text = desc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(
+                                            start = 8.dp, end = 8.dp, bottom = 4.dp
+                                        )
+                                    )
+                                }
+                                Text(
+                                    text = try {
+                                        URI(preview.url).host ?: preview.url
+                                    } catch (_: Exception) {
+                                        preview.url
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(
+                                        start = 8.dp, end = 8.dp, bottom = 8.dp
+                                    )
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    linkPreview.value = null
+                                    linkPreviewDismissed.value = true
+                                },
+                                modifier = Modifier.align(Alignment.TopEnd)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Dismiss link preview"
+                                )
+                            }
+                        }
+                    }
+                }
+
                 ActionRow(
                     context,
                     uploadingPost,
@@ -333,7 +493,8 @@ fun ComposeView(
                     scaffoldState,
                     inReplyTo.value,
                     isQuotePost.value,
-                    facets = facets
+                    facets = facets,
+                    linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -396,7 +557,8 @@ fun ActionRow(
     scaffoldState: BottomSheetScaffoldState,
     inReplyToData: SkeetData? = null,
     isQuotePost: Boolean = false,
-    facets: List<Facet> = listOf()
+    facets: List<Facet> = listOf(),
+    linkPreview: LinkPreviewData? = null
 ) {
     Row(
         modifier = Modifier
@@ -448,7 +610,8 @@ fun ActionRow(
                                 }
                             } else {
                                 null
-                            }
+                            },
+                            linkPreview = linkPreview
                         ).onSuccess {
                             coroutineScope.launch {
                                 scaffoldState.bottomSheetState.hide()
