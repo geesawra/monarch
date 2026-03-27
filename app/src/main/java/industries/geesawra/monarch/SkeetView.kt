@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,8 +21,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
@@ -31,13 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.media3.common.MimeTypes
 import app.bsky.embed.ExternalViewExternal
@@ -508,6 +518,39 @@ private fun SkeetReason(
     }
 }
 
+private data class LabelDefinition(
+    val plaintext: String,
+    val icon: ImageVector,
+)
+
+private val knownLabels: Map<String, LabelDefinition> = mapOf(
+    "porn" to LabelDefinition("Adult Content", Icons.Filled.VisibilityOff),
+    "sexual" to LabelDefinition("Sexually Suggestive", Icons.Filled.VisibilityOff),
+    "nudity" to LabelDefinition("Nudity", Icons.Filled.VisibilityOff),
+    "sexual-figurative" to LabelDefinition("Figurative Nudity", Icons.Filled.VisibilityOff),
+    "graphic-media" to LabelDefinition("Graphic Media", Icons.Filled.Warning),
+    "gore" to LabelDefinition("Gore", Icons.Filled.Warning),
+    "impersonation" to LabelDefinition("Impersonation", Icons.Filled.Person),
+    "spam" to LabelDefinition("Spam", Icons.Filled.Report),
+    "scam" to LabelDefinition("Scam", Icons.Filled.Report),
+    "intolerance" to LabelDefinition("Intolerance", Icons.Filled.Block),
+    "icon-intolerance" to LabelDefinition("Intolerant Imagery", Icons.Filled.Block),
+    "misleading" to LabelDefinition("Misleading", Icons.Filled.Warning),
+    "threat" to LabelDefinition("Threatening", Icons.Filled.Warning),
+    "rude" to LabelDefinition("Rude", Icons.Filled.Warning),
+    "violation" to LabelDefinition("Community Violation", Icons.Filled.Report),
+    "dmca-violation" to LabelDefinition("DMCA Violation", Icons.Filled.Shield),
+    "doxxing" to LabelDefinition("Doxxing", Icons.Filled.Report),
+)
+
+private fun labelDefinition(rawValue: String): LabelDefinition {
+    return knownLabels[rawValue] ?: LabelDefinition(
+        plaintext = rawValue.replace("-", " ")
+            .replaceFirstChar { it.uppercaseChar() },
+        icon = Icons.Filled.Visibility,
+    )
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean) {
@@ -542,15 +585,27 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                         return@forEach
                     }
 
+                    val definition = labelDefinition(it.`val`)
                     OutlinedCard(
                         modifier = Modifier.padding(end = 4.dp, bottom = 4.dp),
                         shape = CircleShape
                     ) {
-                        Text(
+                        Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            text = it.`val`,
-                            style = TextStyle(fontSize = 12.sp),
-                        )
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = definition.icon,
+                                contentDescription = definition.plaintext,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = definition.plaintext,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
                     }
                 }
             }
