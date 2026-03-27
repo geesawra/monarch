@@ -148,16 +148,21 @@ data class SkeetData(
                         val (parent, _) = sd.parent()
                         val root = sd.root()
 
+                        fun isFollowedOrSelf(skeet: SkeetData?): Boolean {
+                            if (skeet == null) return false
+                            if (currentUserDid != null && skeet.did == currentUserDid) return true
+                            return skeet.following
+                        }
+
                         if (parent == null) {
                             return@run false // no parent AND no root, this is a single post
                         }
 
-
                         if (root == null) {
-                            return@run !parent.following // just parent, this is a single reply
+                            return@run !isFollowedOrSelf(parent) // just parent, this is a single reply
                         }
 
-                        if (!parent.following) {
+                        if (!isFollowedOrSelf(parent)) {
                             return@run true // I don't follow whoever sd is replying to, don't care
                         }
 
@@ -171,13 +176,18 @@ data class SkeetData(
                         val parentsParent = sd.parentsParentRef()!!
                         if (parentsParent.uri == root.uri) {
                             // parent's root == root, this is a 3 post thread
-                            return@run !root.following
+                            return@run !isFollowedOrSelf(root)
                         }
 
                         val grandfather = sd.grandparentAuthor()
+                        val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
+                            true
+                        } else {
+                            grandfather?.viewer?.following?.isNotEmpty() ?: false
+                        }
 
                         // base case: parent, root and grandfather all followed
-                        return@run !(root.following && grandfather?.viewer?.following?.isNotEmpty() ?: false)
+                        return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
                     }
 
 
