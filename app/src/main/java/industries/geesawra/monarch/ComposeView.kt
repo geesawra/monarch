@@ -241,18 +241,33 @@ fun ComposeView(
 
                 val urlColor = MaterialTheme.colorScheme.primary
 
-                class FacetTextTransform() : OutputTransformation {
-                    override fun TextFieldBuffer.transformOutput() {
-                        val a = readFacets(originalText.toString())
-                        facets.clear()
-                        facets.addAll(a)
+                LaunchedEffect(textfieldState.text) {
+                    val data = textfieldState.text.toString()
+                    val computed = readFacets(data)
+                    facets.clear()
+                    facets.addAll(computed)
+                }
 
-                        facets.forEach {
-                            addStyle(
-                                SpanStyle(color = urlColor),
-                                it.index.byteStart.toInt(),
-                                it.index.byteEnd.toInt()
-                            )
+                val facetHighlighter = remember {
+                    OutputTransformation {
+                        for (token in tokensRegexp.findAll(originalText)) {
+                            val s = token.value
+                            if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) {
+                                addStyle(
+                                    SpanStyle(color = urlColor),
+                                    token.range.first,
+                                    token.range.last + 1,
+                                )
+                            } else if (s.startsWith("#") && s.length > 1) {
+                                val tag = s.substring(1)
+                                if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
+                                    addStyle(
+                                        SpanStyle(color = urlColor),
+                                        token.range.first,
+                                        token.range.last + 1,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -283,7 +298,7 @@ fun ComposeView(
                     isError = textfieldState.text.length > maxChars,
                     lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 10),
                     state = textfieldState,
-                    outputTransformation = FacetTextTransform(),
+                    outputTransformation = facetHighlighter,
                 )
 
 //                OutlinedTextField(
@@ -477,7 +492,6 @@ fun ActionRow(
 }
 
 val tokensRegexp = Regex("(\\S+)")
-
 
 private fun readFacets(data: String): List<Facet> {
     val facets = mutableListOf<Facet>()
