@@ -13,6 +13,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
+import app.bsky.actor.VerifiedStatus
 import app.bsky.embed.ExternalView
 import app.bsky.embed.ExternalViewExternal
 import app.bsky.embed.ImagesView
@@ -94,6 +95,7 @@ data class SkeetData(
     val authorName: String? = null,
     val authorHandle: Handle? = null,
     val authorLabels: List<Label> = listOf(),
+    val verified: Boolean = false,
     val content: String = "",
     var embed: PostViewEmbedUnion? = null,
     val reason: FeedViewPostReasonUnion? = null,
@@ -122,6 +124,7 @@ data class SkeetData(
                 authorName = post.post.author.displayName,
                 authorHandle = post.post.author.handle,
                 authorLabels = post.post.author.labels,
+                verified = post.post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
                 embed = post.post.embed,
                 reason = post.reason,
@@ -197,6 +200,7 @@ data class SkeetData(
                 authorName = post.author.displayName,
                 authorHandle = post.author.handle,
                 authorLabels = post.author.labels,
+                verified = post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
                 embed = post.embed,
                 createdAt = content.createdAt.toStdlibInstant(),
@@ -214,6 +218,7 @@ data class SkeetData(
                 authorName = author.displayName,
                 authorHandle = author.handle,
                 authorLabels = author.labels,
+                verified = author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 did = author.did,
                 content = post.text,
                 embed = when (post.embed) {
@@ -305,6 +310,7 @@ data class SkeetData(
                 authorName = author.displayName,
                 authorHandle = author.handle,
                 authorLabels = author.labels,
+                verified = author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = post.text,
                 embed = when (post.embed) {
                     is PostEmbedUnion.External -> {
@@ -432,6 +438,7 @@ data class SkeetData(
                 authorName = post.author.displayName,
                 authorHandle = post.author.handle,
                 authorLabels = post.author.labels,
+                verified = post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
                 embed = embed,
                 reason = null,
