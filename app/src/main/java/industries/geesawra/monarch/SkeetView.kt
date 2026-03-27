@@ -6,7 +6,6 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -81,6 +80,7 @@ import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkeetView(
     modifier: Modifier = Modifier,
@@ -110,14 +110,13 @@ fun SkeetView(
 
     Surface(
         color = Color.Transparent,
+        onClick = {
+            Log.d("SkeetView", skeet.content)
+            onShowThread(skeet)
+        },
         modifier =
             modifier
                 .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
-                .background(Color.Transparent)
-                .clickable {
-                    Log.d("SkeetView", skeet.content)
-                    onShowThread(skeet)
-                }
     ) {
         Row(
             verticalAlignment = Alignment.Top,
