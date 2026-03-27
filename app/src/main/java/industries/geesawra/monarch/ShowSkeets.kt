@@ -79,6 +79,14 @@ fun ShowSkeets(
 
                         parent?.let {
                             if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
+                                VerticalDivider(
+                                    thickness = 4.dp,
+                                    modifier = Modifier
+                                        .height(48.dp)
+                                        .padding(start = (16 + 24).dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                )
+
                                 ConditionalCard(
                                     text = "See more",
                                     onTap = {
@@ -88,15 +96,15 @@ fun ShowSkeets(
                                         }
                                     }
                                 )
-
-                                VerticalDivider(
-                                    thickness = 4.dp,
-                                    modifier = Modifier
-                                        .height(48.dp)
-                                        .padding(start = (16 + 24).dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                )
                             }
+
+                            VerticalDivider(
+                                thickness = 4.dp,
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .padding(start = (16 + 24).dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                            )
 
                             SkeetView(
                                 viewModel = viewModel,
@@ -112,6 +120,16 @@ fun ShowSkeets(
                             )
                         }
                     }
+                }
+
+                if (!isShowingThread && !isRepost && parent != null) {
+                    VerticalDivider(
+                        thickness = 4.dp,
+                        modifier = Modifier
+                            .height(48.dp)
+                            .padding(start = (16 + 24).dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
                 }
 
                 SkeetView(
