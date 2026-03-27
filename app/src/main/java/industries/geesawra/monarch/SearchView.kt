@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,9 +30,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -73,7 +78,7 @@ fun SearchView(
     onProfileTap: (Did) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    var showPeople by rememberSaveable { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
 
     Column(
         modifier = modifier
@@ -112,65 +117,81 @@ fun SearchView(
                 .padding(horizontal = 16.dp),
         ) {}
 
-        // Filter chips row
-        SearchFilters(viewModel, showPeople, onShowPeopleChange = { showPeople = it })
+        // from: author filter row
+        AuthorFilterRow(viewModel)
+
+        // Tabs
+        SearchTabs(
+            selectedTab = selectedTab,
+            onTabSelected = { index ->
+                selectedTab = index
+                when (index) {
+                    0 -> viewModel.setSearchSort(SearchPostsSort.Latest)
+                    1 -> viewModel.setSearchSort(SearchPostsSort.Top)
+                }
+            },
+        )
 
         // Content
-        if (showPeople) {
-            SearchPeopleResults(
-                viewModel = viewModel,
-                listState = peopleListState,
-                isScrollEnabled = isScrollEnabled,
-                onProfileTap = onProfileTap,
-            )
-        } else {
-            SearchPostsResults(
+        when (selectedTab) {
+            0, 1 -> SearchPostsResults(
                 viewModel = viewModel,
                 listState = postsListState,
                 isScrollEnabled = isScrollEnabled,
                 onThreadTap = onThreadTap,
                 onProfileTap = onProfileTap,
             )
+
+            2 -> SearchPeopleResults(
+                viewModel = viewModel,
+                listState = peopleListState,
+                isScrollEnabled = isScrollEnabled,
+                onProfileTap = onProfileTap,
+            )
+        }
+    }
+}
+
+private val searchTabs = listOf("Latest", "Top", "People")
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchTabs(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+) {
+    PrimaryTabRow(selectedTabIndex = selectedTab) {
+        searchTabs.forEachIndexed { index, label ->
+            Tab(
+                selected = selectedTab == index,
+                onClick = { onTabSelected(index) },
+                text = { Text(label) },
+            )
         }
     }
 }
 
 @Composable
-private fun SearchFilters(
-    viewModel: TimelineViewModel,
-    showPeople: Boolean,
-    onShowPeopleChange: (Boolean) -> Unit,
-) {
-    val sort = viewModel.uiState.searchPostsSort
+private fun AuthorFilterRow(viewModel: TimelineViewModel) {
     val authorFilter = viewModel.uiState.searchAuthorFilter
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        FromAuthorDialog(
+            onDismiss = { showDialog = false },
+            onConfirm = { handle ->
+                viewModel.setSearchAuthorFilter(handle)
+                showDialog = false
+            },
+        )
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
-            selected = !showPeople && sort == SearchPostsSort.Latest,
-            onClick = {
-                onShowPeopleChange(false)
-                viewModel.setSearchSort(SearchPostsSort.Latest)
-            },
-            label = { Text("Latest") },
-        )
-        FilterChip(
-            selected = !showPeople && sort == SearchPostsSort.Top,
-            onClick = {
-                onShowPeopleChange(false)
-                viewModel.setSearchSort(SearchPostsSort.Top)
-            },
-            label = { Text("Top") },
-        )
-        FilterChip(
-            selected = showPeople,
-            onClick = { onShowPeopleChange(!showPeople) },
-            label = { Text("People") },
-        )
         if (authorFilter != null) {
             FilterChip(
                 selected = true,
@@ -184,8 +205,49 @@ private fun SearchFilters(
                     )
                 },
             )
+        } else {
+            FilterChip(
+                selected = false,
+                onClick = { showDialog = true },
+                label = { Text("from:user") },
+            )
         }
     }
+}
+
+@Composable
+private fun FromAuthorDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var handle by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Filter by author") },
+        text = {
+            OutlinedTextField(
+                value = handle,
+                onValueChange = { handle = it },
+                label = { Text("Handle") },
+                placeholder = { Text("e.g. alice.bsky.social") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (handle.isNotBlank()) onConfirm(handle.trim()) },
+            ) {
+                Text("Apply")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable
