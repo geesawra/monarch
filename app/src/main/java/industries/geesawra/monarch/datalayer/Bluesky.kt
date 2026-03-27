@@ -1121,7 +1121,7 @@ class BlueskyConn(val context: Context) {
             val res = client!!.searchActorsTypeahead(
                 SearchActorsTypeaheadQueryParams(
                     q = query,
-                    limit = 8,
+                    limit = 5,
                 )
             )
 

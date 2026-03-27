@@ -62,6 +62,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,8 +90,12 @@ import kotlinx.coroutines.delay
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.richtext.FacetMention
 import sh.christian.ozone.api.Did
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import industries.geesawra.monarch.datalayer.LinkPreviewData
 import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
 import coil3.compose.AsyncImage
@@ -126,7 +131,7 @@ fun ComposeView(
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
     val mentionResults = remember { mutableStateOf(listOf<ProfileViewBasic>()) }
     val showMentionDropdown = remember { mutableStateOf(false) }
-    val mentionDids = remember { mutableMapOf<String, Did>() }
+    val mentionDids = remember { mutableStateMapOf<String, Did>() }
 
     val linkPreview = remember { mutableStateOf<LinkPreviewData?>(null) }
     val linkPreviewLoading = remember { mutableStateOf(false) }
@@ -432,87 +437,81 @@ fun ComposeView(
                     outputTransformation = facetHighlighter,
                 )
 
-                DropdownMenu(
-                    expanded = showMentionDropdown.value,
-                    onDismissRequest = { showMentionDropdown.value = false },
-                ) {
-                    mentionResults.value.forEach { profile ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    profile.displayName?.let { name ->
+                if (showMentionDropdown.value) {
+                    OutlinedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .heightIn(max = 200.dp)
+                    ) {
+                        LazyColumn {
+                            items(mentionResults.value) { profile ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            val text = textfieldState.text.toString()
+                                            val cursorPos = textfieldState.selection.min
+                                            val textBeforeCursor =
+                                                text.substring(0, cursorPos)
+                                            val atIndex =
+                                                textBeforeCursor.lastIndexOf('@')
+
+                                            if (atIndex >= 0) {
+                                                val fullHandle = profile.handle.handle
+                                                val replacement = "@$fullHandle "
+                                                val afterCursor =
+                                                    text.substring(cursorPos)
+                                                val newText =
+                                                    text.substring(0, atIndex) + replacement + afterCursor
+
+                                                textfieldState.edit {
+                                                    replace(0, length, newText)
+                                                    val newCursorPos =
+                                                        atIndex + replacement.length
+                                                    selection = TextRange(
+                                                        newCursorPos,
+                                                        newCursorPos
+                                                    )
+                                                }
+
+                                                mentionDids[fullHandle] = profile.did
+                                            }
+
+                                            showMentionDropdown.value = false
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(profile.avatar?.uri)
+                                            .build(),
+                                        contentDescription = "${profile.displayName ?: profile.handle.handle}'s avatar",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape),
+                                    )
+                                    Column {
+                                        profile.displayName?.let { name ->
+                                            Text(
+                                                text = name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                            )
+                                        }
                                         Text(
-                                            text = name,
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            text = "@${profile.handle.handle}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    Text(
-                                        text = "@${profile.handle.handle}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
                                 }
-                            },
-                            onClick = {
-                                val text = textfieldState.text.toString()
-                                val cursorPos = textfieldState.selection.min
-                                val textBeforeCursor = text.substring(0, cursorPos)
-                                val atIndex = textBeforeCursor.lastIndexOf('@')
-
-                                if (atIndex >= 0) {
-                                    val fullHandle = profile.handle.handle
-                                    val replacement = "@$fullHandle "
-                                    val afterCursor = text.substring(cursorPos)
-                                    val newText = text.substring(0, atIndex) + replacement + afterCursor
-
-                                    textfieldState.edit {
-                                        replace(0, length, newText)
-                                        val newCursorPos = atIndex + replacement.length
-                                        selection = TextRange(newCursorPos, newCursorPos)
-                                    }
-
-                                    mentionDids[fullHandle] = profile.did
-                                }
-
-                                showMentionDropdown.value = false
                             }
-                        )
+                        }
                     }
                 }
-
-//                OutlinedTextField(
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .heightIn(min = 250.dp)
-//                        .focusRequester(focusRequester)
-//                        .contentReceiver(receiveContentListener),
-//                    value = composeFieldState.value,
-//                    onValueChange = {
-//                        val a = annotated(it.text, urlColor)
-//                        facets.clear()
-//                        facets.addAll(a.facets)
-//                        composeFieldState.value =
-//                            it.copy(annotatedString = a.annotated)
-//                    },
-//                    keyboardOptions = KeyboardOptions(
-//                        capitalization = KeyboardCapitalization.Sentences,
-//                        keyboardType = KeyboardType.Text,
-//                    ),
-//                    label = {
-//                        if (wasEdited.value) {
-//                            Text(
-//                                text = "${maxChars - charCount.intValue}",
-//                                color = if (composeFieldState.value.text.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-//                            )
-//                        } else {
-//                            Text(
-//                                text = "Less cringe this time, okay?",
-//                            )
-//                        }
-//                    },
-//                    isError = composeFieldState.value.text.length > maxChars,
-//                    maxLines = 10,
-//                )
 
                 // Link preview card
                 if (linkPreviewLoading.value) {
@@ -545,7 +544,6 @@ fun ComposeView(
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(imgUrl)
-                                            .crossfade(true)
                                             .build(),
                                         contentScale = ContentScale.Crop,
                                         contentDescription = "Link preview thumbnail",
@@ -771,6 +769,17 @@ fun ActionRow(
 }
 
 val tokensRegexp = Regex("(\\S+)")
+
+private val bareUrlRegex = Regex("^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\\.[a-zA-Z]{2,}(/\\S*)?$")
+
+private fun isUrl(s: String): Boolean {
+    return URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s) || bareUrlRegex.matches(s)
+}
+
+private fun normalizeUrl(s: String): String {
+    if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) return s
+    return "https://$s"
+}
 
 private fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap()): List<Facet> {
     val facets = mutableListOf<Facet>()
