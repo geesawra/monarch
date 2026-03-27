@@ -30,7 +30,8 @@ steps:
       echo $AGE_KEY > age-key.txt
       age --decrypt -i age-key.txt -o app/keystore.jks keystore.jks.age
 
-      ./gradlew assembleRelease --no-daemon -Dorg.gradle.java.installations.auto-download=false
+      sed -i 's/toolchainVendor=JETBRAINS/toolchainVendor=ADOPTIUM/' gradle/gradle-daemon-jvm.properties
+      JAVA_HOME=$JDK ./gradlew assembleRelease --no-daemon -Dorg.gradle.java.installations.auto-download=false
       # fastlane release_bin
       source ./generate-root.sh app/build/outputs/apk/release/app-release.apk
       npx wrangler r2 object put monarch-releases/$MONARCH_APK_FILENAME --remote true --file=$MONARCH_APK_PATH
