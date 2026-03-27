@@ -129,24 +129,14 @@ fun PostImageGallery(
                         onCrossClick = onCrossClick,
                         onMediaClick = { galleryVisible.value = it })
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min), // Apply IntrinsicSize.Min to the Row
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    DeletableImageView(
-                        modifier = Modifier.weight(1f),
-                        image = imagesToDisplay[2],
-                        originalIndex = 2,
-                        onCrossClick = onCrossClick,
-                        onMediaClick = { galleryVisible.value = it })
-                    Spacer(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight() // Spacer fills the height of the intrinsically sized Row
-                    )
-                }
+                DeletableImageView(
+                    modifier = Modifier.fillMaxWidth(),
+                    image = imagesToDisplay[2],
+                    originalIndex = 2,
+                    aspectRatio = 2f,
+                    onCrossClick = onCrossClick,
+                    onMediaClick = { galleryVisible.value = it }
+                )
             }
         }
 
