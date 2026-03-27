@@ -43,6 +43,8 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -647,12 +649,52 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                     }
 
                     if (description != null) {
+                        val tooltipState = rememberTooltipState()
+                        val scope = rememberCoroutineScope()
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                             tooltip = { PlainTooltip { Text(description) } },
-                            state = rememberTooltipState()
+                            state = tooltipState
                         ) {
-                            labelCard()
+                            OutlinedCard(
+                                modifier = Modifier
+                                    .padding(end = 4.dp, bottom = 4.dp)
+                                    .clickable {
+                                        scope.launch { tooltipState.show() }
+                                    },
+                                shape = CircleShape
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val avatarUrl = labelerAvatar(it)
+                                    if (avatarUrl != null) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(avatarUrl)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = definition.plaintext,
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clip(CircleShape)
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = definition.icon,
+                                            contentDescription = definition.plaintext,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = definition.plaintext,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
                         }
                     } else {
                         labelCard()
