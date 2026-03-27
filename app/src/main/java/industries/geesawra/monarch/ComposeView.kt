@@ -327,14 +327,14 @@ fun ComposeView(
                     val text = textfieldState.text.toString()
                     val firstUrl = tokensRegexp.findAll(text)
                         .map { it.value }
-                        .firstOrNull { URLUtil.isHttpUrl(it) || URLUtil.isHttpsUrl(it) }
+                         .firstOrNull { isUrl(it) }
 
                     if (firstUrl == null) {
-                        linkPreview.value = null
                         linkPreviewLoading.value = false
-                        linkPreviewDismissed.value = false
                         return@LaunchedEffect
                     }
+
+                    val normalizedUrl = normalizeUrl(firstUrl)
 
                     // If user dismissed this URL, do not re-fetch
                     if (linkPreviewDismissed.value && linkPreview.value == null) {
@@ -342,13 +342,13 @@ fun ComposeView(
                     }
 
                     // If already showing preview for same URL, skip
-                    if (linkPreview.value?.url == firstUrl) {
+                    if (linkPreview.value?.url == normalizedUrl) {
                         return@LaunchedEffect
                     }
 
                     // Check cache
-                    if (linkPreviewCache.containsKey(firstUrl)) {
-                        linkPreview.value = linkPreviewCache[firstUrl]
+                    if (linkPreviewCache.containsKey(normalizedUrl)) {
+                        linkPreview.value = linkPreviewCache[normalizedUrl]
                         linkPreviewLoading.value = false
                         return@LaunchedEffect
                     }
@@ -357,8 +357,8 @@ fun ComposeView(
                     delay(500)
 
                     linkPreviewLoading.value = true
-                    val preview = LinkPreviewFetcher.fetch(firstUrl)
-                    linkPreviewCache[firstUrl] = preview
+                    val preview = LinkPreviewFetcher.fetch(normalizedUrl)
+                    linkPreviewCache[normalizedUrl] = preview
                     linkPreview.value = preview
                     linkPreviewLoading.value = false
                     linkPreviewDismissed.value = false
@@ -378,7 +378,7 @@ fun ComposeView(
                         override fun TextFieldBuffer.transformOutput() {
                             for (token in tokensRegexp.findAll(originalText)) {
                                 val s = token.value
-                                if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) {
+                                if (isUrl(s)) {
                                     addStyle(
                                         SpanStyle(color = urlColor),
                                         token.range.first,
@@ -791,14 +791,14 @@ private fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap())
         val endByte =
             data.substring(0, token.range.last + 1).encodeToByteArray().size
 
-        if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) {
+        if (isUrl(s)) {
             facets.add(
                 Facet(
                     index = FacetByteSlice(startByte.toLong(), endByte.toLong()),
                     features = listOf(
                         FacetFeatureUnion.Link(
                             value = FacetLink(
-                                uri = sh.christian.ozone.api.Uri(s)
+                                uri = sh.christian.ozone.api.Uri(normalizeUrl(s))
                             )
                         )
                     )
