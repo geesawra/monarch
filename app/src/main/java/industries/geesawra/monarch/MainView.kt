@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Badge
@@ -85,6 +86,9 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -345,7 +349,14 @@ private fun InnerTimelineView(
                                     Text(text = timelineViewModel.uiState.feedName)
                                 }
 
-                                TabBarDestinations.SEARCH -> Text(text = "Search")
+                                TabBarDestinations.SEARCH -> {
+                                    val authorFilter = timelineViewModel.uiState.searchAuthorFilter
+                                    if (authorFilter != null) {
+                                        Text(text = "from:$authorFilter")
+                                    } else {
+                                        Text(text = "Search")
+                                    }
+                                }
 
                                 TabBarDestinations.NOTIFICATIONS -> Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -396,7 +407,30 @@ private fun InnerTimelineView(
                                     }
                                 }
 
-                                TabBarDestinations.SEARCH -> {}
+                                TabBarDestinations.SEARCH -> {
+                                    val authorFilter = timelineViewModel.uiState.searchAuthorFilter
+                                    if (authorFilter != null) {
+                                        IconButton(onClick = {
+                                            timelineViewModel.setSearchAuthorFilter(null)
+                                        }) {
+                                            Icon(Icons.Default.PersonSearch, "Remove author filter")
+                                        }
+                                    } else {
+                                        var showFromDialog by remember { mutableStateOf(false) }
+                                        IconButton(onClick = { showFromDialog = true }) {
+                                            Icon(Icons.Default.PersonSearch, "Filter by author")
+                                        }
+                                        if (showFromDialog) {
+                                            SearchFromAuthorDialog(
+                                                onDismiss = { showFromDialog = false },
+                                                onConfirm = { handle ->
+                                                    timelineViewModel.setSearchAuthorFilter(handle)
+                                                    showFromDialog = false
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
                                 TabBarDestinations.NOTIFICATIONS -> {}
                             }
                         }
@@ -636,4 +670,39 @@ fun FeedsDrawer(
             railExpanded = state == WideNavigationRailValue.Expanded,
         )
     }
+}
+
+@Composable
+fun SearchFromAuthorDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var handle by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Filter by author") },
+        text = {
+            OutlinedTextField(
+                value = handle,
+                onValueChange = { handle = it },
+                label = { Text("Handle") },
+                placeholder = { Text("e.g. alice.bsky.social") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (handle.isNotBlank()) onConfirm(handle.trim()) },
+            ) {
+                Text("Apply")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
