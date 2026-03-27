@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Person
@@ -142,7 +143,7 @@ fun SkeetView(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -500,9 +501,16 @@ private fun SkeetReason(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 4.dp),
+                            .padding(bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Icon(
+                            imageVector = Icons.Filled.Repeat,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         it.value.by.avatar?.let { avatarUri ->
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
@@ -511,16 +519,15 @@ private fun SkeetReason(
                                     .build(),
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(16.dp)
+                                    .size(18.dp)
                                     .clip(CircleShape)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                         }
                         Text(
                             text = "Reposted by ${it.value.by.displayName ?: it.value.by.handle.toString()}",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.outline,
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
                         )
                     }
                     isRepost = true
