@@ -36,15 +36,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -649,51 +649,68 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                     }
 
                     if (description != null) {
-                        val tooltipState = rememberTooltipState()
-                        val scope = rememberCoroutineScope()
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text(description) } },
-                            state = tooltipState
-                        ) {
-                            OutlinedCard(
-                                modifier = Modifier
-                                    .padding(end = 4.dp, bottom = 4.dp)
-                                    .clickable {
-                                        scope.launch { tooltipState.show() }
-                                    },
-                                shape = CircleShape
+                        var showSheet by remember { mutableStateOf(false) }
+
+                        if (showSheet) {
+                            ModalBottomSheet(
+                                onDismissRequest = { showSheet = false },
+                                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Column(
+                                    modifier = Modifier.padding(
+                                        start = 24.dp, end = 24.dp,
+                                        bottom = 32.dp
+                                    )
                                 ) {
-                                    val avatarUrl = labelerAvatar(it)
-                                    if (avatarUrl != null) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current)
-                                                .data(avatarUrl)
-                                                .crossfade(true)
-                                                .build(),
-                                            contentDescription = definition.plaintext,
-                                            modifier = Modifier
-                                                .size(14.dp)
-                                                .clip(CircleShape)
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = definition.icon,
-                                            contentDescription = definition.plaintext,
-                                            modifier = Modifier.size(14.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = definition.plaintext,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = description,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                            }
+                        }
+
+                        OutlinedCard(
+                            modifier = Modifier
+                                .padding(end = 4.dp, bottom = 4.dp)
+                                .clickable { showSheet = true },
+                            shape = CircleShape
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val avatarUrl = labelerAvatar(it)
+                                if (avatarUrl != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(avatarUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = definition.plaintext,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clip(CircleShape)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = definition.icon,
+                                        contentDescription = definition.plaintext,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = definition.plaintext,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
                             }
                         }
                     } else {
