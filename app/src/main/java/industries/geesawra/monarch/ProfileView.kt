@@ -149,33 +149,35 @@ fun ProfileView(
                         }
                     },
                     title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        AnimatedVisibility(
+                            visible = showAvatarInBar,
+                            enter = fadeIn() + expandHorizontally(),
+                            exit = fadeOut() + shrinkHorizontally(),
                         ) {
-                            AnimatedVisibility(
-                                visible = showAvatarInBar && profile?.avatar != null,
-                                enter = fadeIn() + expandHorizontally(),
-                                exit = fadeOut() + shrinkHorizontally(),
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(profile?.avatar?.uri)
-                                        .crossfade(true)
-                                        .build(),
-                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
+                                if (profile?.avatar != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(profile.avatar?.uri)
+                                            .crossfade(true)
+                                            .build(),
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                    )
+                                }
+                                Text(
+                                    text = profile?.displayName ?: profile?.handle?.handle ?: "",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            Text(
-                                text = profile?.displayName ?: profile?.handle?.handle ?: "",
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
                         }
                     },
                     scrollBehavior = scrollBehavior,
