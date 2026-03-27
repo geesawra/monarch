@@ -37,6 +37,7 @@ fun ConditionalCard(
                 Text(
                     modifier = Modifier.padding(start = 16.dp),
                     text = text,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -51,6 +52,7 @@ fun ConditionalCard(
         ) {
             Text(
                 text = text,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

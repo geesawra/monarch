@@ -517,14 +517,14 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
         Text(
             text = authorName,
             color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold
         )
 
         Text(
             text = "@" + skeet.authorHandle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelMedium,
         )
 
         if (showLabels) {

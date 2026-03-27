@@ -102,7 +102,7 @@ fun LoginView(
     ) {
         Text(
             text = "Log into your Bluesky account",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
         TextField(
@@ -230,7 +230,7 @@ fun LoginView(
         if (password.isNotEmpty() && !password.matches(appPasswordRegex) && !isPasswordFocused) {
             Text(
                 text = "Hint: Consider using an app password (e.g., xxxx-xxxx-xxxx-xxxx).",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(top = 4.dp)
             )
         }

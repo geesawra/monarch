@@ -58,9 +58,6 @@ private fun IconWithNumber(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        var fontSize by remember {
-            mutableStateOf(10.dp)
-        }
         Icon(
             imageVector,
             contentDescription = contentDescription,
@@ -71,12 +68,8 @@ private fun IconWithNumber(
             modifier = Modifier.padding(start = 4.dp),
             text = number.longValue.toString(),
             color = tint,
+            style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
-            onTextLayout = { textLayout ->
-                if (textLayout.multiParagraph.didExceedMaxLines) {
-                    fontSize -= 1.dp
-                }
-            }
         )
     }
 }
