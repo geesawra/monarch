@@ -15,7 +15,10 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.actor.GetProfileQueryParams
 import app.bsky.actor.GetProfileResponse
 import app.bsky.actor.PreferencesUnion
+import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
+import app.bsky.actor.SearchActorsTypeaheadQueryParams
+import app.bsky.actor.SearchActorsTypeaheadResponse
 import app.bsky.embed.AspectRatio
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
@@ -1061,6 +1064,26 @@ class BlueskyConn(val context: Context) {
             return when (res) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get thread: ${res.error?.message}"))
                 is AtpResponse.Success<GetPostThreadResponse> -> Result.success(res.response)
+            }
+        }
+    }
+
+    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val res = client!!.searchActorsTypeahead(
+                SearchActorsTypeaheadQueryParams(
+                    q = query,
+                    limit = 8,
+                )
+            )
+
+            return when (res) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Typeahead search failed: ${res.error?.message}"))
+                is AtpResponse.Success<SearchActorsTypeaheadResponse> -> Result.success(res.response.actors)
             }
         }
     }

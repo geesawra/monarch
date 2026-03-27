@@ -697,6 +697,10 @@ class TimelineViewModel @AssistedInject constructor(
         )
     }
 
+    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> {
+        return bskyConn.searchActorsTypeahead(query)
+    }
+
     fun getThread(then: () -> Unit) {
         viewModelScope.launch {
             bskyConn.getThread(uiState.currentlyShownThread.post.uri).onFailure {

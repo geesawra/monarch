@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -84,6 +85,12 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import app.bsky.actor.ProfileViewBasic
+import app.bsky.richtext.FacetMention
+import sh.christian.ozone.api.Did
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -106,6 +113,9 @@ fun ComposeView(
     val facets = remember { mutableListOf<Facet>() }
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
+    val mentionResults = remember { mutableStateOf(listOf<ProfileViewBasic>()) }
+    val showMentionDropdown = remember { mutableStateOf(false) }
+    val mentionDids = remember { mutableMapOf<String, Did>() }
 
     LaunchedEffect(scaffoldState.bottomSheetState.targetValue) {
         when (scaffoldState.bottomSheetState.targetValue) {
@@ -118,6 +128,9 @@ fun ComposeView(
                 isQuotePost.value = false
                 mediaSelected.value = listOf()
                 mediaSelectedIsVideo.value = false
+                mentionResults.value = listOf()
+                showMentionDropdown.value = false
+                mentionDids.clear()
             }
 
             SheetValue.PartiallyExpanded, SheetValue.Expanded -> {
@@ -239,11 +252,56 @@ fun ComposeView(
                     }
                 }
 
+                // Mention typeahead: detect @query and search
+                LaunchedEffect(textfieldState.text, textfieldState.selection) {
+                    val text = textfieldState.text.toString()
+                    val cursorPos = textfieldState.selection.min
+
+                    if (cursorPos <= 0 || text.isEmpty()) {
+                        showMentionDropdown.value = false
+                        return@LaunchedEffect
+                    }
+
+                    // Find the last @ before cursor that is preceded by whitespace or is at start
+                    val textBeforeCursor = text.substring(0, cursorPos)
+                    val atIndex = textBeforeCursor.lastIndexOf('@')
+
+                    if (atIndex < 0) {
+                        showMentionDropdown.value = false
+                        return@LaunchedEffect
+                    }
+
+                    // @ must be at start or preceded by whitespace
+                    if (atIndex > 0 && !textBeforeCursor[atIndex - 1].isWhitespace()) {
+                        showMentionDropdown.value = false
+                        return@LaunchedEffect
+                    }
+
+                    val query = textBeforeCursor.substring(atIndex + 1)
+
+                    // No whitespace allowed in the query part
+                    if (query.contains(' ') || query.isEmpty()) {
+                        showMentionDropdown.value = false
+                        return@LaunchedEffect
+                    }
+
+                    delay(300)
+
+                    timelineViewModel.searchActorsTypeahead(query)
+                        .onSuccess {
+                            mentionResults.value = it
+                            showMentionDropdown.value = it.isNotEmpty()
+                        }
+                        .onFailure {
+                            showMentionDropdown.value = false
+                        }
+                }
+
                 val urlColor = MaterialTheme.colorScheme.primary
 
                 class FacetTextTransform() : OutputTransformation {
                     override fun TextFieldBuffer.transformOutput() {
-                        val a = readFacets(originalText.toString())
+                        val a = readFacets(originalText.toString(), mentionDids)
                         facets.clear()
                         facets.addAll(a)
 
@@ -285,6 +343,54 @@ fun ComposeView(
                     state = textfieldState,
                     outputTransformation = FacetTextTransform(),
                 )
+
+                DropdownMenu(
+                    expanded = showMentionDropdown.value,
+                    onDismissRequest = { showMentionDropdown.value = false },
+                ) {
+                    mentionResults.value.forEach { profile ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    profile.displayName?.let { name ->
+                                        Text(
+                                            text = name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    }
+                                    Text(
+                                        text = "@${profile.handle.handle}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                val text = textfieldState.text.toString()
+                                val cursorPos = textfieldState.selection.min
+                                val textBeforeCursor = text.substring(0, cursorPos)
+                                val atIndex = textBeforeCursor.lastIndexOf('@')
+
+                                if (atIndex >= 0) {
+                                    val fullHandle = profile.handle.handle
+                                    val replacement = "@$fullHandle "
+                                    val afterCursor = text.substring(cursorPos)
+                                    val newText = text.substring(0, atIndex) + replacement + afterCursor
+
+                                    textfieldState.edit {
+                                        replace(0, length, newText)
+                                        val newCursorPos = atIndex + replacement.length
+                                        selection = TextRange(newCursorPos, newCursorPos)
+                                    }
+
+                                    mentionDids[fullHandle] = profile.did
+                                }
+
+                                showMentionDropdown.value = false
+                            }
+                        )
+                    }
+                }
 
 //                OutlinedTextField(
 //                    modifier = Modifier
@@ -479,7 +585,7 @@ fun ActionRow(
 val tokensRegexp = Regex("(\\S+)")
 
 
-private fun readFacets(data: String): List<Facet> {
+private fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap()): List<Facet> {
     val facets = mutableListOf<Facet>()
 
     for (token in tokensRegexp.findAll(data)) {
@@ -522,25 +628,25 @@ private fun readFacets(data: String): List<Facet> {
                 )
             }
         } else if (s.startsWith("@") && s.length > 1) {
-            // TODO: mentions go here, need DID resolution
-//                val tag = s.substring(1)
-//                if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
-//                    facets.add(
-//                        Facet(
-//                            index = FacetByteSlice(
-//                                startByte.toLong(),
-//                                endByte.toLong()
-//                            ),
-//                            features = listOf(
-//                                FacetFeatureUnion.Mention(
-//                                    value = FacetMention(
-//                                        tag = s,
-//                                    )
-//                                )
-//                            )
-//                        )
-//                    )
-//                }
+            val handle = s.substring(1)
+            val did = mentionDids[handle]
+            if (did != null) {
+                facets.add(
+                    Facet(
+                        index = FacetByteSlice(
+                            startByte.toLong(),
+                            endByte.toLong()
+                        ),
+                        features = listOf(
+                            FacetFeatureUnion.Mention(
+                                value = FacetMention(
+                                    did = did,
+                                )
+                            )
+                        )
+                    )
+                )
+            }
         }
     }
 
