@@ -114,31 +114,25 @@ fun SkeetView(
 
     val minSize = 44.dp
 
-    Column(
-        modifier =
-            modifier
+    if (nested) {
+        // Embedded posts: simple stacked layout
+        Column(
+            modifier = modifier
                 .clip(MaterialTheme.shapes.medium)
                 .clickable {
                     Log.d("SkeetView", skeet.content)
                     onShowThread(skeet)
                 }
-                .padding(
-                    top = 8.dp,
-                    start = if (nested) 10.dp else 16.dp,
-                    end = if (nested) 10.dp else 16.dp,
-                    bottom = 8.dp
-                )
-    ) {
-        SkeetReason(
-            modifier = Modifier.padding(start = 4.dp),
-            skeet = skeet,
-            showInReplyTo,
-            renderingReplyNotif,
-            renderingMention
-        )
+                .padding(top = 8.dp, start = 10.dp, end = 10.dp, bottom = 8.dp)
+        ) {
+            SkeetReason(
+                modifier = Modifier.padding(start = 4.dp),
+                skeet = skeet,
+                showInReplyTo,
+                renderingReplyNotif,
+                renderingMention
+            )
 
-        if (nested) {
-            // Embedded posts: avatar + header in a row, content below
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -167,71 +161,83 @@ fun SkeetView(
             }
 
             SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
-        } else {
-            // Top-level posts: two-column layout with thread line for header,
-            // content and actions span full width below
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-            ) {
-                // Left column: avatar + thread line
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .width(minSize)
-                        .fillMaxHeight()
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(skeet.authorAvatarURL)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Avatar",
-                        modifier = Modifier
-                            .size(minSize)
-                            .clip(CircleShape)
-                    )
-                    if (inThread) {
-                        VerticalDivider(
-                            thickness = 3.dp,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                    }
+        }
+    } else {
+        // Top-level posts: two-column layout, thread line spans full height
+        Row(
+            modifier = modifier
+                .clip(MaterialTheme.shapes.medium)
+                .clickable {
+                    Log.d("SkeetView", skeet.content)
+                    onShowThread(skeet)
                 }
-
-                // Right column: header + content + actions
-                Column(
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = if (inThread) 0.dp else 8.dp)
+                .height(IntrinsicSize.Min)
+        ) {
+            // Left column: avatar + thread line (spans full post height)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(minSize)
+                    .fillMaxHeight()
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(skeet.authorAvatarURL)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Avatar",
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 12.dp)
-                        .sizeIn(minHeight = minSize),
-                ) {
-                    SkeetHeader(
-                        skeet = skeet,
-                        showLabels = showLabels,
-                        labelDisplayName = { viewModel?.labelDisplayName(it) },
-                        labelDescription = { viewModel?.labelDescription(it) },
-                        labelerAvatar = { viewModel?.labelerAvatar(it) }
+                        .size(minSize)
+                        .clip(CircleShape)
+                )
+                if (inThread) {
+                    VerticalDivider(
+                        thickness = 3.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = 4.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        color = MaterialTheme.colorScheme.outlineVariant
                     )
+                }
+            }
 
-                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
+            // Right column: reason + header + content + actions
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+                    .sizeIn(minHeight = minSize),
+            ) {
+                SkeetReason(
+                    modifier = Modifier.padding(start = 4.dp),
+                    skeet = skeet,
+                    showInReplyTo,
+                    renderingReplyNotif,
+                    renderingMention
+                )
 
-                    if (!disableEmbeds) {
-                        TimelinePostActionsView(
-                            onReplyTap = onReplyTap,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            timelineViewModel = viewModel,
-                            skeet = skeet,
-                            inThread = inThread
-                        )
-                    }
+                SkeetHeader(
+                    skeet = skeet,
+                    showLabels = showLabels,
+                    labelDisplayName = { viewModel?.labelDisplayName(it) },
+                    labelDescription = { viewModel?.labelDescription(it) },
+                    labelerAvatar = { viewModel?.labelerAvatar(it) }
+                )
+
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel)
+
+                if (!disableEmbeds) {
+                    TimelinePostActionsView(
+                        onReplyTap = onReplyTap,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        timelineViewModel = viewModel,
+                        skeet = skeet,
+                        inThread = inThread
+                    )
                 }
             }
         }
