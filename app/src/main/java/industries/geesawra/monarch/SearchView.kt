@@ -31,14 +31,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
-import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,11 +60,6 @@ import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.Did
 
 
-private enum class SearchTab(val label: String) {
-    POSTS("Posts"),
-    PEOPLE("People"),
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchView(
@@ -81,8 +73,7 @@ fun SearchView(
     onProfileTap: (Did) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var showPeople by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -96,7 +87,6 @@ fun SearchView(
                     query = query,
                     onQueryChange = { query = it },
                     onSearch = {
-                        expanded = false
                         viewModel.search(query)
                     },
                     expanded = false,
@@ -123,35 +113,22 @@ fun SearchView(
         ) {}
 
         // Filter chips row
-        SearchFilters(viewModel)
+        SearchFilters(viewModel, showPeople, onShowPeopleChange = { showPeople = it })
 
-        // Tabs: Posts / People
-        PrimaryTabRow(
-            selectedTabIndex = selectedTab,
-        ) {
-            SearchTab.entries.forEachIndexed { index, tab ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(tab.label) },
-                )
-            }
-        }
-
-        // Tab content
-        when (selectedTab) {
-            0 -> SearchPostsResults(
+        // Content
+        if (showPeople) {
+            SearchPeopleResults(
+                viewModel = viewModel,
+                listState = peopleListState,
+                isScrollEnabled = isScrollEnabled,
+                onProfileTap = onProfileTap,
+            )
+        } else {
+            SearchPostsResults(
                 viewModel = viewModel,
                 listState = postsListState,
                 isScrollEnabled = isScrollEnabled,
                 onThreadTap = onThreadTap,
-                onProfileTap = onProfileTap,
-            )
-
-            1 -> SearchPeopleResults(
-                viewModel = viewModel,
-                listState = peopleListState,
-                isScrollEnabled = isScrollEnabled,
                 onProfileTap = onProfileTap,
             )
         }
@@ -159,7 +136,11 @@ fun SearchView(
 }
 
 @Composable
-private fun SearchFilters(viewModel: TimelineViewModel) {
+private fun SearchFilters(
+    viewModel: TimelineViewModel,
+    showPeople: Boolean,
+    onShowPeopleChange: (Boolean) -> Unit,
+) {
     val sort = viewModel.uiState.searchPostsSort
     val authorFilter = viewModel.uiState.searchAuthorFilter
 
@@ -170,14 +151,25 @@ private fun SearchFilters(viewModel: TimelineViewModel) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FilterChip(
-            selected = sort == SearchPostsSort.Latest,
-            onClick = { viewModel.setSearchSort(SearchPostsSort.Latest) },
+            selected = !showPeople && sort == SearchPostsSort.Latest,
+            onClick = {
+                onShowPeopleChange(false)
+                viewModel.setSearchSort(SearchPostsSort.Latest)
+            },
             label = { Text("Latest") },
         )
         FilterChip(
-            selected = sort == SearchPostsSort.Top,
-            onClick = { viewModel.setSearchSort(SearchPostsSort.Top) },
+            selected = !showPeople && sort == SearchPostsSort.Top,
+            onClick = {
+                onShowPeopleChange(false)
+                viewModel.setSearchSort(SearchPostsSort.Top)
+            },
             label = { Text("Top") },
+        )
+        FilterChip(
+            selected = showPeople,
+            onClick = { onShowPeopleChange(!showPeople) },
+            label = { Text("People") },
         )
         if (authorFilter != null) {
             FilterChip(
