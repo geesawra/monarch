@@ -118,7 +118,12 @@ fun SkeetView(
                     Log.d("SkeetView", skeet.content)
                     onShowThread(skeet)
                 }
-                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
+                .padding(
+                    top = 8.dp,
+                    start = if (nested) 10.dp else 16.dp,
+                    end = if (nested) 10.dp else 16.dp,
+                    bottom = 8.dp
+                )
     ) {
         Row(
             verticalAlignment = Alignment.Top,
@@ -237,7 +242,7 @@ fun Embeds(
             }
 
             OutlinedCard(
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 4.dp)
             ) {
                 RecordView(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
@@ -263,7 +268,7 @@ fun Embeds(
             Embeds(context, false, mediaValue, onShowThread, viewModel)
 
             OutlinedCard(
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 4.dp)
             ) {
                 RecordWithMediaView(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
@@ -344,13 +349,15 @@ fun VideoView(uri: Uri) {
 
 @Composable
 private fun ExternalView(context: Context, ev: ExternalViewExternal) {
+    val domain = runCatching { ev.uri.uri.toUri().host }.getOrNull() ?: ""
+
     OutlinedCard(
         modifier = Modifier
-            .padding(top = 8.dp)
+            .padding(top = 4.dp)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .clickable {
                     val customTabsIntent = CustomTabsIntent.Builder()
                         .setShowTitle(true)
@@ -373,18 +380,15 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
                         .fillMaxWidth()
                 )
             }
-            if (ev.title.isNotEmpty()) {
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
 
+            if (ev.title.isNotEmpty()) {
                 Text(
                     text = ev.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 8.dp, bottom = 4.dp, start = 8.dp, end = 8.dp),
+                        .fillMaxWidth()
+                        .padding(top = 10.dp, start = 12.dp, end = 12.dp),
                     maxLines = 3
                 )
             }
@@ -392,15 +396,39 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
             if (ev.description.isNotEmpty()) {
                 Text(
                     text = ev.description,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 8.dp, start = 8.dp, end = 8.dp),
-                    maxLines = 8
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, start = 12.dp, end = 12.dp),
+                    maxLines = 3
                 )
             }
-        }
 
+            if (domain.isNotEmpty()) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Visibility,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = domain,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+            }
+        }
     }
 }
 
