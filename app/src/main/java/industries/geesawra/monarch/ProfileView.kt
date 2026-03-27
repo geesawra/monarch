@@ -47,7 +47,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Button
@@ -87,6 +86,8 @@ import androidx.compose.ui.unit.dp
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.VerifiedStatus
 import app.bsky.feed.GetAuthorFeedFilter
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -265,9 +266,9 @@ private fun ProfileContent(
             )
         }
 
-        // Feed filter chips
-        item(key = "filter_chips") {
-            ProfileFeedFilters(timelineViewModel)
+        // Feed tabs
+        item(key = "feed_tabs") {
+            ProfileFeedTabs(timelineViewModel)
         }
 
         // Posts
@@ -742,33 +743,26 @@ private fun EditProfileSheet(
     }
 }
 
-@Composable
-private fun ProfileFeedFilters(timelineViewModel: TimelineViewModel) {
-    val currentFilter = timelineViewModel.uiState.profileFeedFilter
+private val profileTabs = listOf(
+    "Posts" to null,
+    "Replies" to GetAuthorFeedFilter.PostsWithReplies,
+    "Media" to GetAuthorFeedFilter.PostsWithMedia,
+    "Video" to GetAuthorFeedFilter.PostsWithVideo,
+)
 
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(vertical = 4.dp),
-    ) {
-        FilterChip(
-            selected = currentFilter == null,
-            onClick = { timelineViewModel.setProfileFeedFilter(null) },
-            label = { Text("Posts") },
-        )
-        FilterChip(
-            selected = currentFilter == GetAuthorFeedFilter.PostsWithReplies,
-            onClick = { timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithReplies) },
-            label = { Text("Replies") },
-        )
-        FilterChip(
-            selected = currentFilter == GetAuthorFeedFilter.PostsWithMedia,
-            onClick = { timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithMedia) },
-            label = { Text("Media") },
-        )
-        FilterChip(
-            selected = currentFilter == GetAuthorFeedFilter.PostsWithVideo,
-            onClick = { timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithVideo) },
-            label = { Text("Video") },
-        )
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileFeedTabs(timelineViewModel: TimelineViewModel) {
+    val currentFilter = timelineViewModel.uiState.profileFeedFilter
+    val selectedIndex = profileTabs.indexOfFirst { it.second == currentFilter }.coerceAtLeast(0)
+
+    PrimaryTabRow(selectedTabIndex = selectedIndex) {
+        profileTabs.forEachIndexed { index, (label, filter) ->
+            Tab(
+                selected = selectedIndex == index,
+                onClick = { timelineViewModel.setProfileFeedFilter(filter) },
+                text = { Text(label) },
+            )
+        }
     }
 }
