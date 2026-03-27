@@ -111,6 +111,7 @@ class TimelineViewModel @AssistedInject constructor(
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
 
+    fun appviewName(): String = bskyConn.appviewName()
     fun labelDisplayName(label: Label): String = bskyConn.labelDisplayName(label)
     fun labelDescription(label: Label): String? = bskyConn.labelDescription(label)
     fun labelerAvatar(label: Label): String? = bskyConn.labelerAvatar(label)

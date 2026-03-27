@@ -249,6 +249,15 @@ class BlueskyConn(val context: Context) {
     var session: SessionData? = null
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
+    var appviewProxy: String? = null
+
+    fun appviewName(): String {
+        return when (appviewProxy) {
+            "did:web:api.bsky.app#bsky_appview" -> "Bluesky"
+            "did:web:api.blacksky.community#bsky_appview" -> "Blacksky"
+            else -> appviewProxy?.substringAfter("did:web:")?.substringBefore("#") ?: "Unknown"
+        }
+    }
 
     // Label cache: maps "labelerDid:labelVal" -> display name/description, and labelerDid -> avatar URL
     private var labelDisplayNames: Map<String, String> = emptyMap()
@@ -577,6 +586,7 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(it)
             }
             this.pdsURL = pdsURL
+            this.appviewProxy = appviewProxy
 
             this.pdsClient = mkPdsClient(pdsURL, sessionData)
             this.client = mkClient(

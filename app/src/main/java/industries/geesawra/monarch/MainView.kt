@@ -274,12 +274,18 @@ private fun InnerTimelineView(
         Row(modifier = Modifier.fillMaxSize()) {
             ModalWideNavigationRail(
                 header = {
-                    Text(
-                        text = "Feeds",
-                        modifier = Modifier.padding(start = 16.dp),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
+                    Column(modifier = Modifier.padding(start = 16.dp)) {
+                        Text(
+                            text = "Feeds",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = "via ${timelineViewModel.appviewName()}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 },
                 hideOnCollapse = true,
                 state = drawerState,
