@@ -542,6 +542,7 @@ class TimelineViewModel @AssistedInject constructor(
         replyRef: PostReplyRef? = null,
         quotePostRef: StrongRef? = null,
         facets: List<Facet> = listOf(),
+        linkPreview: LinkPreviewData? = null,
     ): Result<Unit> {
         return bskyConn.post(
             content,
@@ -549,7 +550,8 @@ class TimelineViewModel @AssistedInject constructor(
             video,
             replyRef,
             quotePostRef,
-            facets
+            facets,
+            linkPreview = linkPreview
         ) // TODO: maybe refactor this to use uistate.Error?
     }
 
