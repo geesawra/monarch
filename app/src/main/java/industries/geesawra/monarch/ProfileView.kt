@@ -328,6 +328,15 @@ private fun ProfileHeader(
     profile: ProfileViewDetailed,
     timelineViewModel: TimelineViewModel,
 ) {
+    var showImageViewer by remember { mutableStateOf<String?>(null) }
+
+    if (showImageViewer != null) {
+        GalleryViewer(
+            imageUrls = listOf(Image(url = showImageViewer!!, fullSize = showImageViewer!!, alt = "")),
+            onDismiss = { showImageViewer = null },
+        )
+    }
+
     Column {
         // Banner image
         if (profile.banner != null) {
@@ -343,6 +352,7 @@ private fun ProfileHeader(
                     .fillMaxWidth()
                     .height(150.dp)
                     .clip(MaterialTheme.shapes.medium)
+                    .clickable { showImageViewer = profile.banner?.uri }
             )
         } else {
             Spacer(
@@ -372,6 +382,11 @@ private fun ProfileHeader(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
+                    .then(
+                        if (profile.avatar != null)
+                            Modifier.clickable { showImageViewer = profile.avatar?.uri }
+                        else Modifier
+                    )
             )
 
             if (timelineViewModel.isOwnProfile()) {
