@@ -15,8 +15,13 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.actor.GetProfileQueryParams
 import app.bsky.actor.GetProfileResponse
 import app.bsky.actor.PreferencesUnion
+import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
+import app.bsky.actor.SearchActorsTypeaheadQueryParams
+import app.bsky.actor.SearchActorsTypeaheadResponse
 import app.bsky.embed.AspectRatio
+import app.bsky.embed.External
+import app.bsky.embed.ExternalExternal
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
 import app.bsky.embed.Record
@@ -78,6 +83,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.isSuccess
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
 import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
@@ -551,6 +557,7 @@ class BlueskyConn(val context: Context) {
         replyRef: PostReplyRef? = null,
         quotePostRef: StrongRef? = null,
         facets: List<Facet> = listOf(),
+        linkPreview: LinkPreviewData? = null,
     ): Result<Unit> {
         return runCatching {
             create().onFailure {
@@ -587,6 +594,27 @@ class BlueskyConn(val context: Context) {
                             video = blob.blob,
                             alt = "",
                             aspectRatio = AspectRatio(blob.width, blob.height)
+                        )
+                    )
+                }
+
+                if (postEmbed == null && linkPreview != null) {
+                    var thumbBlob: Blob? = null
+                    if (linkPreview.imageUrl != null) {
+                        try {
+                            thumbBlob = uploadBlobFromUrl(linkPreview.imageUrl)
+                        } catch (_: Exception) {
+                            // Thumbnail upload failed, proceed without it
+                        }
+                    }
+                    postEmbed = PostEmbedUnion.External(
+                        value = External(
+                            external = ExternalExternal(
+                                uri = sh.christian.ozone.api.Uri(linkPreview.url),
+                                title = linkPreview.title ?: "",
+                                description = linkPreview.description ?: "",
+                                thumb = thumbBlob,
+                            )
                         )
                     )
                 }
@@ -666,6 +694,25 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+
+    private suspend fun uploadBlobFromUrl(imageUrl: String): Blob? {
+        val httpClient = HttpClient(OkHttp) {
+            install(HttpTimeout) {
+                requestTimeoutMillis = 10000
+                connectTimeoutMillis = 5000
+                socketTimeoutMillis = 10000
+            }
+        }
+        val response = httpClient.get(imageUrl)
+        if (!response.status.isSuccess()) return null
+        val bytes: ByteArray = response.body()
+        httpClient.close()
+        val uploadResponse = client!!.uploadBlob(bytes)
+        return when (uploadResponse) {
+            is AtpResponse.Failure<*> -> null
+            is AtpResponse.Success<UploadBlobResponse> -> uploadResponse.response.blob
+        }
+    }
     private data class MediaBlob(
         val blob: Blob,
         val width: Long,
@@ -1061,6 +1108,26 @@ class BlueskyConn(val context: Context) {
             return when (res) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get thread: ${res.error?.message}"))
                 is AtpResponse.Success<GetPostThreadResponse> -> Result.success(res.response)
+            }
+        }
+    }
+
+    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val res = client!!.searchActorsTypeahead(
+                SearchActorsTypeaheadQueryParams(
+                    q = query,
+                    limit = 8,
+                )
+            )
+
+            return when (res) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Typeahead search failed: ${res.error?.message}"))
+                is AtpResponse.Success<SearchActorsTypeaheadResponse> -> Result.success(res.response.actors)
             }
         }
     }
