@@ -150,7 +150,8 @@ fun SkeetView(
                         modifier = Modifier.padding(start = 16.dp),
                         skeet = skeet,
                         showLabels = showLabels,
-                        labelDisplayName = { viewModel?.labelDisplayName(it) }
+                        labelDisplayName = { viewModel?.labelDisplayName(it) },
+                        labelerAvatar = { viewModel?.labelerAvatar(it) }
                     )
                 }
 
@@ -555,7 +556,7 @@ private fun labelDefinition(rawValue: String): LabelDefinition {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }) {
+private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
     val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
 
     Column(modifier = modifier) {
@@ -601,12 +602,26 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = definition.icon,
-                                contentDescription = definition.plaintext,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            val avatarUrl = labelerAvatar(it)
+                            if (avatarUrl != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(avatarUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = definition.plaintext,
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = definition.icon,
+                                    contentDescription = definition.plaintext,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = definition.plaintext,

@@ -245,8 +245,9 @@ class BlueskyConn(val context: Context) {
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
 
-    // Label display name cache: maps "labelerDid:labelVal" -> display name
+    // Label cache: maps "labelerDid:labelVal" -> display name, and labelerDid -> avatar URL
     private var labelDisplayNames: Map<String, String> = emptyMap()
+    private var labelerAvatars: Map<String, String> = emptyMap()
     private var labelCacheFetchCount: Int = 0
     private val labelCacheRefreshInterval: Int = 12
 
@@ -255,25 +256,32 @@ class BlueskyConn(val context: Context) {
         return labelDisplayNames[key] ?: label.`val`
     }
 
+    fun labelerAvatar(label: Label): String? {
+        return labelerAvatars[label.src.did]
+    }
+
     suspend fun refreshLabelCacheIfNeeded() {
         labelCacheFetchCount++
         if (labelCacheFetchCount < labelCacheRefreshInterval) return
         labelCacheFetchCount = 0
-        subscribedLabelers().onSuccess { buildLabelDisplayNameCache(it) }
+        subscribedLabelers().onSuccess { buildLabelCache(it) }
     }
 
-    private fun buildLabelDisplayNameCache(
+    private fun buildLabelCache(
         labelers: Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>
     ) {
         val names = mutableMapOf<String, String>()
+        val avatars = mutableMapOf<String, String>()
         for ((did, detailed) in labelers) {
             if (did == null || detailed == null) continue
+            detailed.value.creator.avatar?.let { avatars[did.did] = it }
             for (defn in detailed.value.policies.labelValueDefinitions) {
                 val displayName = defn.locales.firstOrNull()?.name ?: continue
                 names["${did.did}:${defn.identifier}"] = displayName
             }
         }
         labelDisplayNames = names
+        labelerAvatars = avatars
     }
 
     suspend fun storeSessionData(pdsURL: String, appviewProxy: String, session: SessionData) {
@@ -520,7 +528,7 @@ class BlueskyConn(val context: Context) {
             )
 
             val labelerMap = this.subscribedLabelers().getOrThrow()
-            buildLabelDisplayNameCache(labelerMap)
+            buildLabelCache(labelerMap)
             labelCacheFetchCount = 0
             val labelers = labelerMap.keys.mapNotNull { it?.did }
             this.client = mkClient(
