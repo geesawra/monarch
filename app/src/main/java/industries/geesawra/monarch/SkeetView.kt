@@ -339,7 +339,7 @@ private fun ImageView(img: List<ImagesViewImage>) {
     ) {
         PostImageGallery(
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxWidth(),
             images = img.map {
                 Image(
                     url = it.thumb.uri,
