@@ -18,6 +18,8 @@ import app.bsky.actor.PreferencesUnion
 import app.bsky.actor.Profile
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
+import app.bsky.actor.SearchActorsQueryParams
+import app.bsky.actor.SearchActorsResponse
 import app.bsky.actor.SearchActorsTypeaheadQueryParams
 import app.bsky.actor.SearchActorsTypeaheadResponse
 import app.bsky.embed.AspectRatio
@@ -1360,6 +1362,62 @@ class BlueskyConn(val context: Context) {
             return when (ret) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Failed updating profile: ${ret.error?.message}"))
                 is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun searchPosts(
+        query: String,
+        sort: app.bsky.feed.SearchPostsSort? = app.bsky.feed.SearchPostsSort.Latest,
+        cursor: String? = null,
+        author: Did? = null,
+    ): Result<Pair<List<PostView>, String?>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.searchPosts(
+                app.bsky.feed.SearchPostsQueryParams(
+                    q = query,
+                    sort = sort,
+                    limit = 25,
+                    cursor = cursor,
+                    author = author,
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Search failed: ${ret.error}"))
+                is AtpResponse.Success<app.bsky.feed.SearchPostsResponse> -> Result.success(
+                    ret.response.posts to ret.response.cursor
+                )
+            }
+        }
+    }
+
+    suspend fun searchActors(
+        query: String,
+        cursor: String? = null,
+    ): Result<Pair<List<app.bsky.actor.ProfileView>, String?>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(LoginException(it.message))
+            }
+
+            val ret = client!!.searchActors(
+                SearchActorsQueryParams(
+                    q = query,
+                    limit = 25,
+                    cursor = cursor,
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Search failed: ${ret.error}"))
+                is AtpResponse.Success<SearchActorsResponse> -> Result.success(
+                    ret.response.actors to ret.response.cursor
+                )
             }
         }
     }

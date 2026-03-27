@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -99,6 +100,7 @@ enum class TabBarDestinations(
     val badgeDescFmt: (Int) -> String = { "" },
 ) {
     TIMELINE(R.string.timeline, Icons.Filled.Home, R.string.timeline),
+    SEARCH(R.string.search, Icons.Filled.Search, R.string.search),
     NOTIFICATIONS(
         R.string.notifications,
         Icons.Filled.Notifications,
@@ -216,6 +218,8 @@ private fun InnerTimelineView(
     )
     val timelineState = rememberLazyListState()
     val notificationsState = rememberLazyListState()
+    val searchPostsState = rememberLazyListState()
+    val searchPeopleState = rememberLazyListState()
     val drawerState = rememberWideNavigationRailState(
         initialValue = WideNavigationRailValue.Collapsed
     )
@@ -341,6 +345,8 @@ private fun InnerTimelineView(
                                     Text(text = timelineViewModel.uiState.feedName)
                                 }
 
+                                TabBarDestinations.SEARCH -> Text(text = "Search")
+
                                 TabBarDestinations.NOTIFICATIONS -> Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -360,6 +366,7 @@ private fun InnerTimelineView(
                                     Icon(Icons.Default.Tag, "Feeds")
                                 }
 
+                                TabBarDestinations.SEARCH -> {}
                                 TabBarDestinations.NOTIFICATIONS -> {}
                             }
                         },
@@ -389,6 +396,7 @@ private fun InnerTimelineView(
                                     }
                                 }
 
+                                TabBarDestinations.SEARCH -> {}
                                 TabBarDestinations.NOTIFICATIONS -> {}
                             }
                         }
@@ -443,6 +451,8 @@ private fun InnerTimelineView(
                                 }
                             }
                         }
+
+                        TabBarDestinations.SEARCH -> {}
 
                         TabBarDestinations.NOTIFICATIONS -> {
                             AnimatedVisibility(
@@ -540,6 +550,19 @@ private fun InnerTimelineView(
                         data = timelineViewModel.uiState.skeets,
                         isScrollEnabled = isScrollEnabled,
                         onSeeMoreTap = onSeeMoreTap,
+                        onProfileTap = onProfileTap,
+                    )
+
+                    TabBarDestinations.SEARCH -> SearchView(
+                        viewModel = timelineViewModel,
+                        postsListState = searchPostsState,
+                        peopleListState = searchPeopleState,
+                        modifier = Modifier,
+                        isScrollEnabled = isScrollEnabled,
+                        scaffoldPadding = values,
+                        onThreadTap = { skeet ->
+                            onSeeMoreTap(skeet)
+                        },
                         onProfileTap = onProfileTap,
                     )
 

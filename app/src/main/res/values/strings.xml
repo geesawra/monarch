@@ -2,4 +2,5 @@
     <string name="app_name">Monarch</string>
     <string name="timeline">Timeline</string>
     <string name="notifications">Notifications</string>
+    <string name="search">Search</string>
 </resources>

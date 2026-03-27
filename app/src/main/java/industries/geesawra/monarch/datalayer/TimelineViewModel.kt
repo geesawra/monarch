@@ -13,6 +13,7 @@ import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.feed.GetAuthorFeedFilter
+import app.bsky.feed.SearchPostsSort
 import app.bsky.embed.RecordView
 import app.bsky.embed.RecordViewRecord
 import app.bsky.embed.RecordViewRecordUnion
@@ -82,6 +83,16 @@ data class TimelineUiState(
     val isFetchingProfile: Boolean = false,
     val isFetchingProfileFeed: Boolean = false,
     val profileNotFound: Boolean = false,
+
+    // Search state
+    val searchQuery: String = "",
+    val searchPostResults: List<SkeetData> = listOf(),
+    val searchActorResults: List<ProfileView> = listOf(),
+    val searchPostsCursor: String? = null,
+    val searchActorsCursor: String? = null,
+    val searchPostsSort: SearchPostsSort = SearchPostsSort.Latest,
+    val searchAuthorFilter: String? = null,
+    val isSearching: Boolean = false,
 )
 
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
@@ -862,6 +873,108 @@ class TimelineViewModel @AssistedInject constructor(
                     uiState = uiState.copy(profileUser = it)
                 }
             }
+        }
+    }
+
+    fun search(query: String, fresh: Boolean = true) {
+        if (query.isBlank()) {
+            uiState = uiState.copy(
+                searchQuery = "",
+                searchPostResults = listOf(),
+                searchActorResults = listOf(),
+                searchPostsCursor = null,
+                searchActorsCursor = null,
+                isSearching = false,
+            )
+            return
+        }
+
+        if (fresh) {
+            uiState = uiState.copy(
+                searchQuery = query,
+                searchPostResults = listOf(),
+                searchActorResults = listOf(),
+                searchPostsCursor = null,
+                searchActorsCursor = null,
+                isSearching = true,
+            )
+        } else {
+            uiState = uiState.copy(isSearching = true)
+        }
+
+        searchPosts(query, fresh)
+        searchActors(query, fresh)
+    }
+
+    private fun searchPosts(query: String, fresh: Boolean) {
+        val effectiveQuery = if (uiState.searchAuthorFilter != null) {
+            "from:${uiState.searchAuthorFilter} $query"
+        } else {
+            query
+        }
+
+        viewModelScope.launch {
+            bskyConn.searchPosts(
+                query = effectiveQuery,
+                sort = uiState.searchPostsSort,
+                cursor = if (fresh) null else uiState.searchPostsCursor,
+            ).onFailure {
+                if (it is CancellationException) return@onFailure
+                uiState = uiState.copy(isSearching = false, error = it.message)
+            }.onSuccess { (posts, cursor) ->
+                val newSkeets = posts.map {
+                    SkeetData.fromPostView(it, it.author)
+                }
+                uiState = uiState.copy(
+                    searchPostResults = if (fresh) newSkeets
+                    else (uiState.searchPostResults + newSkeets).distinctBy { it.cid },
+                    searchPostsCursor = cursor,
+                    isSearching = false,
+                )
+            }
+        }
+    }
+
+    private fun searchActors(query: String, fresh: Boolean) {
+        viewModelScope.launch {
+            bskyConn.searchActors(
+                query = query,
+                cursor = if (fresh) null else uiState.searchActorsCursor,
+            ).onFailure {
+                if (it is CancellationException) return@onFailure
+                uiState = uiState.copy(isSearching = false)
+            }.onSuccess { (actors, cursor) ->
+                uiState = uiState.copy(
+                    searchActorResults = if (fresh) actors
+                    else (uiState.searchActorResults + actors).distinctBy { it.did },
+                    searchActorsCursor = cursor,
+                    isSearching = false,
+                )
+            }
+        }
+    }
+
+    fun fetchMoreSearchPosts() {
+        if (uiState.searchPostsCursor == null || uiState.searchQuery.isBlank()) return
+        searchPosts(uiState.searchQuery, fresh = false)
+    }
+
+    fun fetchMoreSearchActors() {
+        if (uiState.searchActorsCursor == null || uiState.searchQuery.isBlank()) return
+        searchActors(uiState.searchQuery, fresh = false)
+    }
+
+    fun setSearchSort(sort: SearchPostsSort) {
+        uiState = uiState.copy(searchPostsSort = sort)
+        if (uiState.searchQuery.isNotBlank()) {
+            search(uiState.searchQuery, fresh = true)
+        }
+    }
+
+    fun setSearchAuthorFilter(handle: String?) {
+        uiState = uiState.copy(searchAuthorFilter = handle)
+        if (uiState.searchQuery.isNotBlank()) {
+            search(uiState.searchQuery, fresh = true)
         }
     }
 
