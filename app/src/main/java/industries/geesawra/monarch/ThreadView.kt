@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import sh.christian.ozone.api.Did
@@ -31,6 +32,7 @@ import sh.christian.ozone.api.Did
 fun ThreadView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState = SettingsState(),
     backButton: () -> Unit,
     coroutineScope: CoroutineScope,
     onProfileTap: ((Did) -> Unit)? = null,
@@ -91,6 +93,7 @@ fun ThreadView(
                     data = timelineViewModel.uiState.currentlyShownThread.flatten(),
                     shouldFetchMoreData = false,
                     isShowingThread = true,
+                    settingsState = settingsState,
                     onProfileTap = onProfileTap,
                 )
             }

@@ -15,8 +15,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Repeat
@@ -52,10 +51,14 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import industries.geesawra.monarch.datalayer.AvatarShape
+import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.RepeatableNotification
+import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.RepeatedNotification
 import industries.geesawra.monarch.datalayer.SkeetData
 import nl.jacobras.humanreadable.HumanReadable
+import sh.christian.ozone.api.Did
 import kotlin.time.ExperimentalTime
 
 fun name(p: ProfileView): String {
@@ -68,15 +71,18 @@ fun name(p: ProfileView): String {
     }
 }
 
-@OptIn(ExperimentalTime::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalTime::class)
 @Composable
 fun LikeRepostRowView(
     modifier: Modifier = Modifier,
     data: RepeatedNotification,
+    settingsState: SettingsState = SettingsState(),
     onShowThread: (SkeetData) -> Unit = {},
+    onProfileTap: ((Did) -> Unit)? = null,
 ) {
     val avatarSize = 28.dp
     val showAvatars = remember { mutableStateOf(false) }
+    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
 
     Column(
         modifier = modifier
@@ -159,50 +165,9 @@ fun LikeRepostRowView(
             }, label = "size transform"
         ) {
             when (it) {
-                true -> Column {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                    ) {
-                        data.authors.take(8).forEach {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clickable {
-                                        Log.d(
-                                            "LikeRepostRowView",
-                                            "Clicked ${it.author.handle.handle}"
-                                        )
-                                    },
-                            ) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(it.author.avatar?.uri)
-                                        .crossfade(true)
-                                        .build(),
-                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentDescription = "Avatar",
-                                    modifier = Modifier
-                                        .size(avatarSize)
-                                        .border(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                            shape = CircleShape
-                                        )
-                                        .clip(CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = name(it.author),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
-                        }
-                    }
+                true -> Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     IconButton(
                         modifier = Modifier.align(Alignment.End),
                         onClick = {
@@ -213,6 +178,42 @@ fun LikeRepostRowView(
                             imageVector = Icons.Default.KeyboardArrowUp,
                             contentDescription = "Close avatar list",
                         )
+                    }
+                    data.authors.take(8).forEach {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onProfileTap?.invoke(it.author.did)
+                                },
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(it.author.avatar?.uri)
+                                    .crossfade(true)
+                                    .build(),
+                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                contentDescription = "Avatar",
+                                modifier = Modifier
+                                    .size(avatarSize + 4.dp)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        shape = avatarClipShape
+                                    )
+                                    .clip(avatarClipShape)
+                            )
+                            Text(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 8.dp),
+                                text = name(it.author),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
                 }
 
@@ -245,9 +246,9 @@ fun LikeRepostRowView(
                                 .border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                    shape = CircleShape
+                                    shape = avatarClipShape
                                 )
-                                .clip(CircleShape)
+                                .clip(avatarClipShape)
                         )
                     }
                 }
@@ -265,7 +266,9 @@ fun LikeRepostRowView(
                 viewModel = null,
                 skeet = data.post,
                 nested = true,
-                showLabels = false,
+                showLabels = settingsState.showLabels,
+                postTextSize = settingsState.postTextSize,
+                avatarShape = avatarClipShape,
                 onShowThread = onShowThread,
             )
         }

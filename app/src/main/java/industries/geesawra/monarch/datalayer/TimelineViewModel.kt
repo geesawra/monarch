@@ -174,7 +174,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun fetchTimeline(fresh: Boolean = false, then: () -> Unit = {}) {
+    fun fetchTimeline(fresh: Boolean = false, replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads, then: () -> Unit = {}) {
         uiState = uiState.copy(isFetchingMoreTimeline = true)
         runCatching {
             timelineFetchJob?.cancel()
@@ -202,9 +202,9 @@ class TimelineViewModel @AssistedInject constructor(
                 )
             }.onSuccess { response ->
                 val newSkeets = if (fresh) {
-                    response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did) }.distinctBy { it.cid }
+                    response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { it.cid }
                 } else {
-                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did) }).distinctBy { it.cid }
+                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { it.cid }
                 }
 
                 uiState = uiState.copy(

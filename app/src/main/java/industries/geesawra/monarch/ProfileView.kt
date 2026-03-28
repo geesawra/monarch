@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -91,6 +92,9 @@ import androidx.compose.material3.Tab
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import industries.geesawra.monarch.datalayer.AvatarShape
+import industries.geesawra.monarch.datalayer.PostTextSize
+import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -103,6 +107,7 @@ import kotlin.time.ExperimentalTime
 fun ProfileView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState = SettingsState(),
     coroutineScope: CoroutineScope,
     backButton: () -> Unit,
     onThreadTap: (SkeetData) -> Unit,
@@ -208,6 +213,7 @@ fun ProfileView(
                 modifier = Modifier.padding(padding),
                 profile = profile,
                 timelineViewModel = timelineViewModel,
+                settingsState = settingsState,
                 listState = listState,
                 onThreadTap = onThreadTap,
                 onProfileTap = onProfileTap,
@@ -245,11 +251,13 @@ private fun ProfileContent(
     modifier: Modifier = Modifier,
     profile: ProfileViewDetailed,
     timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState = SettingsState(),
     listState: LazyListState,
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
 ) {
     val posts = timelineViewModel.uiState.profilePosts
+    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
 
     LazyColumn(
         state = listState,
@@ -281,6 +289,9 @@ private fun ProfileContent(
                     viewModel = timelineViewModel,
                     skeet = skeet,
                     onReplyTap = { _, _ -> },
+                    postTextSize = settingsState.postTextSize,
+                    avatarShape = avatarClipShape,
+                    showLabels = settingsState.showLabels,
                     onShowThread = { s ->
                         timelineViewModel.setThread(s)
                         onThreadTap(s)

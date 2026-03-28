@@ -27,11 +27,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.Notification
+import industries.geesawra.monarch.datalayer.PostTextSize
+import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.delay
+import sh.christian.ozone.api.Did
 import kotlin.time.ExperimentalTime
 
 @ExperimentalTime
@@ -41,8 +47,10 @@ fun NotificationsView(
     state: LazyListState,
     modifier: Modifier = Modifier,
     isScrollEnabled: Boolean,
+    settingsState: SettingsState = SettingsState(),
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onSeeMoreTap: ((SkeetData) -> Unit)? = null,
+    onProfileTap: ((Did) -> Unit)? = null,
     scaffoldPadding: PaddingValues
 ) {
     LaunchedEffect(Unit) {
@@ -75,7 +83,9 @@ fun NotificationsView(
                 RenderNotification(
                     viewModel = viewModel,
                     notification = notif,
+                    settingsState = settingsState,
                     onReplyTap = onReplyTap,
+                    onProfileTap = onProfileTap,
                     onShowThread = { skeet ->
                         if (onSeeMoreTap != null) {
                             viewModel.setThread(skeet)
@@ -112,9 +122,13 @@ fun NotificationsView(
 private fun RenderNotification(
     viewModel: TimelineViewModel,
     notification: Notification,
+    settingsState: SettingsState = SettingsState(),
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onProfileTap: ((Did) -> Unit)? = null,
     onShowThread: (SkeetData) -> Unit = {},
 ) {
+    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
+
     when (notification) {
         is Notification.Follow -> {
             Column {
@@ -163,7 +177,10 @@ private fun RenderNotification(
                             authorHandle = notification.follow.handle,
                             content = notification.follow.description ?: ""
                         ),
-                        nested = true
+                        nested = true,
+                        postTextSize = settingsState.postTextSize,
+                        avatarShape = avatarClipShape,
+                        showLabels = settingsState.showLabels,
                     )
                 }
             }
@@ -171,7 +188,9 @@ private fun RenderNotification(
 
         is Notification.Like -> LikeRepostRowView(
             data = notification.data,
+            settingsState = settingsState,
             onShowThread = onShowThread,
+            onProfileTap = onProfileTap,
         )
 
         is Notification.Mention -> SkeetView(
@@ -182,6 +201,9 @@ private fun RenderNotification(
                 notification.author,
             ),
             onReplyTap = onReplyTap,
+            postTextSize = settingsState.postTextSize,
+            avatarShape = avatarClipShape,
+            showLabels = settingsState.showLabels,
             renderingMention = true,
         )
 
@@ -194,6 +216,9 @@ private fun RenderNotification(
                 notification.quotedPost
             ),
             onReplyTap = onReplyTap,
+            postTextSize = settingsState.postTextSize,
+            avatarShape = avatarClipShape,
+            showLabels = settingsState.showLabels,
         )
 
         is Notification.Reply -> SkeetView(
@@ -204,12 +229,17 @@ private fun RenderNotification(
                 notification.author
             ),
             onReplyTap = onReplyTap,
+            postTextSize = settingsState.postTextSize,
+            avatarShape = avatarClipShape,
+            showLabels = settingsState.showLabels,
             renderingReplyNotif = true,
         )
 
         is Notification.Repost -> LikeRepostRowView(
             data = notification.data,
+            settingsState = settingsState,
             onShowThread = onShowThread,
+            onProfileTap = onProfileTap,
         )
 
 

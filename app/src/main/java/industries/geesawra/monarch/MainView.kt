@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -89,6 +90,7 @@ import coil3.request.crossfade
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
+import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -125,10 +127,12 @@ enum class TabBarDestinations(
 @Composable
 fun MainView(
     timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState,
     coroutineScope: CoroutineScope,
     onLoginError: () -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
+    onSettingsTap: () -> Unit,
     onFirstLoad: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
@@ -173,7 +177,9 @@ fun MainView(
                 modifier = Modifier.padding(paddingValues),
                 coroutineScope = coroutineScope,
                 timelineViewModel = timelineViewModel,
+                settingsState = settingsState,
                 onProfileTap = onProfileTap,
+                onSettingsTap = onSettingsTap,
                 fobOnClick = {
                     coroutineScope.launch {
                         scaffoldState.bottomSheetState.expand()
@@ -209,8 +215,10 @@ private fun InnerTimelineView(
     modifier: Modifier = Modifier,
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onProfileTap: (Did) -> Unit = {},
+    onSettingsTap: () -> Unit = {},
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
     onError: (String) -> Unit,
@@ -388,6 +396,9 @@ private fun InnerTimelineView(
                             }
                         },
                         actions = {
+                            IconButton(onClick = onSettingsTap) {
+                                Icon(Icons.Default.Settings, "Settings")
+                            }
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> {
                                     if (timelineViewModel.uiState.user == null) {
@@ -584,6 +595,7 @@ private fun InnerTimelineView(
                 when (currentDestination) {
                     TabBarDestinations.TIMELINE -> ShowSkeets(
                         viewModel = timelineViewModel,
+                        settingsState = settingsState,
                         state = timelineState,
                         modifier = Modifier.padding(values),
                         onReplyTap = onReplyTap,
@@ -608,10 +620,12 @@ private fun InnerTimelineView(
 
                     TabBarDestinations.NOTIFICATIONS -> NotificationsView(
                         viewModel = timelineViewModel,
+                        settingsState = settingsState,
                         state = notificationsState,
                         modifier = Modifier,
                         isScrollEnabled = isScrollEnabled,
                         onReplyTap = onReplyTap,
+                        onProfileTap = onProfileTap,
                         scaffoldPadding = values,
                         onSeeMoreTap = onSeeMoreTap
                     )
