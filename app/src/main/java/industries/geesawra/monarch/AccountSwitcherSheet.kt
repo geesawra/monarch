@@ -60,7 +60,10 @@ fun AccountSwitcherSheet(
                 modifier = Modifier.padding(start = 24.dp, bottom = 16.dp)
             )
 
-            accounts.forEach { account ->
+            val active = accounts.filter { it.did == activeDid }
+            val rest = accounts.filter { it.did != activeDid }.sortedByDescending { it.handle }
+            val sortedAccounts = active + rest
+            sortedAccounts.forEach { account ->
                 val isActive = account.did == activeDid
                 Row(
                     modifier = Modifier
