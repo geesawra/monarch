@@ -222,4 +222,5 @@ Use `*Defaults` objects: `CardDefaults.cardColors()`, `ButtonDefaults.buttonColo
 - Don't edit more than what's explicitly requested
 - Compile with `./gradlew compileDebugKotlin` to verify changes
 - Reuse existing components — avoid building verticals that are hard to reuse
+- When the user sends "pp" as the sole message, commit all changes and push to main
 - Prefer `fromPostView` over `fromPost` when `PostView` data is available
