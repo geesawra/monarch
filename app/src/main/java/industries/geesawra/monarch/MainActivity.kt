@@ -161,6 +161,9 @@ class MainActivity : ComponentActivity() {
                                 onSettingsTap = {
                                     navController.navigate(ViewList.Settings.name)
                                 },
+                                onAddAccount = {
+                                    navController.navigate(ViewList.Login.name)
+                                },
                                 onFirstLoad = {
                                     if (firstLoadDone.value) {
                                         return@MainView
@@ -209,8 +212,22 @@ class MainActivity : ComponentActivity() {
                         composable(route = ViewList.Settings.name) {
                             SettingsView(
                                 settingsViewModel = settingsViewModel,
+                                timelineViewModel = timelineViewModel,
                                 backButton = {
                                     navController.popBackStack()
+                                },
+                                onLogout = {
+                                    timelineViewModel.logout {
+                                        if (timelineViewModel.accounts.isEmpty()) {
+                                            navController.navigate(ViewList.Login.name) {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        } else {
+                                            navController.navigate(ViewList.Main.name) {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        }
+                                    }
                                 },
                             )
                         }

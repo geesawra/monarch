@@ -195,7 +195,7 @@ private fun RenderNotification(
 
         is Notification.Mention -> SkeetView(
             viewModel = viewModel,
-            skeet = SkeetData.fromPost(
+            skeet = notification.hydratedPost ?: SkeetData.fromPost(
                 notification.parent,
                 notification.mention,
                 notification.author,
@@ -209,7 +209,7 @@ private fun RenderNotification(
 
         is Notification.Quote -> SkeetView(
             viewModel = viewModel,
-            skeet = SkeetData.fromPost(
+            skeet = notification.hydratedPost ?: SkeetData.fromPost(
                 notification.parent,
                 notification.quote,
                 notification.author,
@@ -223,7 +223,7 @@ private fun RenderNotification(
 
         is Notification.Reply -> SkeetView(
             viewModel = viewModel,
-            skeet = SkeetData.fromPost(
+            skeet = notification.hydratedPost ?: SkeetData.fromPost(
                 notification.parent,
                 notification.reply,
                 notification.author

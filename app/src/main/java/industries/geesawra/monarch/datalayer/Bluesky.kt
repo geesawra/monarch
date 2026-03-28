@@ -316,6 +316,30 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    suspend fun logout() {
+        cleanSessionData()
+        client = null
+        pdsClient = null
+        session = null
+        pdsURL = null
+        appviewProxy = null
+    }
+
+    fun resetClients() {
+        client = null
+        pdsClient = null
+        session = null
+        pdsURL = null
+    }
+
+    suspend fun changeAppview(newAppviewProxy: String) {
+        this.appviewProxy = newAppviewProxy
+        context.dataStore.edit { settings ->
+            settings[APPVIEW_PROXY] = newAppviewProxy
+        }
+        this.client = null
+    }
+
     suspend fun cleanSessionData() {
         context.dataStore.edit { settings ->
             settings.remove(SESSION)

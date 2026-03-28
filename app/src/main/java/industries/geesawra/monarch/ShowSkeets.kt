@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -141,18 +143,17 @@ fun ShowSkeets(
                                             color = MaterialTheme.colorScheme.outlineVariant
                                         )
                                     }
-                                    ConditionalCard(
-                                        text = "See more",
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(start = 12.dp),
-                                        onTap = {
+                                    FilledTonalButton(
+                                        modifier = Modifier.padding(start = 12.dp),
+                                        onClick = {
                                             if (onSeeMoreTap != null) {
                                                 viewModel.setThread(root)
                                                 onSeeMoreTap(root)
                                             }
                                         }
-                                    )
+                                    ) {
+                                        Text("See full thread")
+                                    }
                                 }
                             }
 
