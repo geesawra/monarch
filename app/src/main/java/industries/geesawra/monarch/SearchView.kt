@@ -23,8 +23,9 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -167,6 +168,7 @@ private fun SearchTabs(
 }
 
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SearchPostsResults(
     viewModel: TimelineViewModel,
@@ -240,7 +242,7 @@ private fun SearchPostsResults(
                         .padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator()
+                    CircularWavyProgressIndicator()
                 }
             }
         }
@@ -262,6 +264,7 @@ private fun SearchPostsResults(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SearchPeopleResults(
     viewModel: TimelineViewModel,
@@ -324,7 +327,7 @@ private fun SearchPeopleResults(
                         .padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator()
+                    CircularWavyProgressIndicator()
                 }
             }
         }
