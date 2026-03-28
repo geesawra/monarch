@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Card
@@ -112,6 +113,7 @@ fun ProfileView(
     backButton: () -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
+    onSettingsTap: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listState = rememberLazyListState()
@@ -188,6 +190,11 @@ fun ProfileView(
                     },
                     scrollBehavior = scrollBehavior,
                     actions = {
+                        if (profile != null && timelineViewModel.isOwnProfile()) {
+                            IconButton(onClick = onSettingsTap) {
+                                Icon(Icons.Default.Settings, "Settings")
+                            }
+                        }
                         if (profile != null && !timelineViewModel.isOwnProfile()) {
                             ProfileOverflowMenu(timelineViewModel, profile)
                         }

@@ -236,6 +236,7 @@ data class SkeetData(
                 authorLabels = post.author.labels,
                 verified = post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
+                facets = content.facets,
                 embed = post.embed,
                 createdAt = content.createdAt.toStdlibInstant(),
                 following = author.viewer?.following != null,

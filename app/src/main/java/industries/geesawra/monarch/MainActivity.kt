@@ -201,6 +201,9 @@ class MainActivity : ComponentActivity() {
                                     timelineViewModel.openProfile(did)
                                     navController.navigate(ViewList.Profile.name)
                                 },
+                                onSettingsTap = {
+                                    navController.navigate(ViewList.Settings.name)
+                                },
                             )
                         }
                         composable(route = ViewList.Settings.name) {
