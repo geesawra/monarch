@@ -47,6 +47,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -121,6 +122,21 @@ fun SkeetView(
         return
     }
 
+    val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
+    if (warningLabel != null) {
+        var revealed by remember { mutableStateOf(false) }
+        val definition = labelDefinition(warningLabel.`val`)
+
+        if (!revealed) {
+            ContentWarningCard(
+                label = definition.plaintext,
+                onShow = { revealed = true },
+                wrapWithCard = !nested,
+            )
+            return
+        }
+    }
+
     val minSize = 40.dp
 
     if (nested) {
@@ -140,7 +156,8 @@ fun SkeetView(
                     skeet = skeet,
                     showInReplyTo,
                     renderingReplyNotif,
-                    renderingMention
+                    renderingMention,
+                    onAvatarTap = onAvatarTap,
                 )
             }
 
@@ -238,7 +255,8 @@ fun SkeetView(
                     skeet = skeet,
                     showInReplyTo,
                     renderingReplyNotif,
-                    renderingMention
+                    renderingMention,
+                    onAvatarTap = onAvatarTap,
                 )
 
                 SkeetHeader(
@@ -603,6 +621,7 @@ private fun SkeetReason(
     showInReplyTo: Boolean = true,
     renderingReplyNotif: Boolean = false,
     renderingMention: Boolean = false,
+    onAvatarTap: ((Did) -> Unit)? = null,
 ) {
     Column(modifier = modifier) {
         if (renderingMention) {
@@ -638,7 +657,12 @@ private fun SkeetReason(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp),
+                            .padding(bottom = 8.dp)
+                            .then(
+                                if (onAvatarTap != null)
+                                    Modifier.clickable { onAvatarTap(it.value.by.did) }
+                                else Modifier
+                            ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -702,6 +726,11 @@ private fun SkeetReason(
 private data class LabelDefinition(
     val plaintext: String,
     val icon: ImageVector,
+)
+
+private val contentWarningLabels = setOf(
+    "porn", "sexual", "nudity", "sexual-figurative",
+    "graphic-media", "gore",
 )
 
 private val knownLabels: Map<String, LabelDefinition> = mapOf(
@@ -896,5 +925,49 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             }
         }
 
+    }
+}
+
+@Composable
+private fun ContentWarningCard(
+    label: String,
+    onShow: () -> Unit,
+    wrapWithCard: Boolean = true,
+) {
+    val content = @Composable {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onShow) {
+                Text("Show")
+            }
+        }
+    }
+
+    if (wrapWithCard) {
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            content()
+        }
+    } else {
+        content()
     }
 }

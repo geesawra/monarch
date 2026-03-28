@@ -3,6 +3,7 @@
 package industries.geesawra.monarch
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
@@ -145,6 +146,12 @@ fun MainView(
 
     LaunchedEffect(Unit) {
         onFirstLoad()
+    }
+
+    BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
+        coroutineScope.launch {
+            scaffoldState.bottomSheetState.hide()
+        }
     }
 
     BottomSheetScaffold(

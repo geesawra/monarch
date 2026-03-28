@@ -272,6 +272,7 @@ fun ComposeView(
                             showLabels = false,
                             showInReplyTo = false,
                             avatarShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape,
+                            postTextSize = settingsState.postTextSize,
                         )
                     }
                 }
