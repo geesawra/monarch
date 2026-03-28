@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -133,13 +134,15 @@ fun SkeetView(
                 }
                 .padding(top = 8.dp, start = 10.dp, end = 10.dp, bottom = 8.dp)
         ) {
-            SkeetReason(
-                modifier = Modifier.padding(start = 4.dp),
-                skeet = skeet,
-                showInReplyTo,
-                renderingReplyNotif,
-                renderingMention
-            )
+            if (showInReplyTo) {
+                SkeetReason(
+                    modifier = Modifier.padding(start = 4.dp),
+                    skeet = skeet,
+                    showInReplyTo,
+                    renderingReplyNotif,
+                    renderingMention
+                )
+            }
 
             Row(
                 modifier = Modifier
@@ -174,7 +177,7 @@ fun SkeetView(
                 )
             }
 
-            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize)
+            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
         }
     } else {
         // Top-level posts: two-column layout, thread line spans full height
@@ -246,7 +249,7 @@ fun SkeetView(
                     labelerAvatar = { viewModel?.labelerAvatar(it) }
                 )
 
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize)
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
 
                 if (!disableEmbeds) {
                     TimelinePostActionsView(
@@ -273,6 +276,7 @@ private fun SkeetContent(
     viewModel: TimelineViewModel? = null,
     onMentionClick: ((Did) -> Unit)? = null,
     postTextSize: PostTextSize = PostTextSize.Medium,
+    avatarShape: Shape = CircleShape,
 ) {
     val context = LocalContext.current
 
@@ -293,7 +297,7 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed, onShowThread, viewModel)
+    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape)
 }
 
 @Composable
@@ -303,6 +307,8 @@ fun Embeds(
     embed: PostViewEmbedUnion?,
     onShowThread: (SkeetData) -> Unit,
     viewModel: TimelineViewModel? = null,
+    postTextSize: PostTextSize = PostTextSize.Medium,
+    avatarShape: Shape = CircleShape,
 ) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
@@ -310,7 +316,11 @@ fun Embeds(
         }
 
         is PostViewEmbedUnion.VideoView -> {
-            VideoView(embed.value.playlist.uri.toUri())
+            val ar = embed.value.aspectRatio
+            VideoView(
+                embed.value.playlist.uri.toUri(),
+                aspectRatio = if (ar != null && ar.height > 0) ar.width.toFloat() / ar.height.toFloat() else null
+            )
         }
 
         is PostViewEmbedUnion.ExternalView -> {
@@ -330,6 +340,8 @@ fun Embeds(
                     embed.value,
                     onShowThread = onShowThread,
                     viewModel = viewModel,
+                    postTextSize = postTextSize,
+                    avatarShape = avatarShape,
                 )
             }
         }
@@ -346,7 +358,7 @@ fun Embeds(
                 is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
             }
 
-            Embeds(context, false, mediaValue, onShowThread, viewModel)
+            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape)
 
             OutlinedCard(
                 modifier = Modifier.padding(top = 4.dp)
@@ -356,6 +368,8 @@ fun Embeds(
                     embed.value,
                     onShowThread = onShowThread,
                     viewModel = viewModel,
+                    postTextSize = postTextSize,
+                    avatarShape = avatarShape,
                 )
             }
         }
@@ -387,10 +401,9 @@ private fun ImageView(img: List<ImagesViewImage>) {
 }
 
 @Composable
-fun VideoView(uri: Uri) {
+fun VideoView(uri: Uri, aspectRatio: Float? = null) {
     OutlinedCard(
         modifier = Modifier
-            .heightIn(max = 500.dp)
             .fillMaxWidth()
             .padding(top = 8.dp, bottom = 8.dp),
     ) {
@@ -420,10 +433,16 @@ fun VideoView(uri: Uri) {
                 controllerAutoShow = true,
                 showFullScreenButton = true,
             ),
-            volume = 0.5f,  // volume 0.0f to 1.0f
-            repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
+            volume = 0.5f,
+            repeatMode = RepeatMode.NONE,
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .then(
+                    if (aspectRatio != null)
+                        Modifier.aspectRatio(aspectRatio)
+                    else
+                        Modifier.heightIn(max = 500.dp)
+                )
         )
     }
 }
@@ -520,6 +539,8 @@ fun RecordView(
     rv: RecordView,
     onShowThread: (SkeetData) -> Unit,
     viewModel: TimelineViewModel? = null,
+    postTextSize: PostTextSize = PostTextSize.Medium,
+    avatarShape: Shape = CircleShape,
 ) {
     val rv = rv.record
     when (rv) {
@@ -531,6 +552,8 @@ fun RecordView(
                 viewModel = viewModel,
                 skeet = s,
                 nested = true,
+                postTextSize = postTextSize,
+                avatarShape = avatarShape,
                 onShowThread = onShowThread
             )
         }
@@ -545,6 +568,8 @@ private fun RecordWithMediaView(
     rv: RecordWithMediaView,
     onShowThread: (SkeetData) -> Unit,
     viewModel: TimelineViewModel? = null,
+    postTextSize: PostTextSize = PostTextSize.Medium,
+    avatarShape: Shape = CircleShape,
 ) {
     val rv = rv.record.record
     val record = when (rv) {
@@ -564,6 +589,8 @@ private fun RecordWithMediaView(
             viewModel = viewModel,
             skeet = record,
             nested = true,
+            postTextSize = postTextSize,
+            avatarShape = avatarShape,
             onShowThread = onShowThread
         )
     }
@@ -769,7 +796,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
             ) {
                 skeet.authorLabels.forEach {
                     it.neg?.let { it ->

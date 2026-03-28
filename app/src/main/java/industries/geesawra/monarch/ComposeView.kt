@@ -82,6 +82,8 @@ import app.bsky.richtext.FacetFeatureUnion
 import app.bsky.richtext.FacetLink
 import app.bsky.richtext.FacetTag
 import com.atproto.repo.StrongRef
+import industries.geesawra.monarch.datalayer.AvatarShape
+import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -91,6 +93,7 @@ import app.bsky.actor.ProfileViewBasic
 import app.bsky.richtext.FacetMention
 import sh.christian.ozone.api.Did
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
@@ -115,6 +118,7 @@ fun ComposeView(
     context: Context,
     coroutineScope: CoroutineScope,
     timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState = SettingsState(),
     inReplyTo: MutableState<SkeetData?>,
     isQuotePost: MutableState<Boolean>,
     scaffoldState: BottomSheetScaffoldState,
@@ -264,7 +268,10 @@ fun ComposeView(
                                 .background(Color.Transparent),
                             skeet = it,
                             nested = true,
-                            disableEmbeds = false
+                            disableEmbeds = false,
+                            showLabels = false,
+                            showInReplyTo = false,
+                            avatarShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape,
                         )
                     }
                 }

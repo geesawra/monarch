@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -161,6 +160,7 @@ fun MainView(
                 context = LocalContext.current,
                 coroutineScope = coroutineScope,
                 timelineViewModel = timelineViewModel,
+                settingsState = settingsState,
                 scaffoldState = scaffoldState,
                 scrollState = scrollState,
                 inReplyTo = inReplyTo,
@@ -396,9 +396,6 @@ private fun InnerTimelineView(
                             }
                         },
                         actions = {
-                            IconButton(onClick = onSettingsTap) {
-                                Icon(Icons.Default.Settings, "Settings")
-                            }
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> {
                                     if (timelineViewModel.uiState.user == null) {
