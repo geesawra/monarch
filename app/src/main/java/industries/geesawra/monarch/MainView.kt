@@ -4,6 +4,8 @@ package industries.geesawra.monarch
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
@@ -133,6 +135,7 @@ fun MainView(
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
     onSettingsTap: () -> Unit,
+    onAddAccount: () -> Unit = {},
     onFirstLoad: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
@@ -187,6 +190,7 @@ fun MainView(
                 settingsState = settingsState,
                 onProfileTap = onProfileTap,
                 onSettingsTap = onSettingsTap,
+                onAddAccount = onAddAccount,
                 fobOnClick = {
                     coroutineScope.launch {
                         scaffoldState.bottomSheetState.expand()
@@ -216,7 +220,7 @@ fun MainView(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun InnerTimelineView(
     modifier: Modifier = Modifier,
@@ -226,6 +230,7 @@ private fun InnerTimelineView(
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onProfileTap: (Did) -> Unit = {},
     onSettingsTap: () -> Unit = {},
+    onAddAccount: () -> Unit = {},
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
     onError: (String) -> Unit,
@@ -294,11 +299,6 @@ private fun InnerTimelineView(
                             text = "Feeds",
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = "via ${timelineViewModel.appviewName()}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 },
@@ -410,20 +410,41 @@ private fun InnerTimelineView(
                                     }
 
                                     val user = timelineViewModel.uiState.user!!
+                                    var showAccountSwitcher by remember { mutableStateOf(false) }
 
-                                    IconButton(onClick = { onProfileTap(user.did) }) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current)
-                                                .data(user.avatar?.uri)
-                                                .crossfade(true)
-                                                .build(),
-                                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                            contentDescription = "${user.displayName ?: user.handle.handle}'s avatar",
-                                            contentScale = ContentScale.Crop,
-                                            modifier =
-                                                Modifier
-                                                    .size(55.dp)
-                                                    .clip(CircleShape)
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(user.avatar?.uri)
+                                            .crossfade(true)
+                                            .build(),
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentDescription = "${user.displayName ?: user.handle.handle}'s avatar",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(55.dp)
+                                            .clip(CircleShape)
+                                            .combinedClickable(
+                                                onClick = { onProfileTap(user.did) },
+                                                onLongClick = { showAccountSwitcher = true }
+                                            )
+                                    )
+
+                                    if (showAccountSwitcher) {
+                                        AccountSwitcherSheet(
+                                            accounts = timelineViewModel.accounts,
+                                            activeDid = timelineViewModel.activeDid,
+                                            onSwitchAccount = { did ->
+                                                timelineViewModel.switchAccount(did)
+                                            },
+                                            onAddAccount = onAddAccount,
+                                            onRemoveAccount = { did ->
+                                                timelineViewModel.logout {
+                                                    if (timelineViewModel.accounts.isEmpty()) {
+                                                        loginError()
+                                                    }
+                                                }
+                                            },
+                                            onDismiss = { showAccountSwitcher = false }
                                         )
                                     }
                                 }

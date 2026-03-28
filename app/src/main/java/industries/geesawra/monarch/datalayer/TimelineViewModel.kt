@@ -97,7 +97,8 @@ data class TimelineUiState(
 
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
 class TimelineViewModel @AssistedInject constructor(
-    @Assisted private val bskyConn: BlueskyConn
+    @Assisted private val bskyConn: BlueskyConn,
+    private val accountManager: AccountManager,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -108,22 +109,111 @@ class TimelineViewModel @AssistedInject constructor(
     var uiState by mutableStateOf(TimelineUiState())
         private set
 
+    var accounts by mutableStateOf<List<StoredAccount>>(emptyList())
+        private set
+
+    var activeDid by mutableStateOf<String?>(null)
+        private set
+
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
 
     fun appviewName(): String = bskyConn.appviewName()
+    fun appviewProxy(): String? = bskyConn.appviewProxy
+
+    fun changeAppview(newAppviewProxy: String, then: () -> Unit = {}) {
+        viewModelScope.launch {
+            bskyConn.changeAppview(newAppviewProxy)
+            fetchAllNewData(then)
+        }
+    }
+
     fun labelDisplayName(label: Label): String = bskyConn.labelDisplayName(label)
     fun labelDescription(label: Label): String? = bskyConn.labelDescription(label)
     fun labelerAvatar(label: Label): String? = bskyConn.labelerAvatar(label)
+
+    fun refreshAccounts() {
+        viewModelScope.launch {
+            accounts = accountManager.getAccounts()
+            activeDid = accountManager.getActiveDid()
+        }
+    }
+
+    fun saveCurrentAccount() {
+        viewModelScope.launch {
+            val session = bskyConn.session ?: return@launch
+            val pds = bskyConn.pdsURL ?: return@launch
+            val appview = bskyConn.appviewProxy ?: return@launch
+            val user = uiState.user
+
+            accountManager.addAccount(
+                StoredAccount(
+                    did = session.did.did,
+                    handle = session.handle.handle,
+                    displayName = user?.displayName,
+                    avatarUrl = user?.avatar?.uri,
+                    pdsHost = pds,
+                    appviewProxy = appview,
+                    sessionJson = session.encodeToJson(),
+                )
+            )
+            refreshAccounts()
+        }
+    }
+
+    fun switchAccount(did: String, then: () -> Unit = {}) {
+        viewModelScope.launch {
+            val currentSession = bskyConn.session
+            if (currentSession != null) {
+                accountManager.updateAccountSession(currentSession.did.did, currentSession.encodeToJson())
+            }
+
+            val target = accountManager.getAccount(did) ?: return@launch
+            accountManager.setActiveDid(did)
+
+            bskyConn.storeSessionData(
+                target.pdsHost,
+                target.appviewProxy,
+                SessionData.decodeFromJson(target.sessionJson)
+            )
+            bskyConn.resetClients()
+            uiState = TimelineUiState()
+            uiState = uiState.copy(authenticated = true, sessionChecked = true)
+            refreshAccounts()
+            fetchAllNewData(then)
+        }
+    }
+
+    fun logout(then: () -> Unit = {}) {
+        viewModelScope.launch {
+            val currentDid = bskyConn.session?.did?.did
+            if (currentDid != null) {
+                accountManager.removeAccount(currentDid)
+            }
+            bskyConn.logout()
+
+            val remaining = accountManager.getAccounts()
+            if (remaining.isNotEmpty()) {
+                val next = remaining.first()
+                switchAccount(next.did, then)
+            } else {
+                uiState = TimelineUiState(sessionChecked = true)
+                refreshAccounts()
+                then()
+            }
+        }
+    }
 
     fun loadSession() {
         viewModelScope.launch {
             if (!bskyConn.hasSession()) {
                 uiState = uiState.copy(sessionChecked = true)
+                refreshAccounts()
                 return@launch
             }
 
             uiState = uiState.copy(authenticated = true, sessionChecked = true)
+            refreshAccounts()
         }
     }
 
@@ -163,13 +253,14 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun fetchSelf(): Job {
         return viewModelScope.launch {
-            val ret = bskyConn.fetchSelf().onFailure {
+            bskyConn.fetchSelf().onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
                     else -> uiState.copy(error = it.message)
                 }
             }.onSuccess {
                 uiState = uiState.copy(user = it)
+                saveCurrentAccount()
             }
         }
     }
@@ -269,35 +360,33 @@ class TimelineViewModel @AssistedInject constructor(
             )
 
             val repeatable = mutableListOf<Notification>()
-            val postsToFetch = rawNotifs.notifications.mapNotNull {
+            val postsToFetch = rawNotifs.notifications.flatMap {
                 when (it.reason) {
                     ListNotificationsReason.Like -> {
                         val l: Like = it.record.decodeAs()
-                        l.subject.uri
+                        listOf(l.subject.uri)
                     }
 
                     ListNotificationsReason.Repost -> {
                         val l: Repost = it.record.decodeAs()
-                        l.subject.uri
+                        listOf(l.subject.uri)
                     }
 
                     ListNotificationsReason.Quote -> {
                         val l: Post = it.record.decodeAs()
                         val e = l.embed
-                        when (e) {
-                            is PostEmbedUnion.Record -> {
-                                e.value.record.uri
-                            }
-
-                            is PostEmbedUnion.RecordWithMedia -> {
-                                e.value.record.record.uri
-                            }
-
+                        val quotedUri = when (e) {
+                            is PostEmbedUnion.Record -> e.value.record.uri
+                            is PostEmbedUnion.RecordWithMedia -> e.value.record.record.uri
                             else -> null
                         }
+                        listOfNotNull(it.uri, quotedUri)
                     }
 
-                    else -> null
+                    ListNotificationsReason.Mention -> listOf(it.uri)
+                    ListNotificationsReason.Reply -> listOf(it.uri)
+
+                    else -> emptyList()
                 }
             }.distinct()
 
@@ -306,9 +395,8 @@ class TimelineViewModel @AssistedInject constructor(
                     acc + bskyConn.getPosts(chunk).getOrThrow()
                         .associate {
                             val record = it.record.decodeAs<Post>()
-                            it.uri to (SkeetData.fromPost(
-                                (it.cid to it.uri),
-                                record,
+                            it.uri to (SkeetData.fromPostView(
+                                it,
                                 it.author
                             ) to record)
                         }
@@ -339,12 +427,14 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Mention -> {
                         val p: Post = it.record.decodeAs()
+                        val hydrated = posts[it.uri]?.first
                         Notification.Mention(
                             Pair(it.cid, it.uri),
                             p,
                             it.author,
                             p.createdAt.toStdlibInstant(),
-                            !it.isRead
+                            !it.isRead,
+                            hydrated,
                         )
                     }
 
@@ -401,18 +491,21 @@ class TimelineViewModel @AssistedInject constructor(
                             ), // TODO: handle recordwithmedia
                             it.author,
                             p.createdAt.toStdlibInstant(),
-                            !it.isRead
+                            !it.isRead,
+                            posts[it.uri]?.first,
                         )
                     }
 
                     ListNotificationsReason.Reply -> {
                         val p: Post = it.record.decodeAs()
+                        val hydrated = posts[it.uri]?.first
                         Notification.Reply(
                             Pair(it.cid, it.uri),
                             p,
                             it.author,
                             p.createdAt.toStdlibInstant(),
-                            !it.isRead
+                            !it.isRead,
+                            hydrated,
                         )
                     }
 

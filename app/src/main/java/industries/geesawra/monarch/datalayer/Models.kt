@@ -719,7 +719,8 @@ sealed class Notification {
         val reply: Post,
         val author: ProfileView,
         val createdAt: Instant,
-        val new: Boolean
+        val new: Boolean,
+        val hydratedPost: SkeetData? = null,
     ) :
         Notification()
 
@@ -731,7 +732,8 @@ sealed class Notification {
         val mention: Post,
         val author: ProfileView,
         val createdAt: Instant,
-        val new: Boolean
+        val new: Boolean,
+        val hydratedPost: SkeetData? = null,
     ) :
         Notification()
 
@@ -741,7 +743,8 @@ sealed class Notification {
         val quotedPost: PostViewEmbedUnion,
         val author: ProfileView,
         val createdAt: Instant,
-        val new: Boolean
+        val new: Boolean,
+        val hydratedPost: SkeetData? = null,
     ) :
         Notification()
 
