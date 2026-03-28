@@ -17,7 +17,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -76,8 +77,11 @@ fun ShowSkeets(
             items = data.filter { !it.replyToNotFollowing && it.cid !in threadContextCids },
             key = { _, skeet -> skeet.key() }
         ) { idx, skeet ->
-            Card(
-                modifier = Modifier.padding(start = (skeet.nestingLevel * 16).dp)
+            ElevatedCard(
+                modifier = Modifier.padding(start = (skeet.nestingLevel * 16).dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                ),
             ) {
                 val isRepost = when (skeet.reason) {
                     is FeedViewPostReasonUnion.ReasonRepost -> true
@@ -116,7 +120,7 @@ fun ShowSkeets(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .width(44.dp)
+                                            .width(40.dp)
                                             .fillMaxHeight(),
                                         contentAlignment = Alignment.Center
                                     ) {

@@ -15,21 +15,25 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -37,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -65,18 +68,17 @@ fun name(p: ProfileView): String {
     }
 }
 
-@OptIn(ExperimentalTime::class)
+@OptIn(ExperimentalTime::class, ExperimentalLayoutApi::class)
 @Composable
 fun LikeRepostRowView(
     modifier: Modifier = Modifier,
     data: RepeatedNotification,
     onShowThread: (SkeetData) -> Unit = {},
 ) {
-    val minSize = 24.dp
+    val avatarSize = 28.dp
     val showAvatars = remember { mutableStateOf(false) }
 
-    Surface(
-        color = Color.Transparent,
+    Column(
         modifier = modifier
             .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
             .fillMaxWidth()
@@ -87,73 +89,88 @@ fun LikeRepostRowView(
         val firstAuthor = authors.first()
         val firstAuthorName = name(firstAuthor.author)
         val remainingCount = authors.size - 1
+        val actionVerb = when (data.kind) {
+            RepeatableNotification.Like -> "liked"
+            RepeatableNotification.Repost -> "reposted"
+        }
         val reasonLine = when {
-            remainingCount > 1 -> "$firstAuthorName and $remainingCount others ${
-                when (data.kind) {
-                    RepeatableNotification.Like -> "liked"
-                    RepeatableNotification.Repost -> "reposted"
-                }
-            } this"
-
-            remainingCount == 1 -> "$firstAuthorName and 1 other ${
-                when (data.kind) {
-                    RepeatableNotification.Like -> "liked"
-                    RepeatableNotification.Repost -> "reposted"
-                }
-            } this"
-
-            else -> "$firstAuthorName ${
-                when (data.kind) {
-                    RepeatableNotification.Like -> "liked"
-                    RepeatableNotification.Repost -> "reposted"
-                }
-            } this"
+            remainingCount > 1 -> "$firstAuthorName and $remainingCount others $actionVerb this"
+            remainingCount == 1 -> "$firstAuthorName and 1 other $actionVerb this"
+            else -> "$firstAuthorName $actionVerb this"
         }
 
-        Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 4.dp)
         ) {
-            AnimatedContent(
-                targetState = showAvatars.value,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(150, 150)) togetherWith
-                            fadeOut(animationSpec = tween(150)) using
-                            SizeTransform { initialSize, targetSize ->
-                                if (targetState) {
-                                    keyframes {
-                                        IntSize(targetSize.width, initialSize.height) at 150
-                                        durationMillis = 300
-                                    }
-                                } else {
-                                    keyframes {
-                                        IntSize(initialSize.width, targetSize.height) at 150
-                                        durationMillis = 300
-                                    }
+            Image(
+                imageVector = when (data.kind) {
+                    RepeatableNotification.Like -> HeartFilled
+                    RepeatableNotification.Repost -> Icons.Default.Repeat
+                },
+                colorFilter = ColorFilter.tint(
+                    when (data.kind) {
+                        RepeatableNotification.Like -> MaterialTheme.colorScheme.error
+                        RepeatableNotification.Repost -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                ),
+                contentDescription = "${
+                    when (data.kind) {
+                        RepeatableNotification.Like -> "Like"
+                        RepeatableNotification.Repost -> "Repost"
+                    }
+                } icon",
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = reasonLine,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = HumanReadable.timeAgo(data.timestamp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+
+        AnimatedContent(
+            targetState = showAvatars.value,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(150, 150)) togetherWith
+                        fadeOut(animationSpec = tween(150)) using
+                        SizeTransform { initialSize, targetSize ->
+                            if (targetState) {
+                                keyframes {
+                                    IntSize(targetSize.width, initialSize.height) at 150
+                                    durationMillis = 300
+                                }
+                            } else {
+                                keyframes {
+                                    IntSize(initialSize.width, targetSize.height) at 150
+                                    durationMillis = 300
                                 }
                             }
-                }, label = "size transform"
-            ) {
-                when (it) {
-                    true -> Column(
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        IconButton(
-                            modifier = Modifier.align(Alignment.End),
-                            onClick = {
-                                showAvatars.value = !showAvatars.value
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Close avatar list",
-                            )
                         }
-                        data.authors.take(8).forEachIndexed { idx, it ->
+            }, label = "size transform"
+        ) {
+            when (it) {
+                true -> Column {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    ) {
+                        data.authors.take(8).forEach {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Start,
                                 modifier = Modifier
-                                    .fillMaxWidth()
                                     .clickable {
                                         Log.d(
                                             "LikeRepostRowView",
@@ -169,144 +186,88 @@ fun LikeRepostRowView(
                                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     contentDescription = "Avatar",
                                     modifier = Modifier
-                                        .size(
-                                            when (data.kind) {
-                                                RepeatableNotification.Like -> minSize + 8.dp
-                                                RepeatableNotification.Repost -> minSize
-                                            }
-                                        )
+                                        .size(avatarSize)
                                         .border(
                                             width = 1.dp,
-                                            color = MaterialTheme.colorScheme.surface,
+                                            color = MaterialTheme.colorScheme.surfaceContainerLow,
                                             shape = CircleShape
                                         )
                                         .clip(CircleShape)
                                 )
-
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 4.dp),
                                     text = name(it.author),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                 )
                             }
                         }
                     }
+                    IconButton(
+                        modifier = Modifier.align(Alignment.End),
+                        onClick = {
+                            showAvatars.value = !showAvatars.value
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Close avatar list",
+                        )
+                    }
+                }
 
-                    false -> Column {
-                        Box(
-                            modifier = Modifier
-                                .clickable {
-                                    if (data.authors.count() > 1) {
-                                        showAvatars.value = !showAvatars.value
-                                    }
-                                }
-                                .fillMaxWidth()
-                        ) {
-                            data.authors.take(8).reversed().forEachIndexed { idx, it ->
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(it.author.avatar?.uri)
-                                        .crossfade(true)
-                                        .build(),
-                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentDescription = "Avatar",
-                                    modifier = Modifier
-                                        .size(
-                                            when (data.kind) {
-                                                RepeatableNotification.Like -> minSize + 8.dp
-                                                RepeatableNotification.Repost -> minSize
-                                            }
-                                        )
-                                        .offset(
-                                            x = when (idx) {
-                                                0 -> 0.dp
-                                                else -> (idx * 16).dp
-                                            }
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.surface,
-                                            shape = CircleShape
-                                        )
-                                        .clip(CircleShape)
-                                )
+                false -> Box(
+                    modifier = Modifier
+                        .clickable {
+                            if (data.authors.count() > 1) {
+                                showAvatars.value = !showAvatars.value
                             }
                         }
-
-                        Text(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = reasonLine,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-
-                    }
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.Start,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
-            ) {
-                Image(
-                    imageVector = when (data.kind) {
-                        RepeatableNotification.Like -> {
-                            HeartFilled
-                        }
-
-                        RepeatableNotification.Repost -> {
-                            Icons.Default.Repeat
-                        }
-                    },
-                    colorFilter = ColorFilter.tint(
-                        when (data.kind) {
-                            RepeatableNotification.Like -> MaterialTheme.colorScheme.error
-                            RepeatableNotification.Repost -> MaterialTheme.colorScheme.inverseSurface
-                        }
-                    ),
-                    contentDescription = "${
-                        when (data.kind) {
-                            RepeatableNotification.Like -> "Like"
-                            RepeatableNotification.Repost -> "Repost"
-                        }
-                    } icon",
-                    modifier = Modifier
-                        .size(minSize)
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 16.dp)
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp)
                 ) {
-                    Text(
-                        text = HumanReadable.timeAgo(data.timestamp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedCard(
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) {
-                        SkeetView(
-                            modifier = Modifier.padding(bottom = 8.dp),
-                            viewModel = null,
-                            skeet = data.post,
-                            nested = true,
-                            showLabels = false,
-                            onShowThread = onShowThread,
+                    data.authors.take(8).reversed().forEachIndexed { idx, it ->
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(it.author.avatar?.uri)
+                                .crossfade(true)
+                                .build(),
+                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            contentDescription = "Avatar",
+                            modifier = Modifier
+                                .size(avatarSize)
+                                .offset(
+                                    x = when (idx) {
+                                        0 -> 0.dp
+                                        else -> (idx * 18).dp
+                                    }
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    shape = CircleShape
+                                )
+                                .clip(CircleShape)
                         )
                     }
                 }
             }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+            modifier = Modifier.padding(start = 28.dp)
+        ) {
+            SkeetView(
+                modifier = Modifier.padding(bottom = 8.dp),
+                viewModel = null,
+                skeet = data.post,
+                nested = true,
+                showLabels = false,
+                onShowThread = onShowThread,
+            )
         }
     }
 }

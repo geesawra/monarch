@@ -101,7 +101,7 @@ fun TimelinePostActionsView(
     val replies = remember { mutableLongStateOf(skeet.replies ?: 0) }
 
     Row(
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier,
     ) {

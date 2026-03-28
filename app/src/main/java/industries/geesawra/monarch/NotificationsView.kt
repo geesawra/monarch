@@ -16,8 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,9 +63,12 @@ fun NotificationsView(
             items = viewModel.uiState.notifications,
             key = { it.createdAt() }
         ) { notif ->
-            Card(
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = if (notif.new() && viewModel.uiState.unreadNotificationsAmt != 0) 8.dp else 0.dp,
+            ElevatedCard(
+                elevation = CardDefaults.elevatedCardElevation(
+                    defaultElevation = if (notif.new() && viewModel.uiState.unreadNotificationsAmt != 0) 4.dp else 1.dp,
+                ),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
@@ -141,7 +144,10 @@ private fun RenderNotification(
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
-                OutlinedCard(
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ),
                     modifier = Modifier.padding(
                         top = 8.dp,
                         start = 40.dp,

@@ -136,6 +136,85 @@ The Bluesky SDK (`sh.christian.ozone:bluesky:0.3.3`) provides typed XRPC methods
 
 For record creation, use `BlueskyJson.encodeAsJsonContent()` to convert typed records to `JsonContent` for `createRecord`/`putRecord`.
 
+## Material 3 Design Guidelines
+
+Reference: https://m3.material.io/
+
+### Color System
+
+Five key colors, each with a tonal palette of 13 tones:
+
+| Role | Purpose |
+|------|---------|
+| **Primary** | Main components, prominent buttons, active states, elevated surface tint |
+| **Secondary** | Less prominent components (filter chips), color expression |
+| **Tertiary** | Contrasting accents to balance primary/secondary |
+| **Surface** | Backgrounds and container surfaces |
+| **Error** | Error states and destructive actions |
+
+Color pairing rules — always use matching on-colors:
+- `onPrimary` on `primary`, `onPrimaryContainer` on `primaryContainer`
+- `onSurface` for high-emphasis text, `onSurfaceVariant` for medium-emphasis
+- Never mix incompatible pairs (e.g. `tertiaryContainer` + `primaryContainer`)
+
+Dynamic color (Android 12+): use `dynamicLightColorScheme()` / `dynamicDarkColorScheme()` with static fallback.
+
+### Typography Scale (15 styles)
+
+| Category | Large | Medium | Small |
+|----------|-------|--------|-------|
+| **Display** | 57/64sp | 45/52sp | 36/44sp |
+| **Headline** | 32/40sp | 28/36sp | 24/32sp |
+| **Title** | 22/28sp | 16/24sp, w500 | 14/20sp, w500 |
+| **Body** | 16/24sp | 14/20sp | 12/16sp |
+| **Label** | 14/20sp, w500 | 12/16sp, w500 | 11/16sp, w500 |
+
+Access via `MaterialTheme.typography.titleLarge`, `.bodyMedium`, etc.
+
+### Shape Scale
+
+| Size | Corner Radius |
+|------|--------------|
+| Extra Small | 4.dp |
+| Small | 8.dp |
+| Medium | 12.dp |
+| Large | 16.dp |
+| Extra Large | 24.dp |
+
+Access via `MaterialTheme.shapes.medium`, etc. Also: `RectangleShape`, `CircleShape`.
+
+### Elevation
+
+M3 uses **tonal color overlays** (surface tint) instead of shadows. Use `tonalElevation` for visual hierarchy, `shadowElevation` sparingly for floating elements.
+
+### Button Emphasis Hierarchy (high → low)
+
+1. `ExtendedFloatingActionButton` / `FloatingActionButton` — highest emphasis
+2. `Button` (filled) — high emphasis
+3. `FilledTonalButton` — medium-high
+4. `OutlinedButton` — medium
+5. `TextButton` — low emphasis
+
+### Navigation by Screen Size
+
+| Device | Component |
+|--------|-----------|
+| Compact (phone) | `NavigationBar` (bottom, ≤5 destinations) |
+| Medium (tablet landscape) | `NavigationRail` (side) |
+| Large (tablet/desktop) | `PermanentNavigationDrawer` |
+
+### Component Color Customization
+
+Use `*Defaults` objects: `CardDefaults.cardColors()`, `ButtonDefaults.buttonColors()`, `CardDefaults.cardElevation()`, etc.
+
+### Key Principles
+
+- Tonal palettes ensure accessible contrast automatically
+- Support both light and dark themes
+- Use `MaterialTheme.colorScheme.*` for all colors — avoid hardcoded values
+- Pair container colors with their on-container counterparts
+- Use typography scale roles semantically (display for hero text, body for content, label for buttons)
+
 ## Guidelines
 
 - Use Material 3 / Material You components and patterns
