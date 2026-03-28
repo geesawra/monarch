@@ -46,6 +46,8 @@ import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.PostView
 import app.bsky.feed.Repost
+import app.bsky.feed.Threadgate
+import app.bsky.feed.ThreadgateAllowUnion
 import app.bsky.labeler.GetServicesQueryParams
 import app.bsky.labeler.GetServicesResponse
 import app.bsky.labeler.GetServicesResponseViewUnion
@@ -693,6 +695,7 @@ class BlueskyConn(val context: Context) {
         quotePostRef: StrongRef? = null,
         facets: List<Facet> = listOf(),
         linkPreview: LinkPreviewData? = null,
+        threadgateRules: List<ThreadgateAllowUnion>? = null,
     ): Result<Unit> {
         return runCatching {
             create().onFailure {
@@ -774,9 +777,32 @@ class BlueskyConn(val context: Context) {
             )
             return when (postRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not create post: ${postRes.error?.message}"))
-                is AtpResponse.Success<*> -> Result.success(Unit)
+                is AtpResponse.Success<CreateRecordResponse> -> {
+                    if (threadgateRules != null) {
+                        createThreadgate(postRes.response.uri, threadgateRules)
+                    }
+                    Result.success(Unit)
+                }
             }
         }
+    }
+
+    private suspend fun createThreadgate(postUri: AtUri, rules: List<ThreadgateAllowUnion>) {
+        val record = BlueskyJson.encodeAsJsonContent(
+            Threadgate(
+                post = postUri,
+                allow = rules,
+                createdAt = Clock.System.now().toDeprecatedInstant(),
+            )
+        )
+        pdsClient!!.createRecord(
+            CreateRecordRequest(
+                repo = session!!.handle,
+                collection = Nsid("app.bsky.feed.threadgate"),
+                record = record,
+                rkey = postUri.rkey(),
+            )
+        )
     }
 
     suspend fun fetchRecord(uri: AtUri): Result<JsonContent> {

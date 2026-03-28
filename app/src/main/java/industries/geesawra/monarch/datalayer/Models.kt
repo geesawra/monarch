@@ -31,6 +31,7 @@ import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.ReplyRef
 import app.bsky.feed.ReplyRefParentUnion
 import app.bsky.feed.ReplyRefRootUnion
+import app.bsky.feed.ThreadgateView
 import app.bsky.richtext.Facet
 import app.bsky.richtext.FacetFeatureUnion
 import com.atproto.label.Label
@@ -109,6 +110,7 @@ data class SkeetData(
     val createdAt: Instant? = null,
     val facets: List<Facet> = listOf(),
     val postLabels: List<Label> = listOf(),
+    val threadgate: ThreadgateView? = null,
     val blocked: Boolean = false,
     val notFound: Boolean = false,
     val following: Boolean = false,
@@ -132,6 +134,7 @@ data class SkeetData(
                 authorHandle = post.post.author.handle,
                 authorLabels = post.post.author.labels,
                 postLabels = post.post.labels,
+                threadgate = post.post.threadgate,
                 verified = post.post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
                 embed = post.post.embed,
@@ -237,6 +240,7 @@ data class SkeetData(
                 authorHandle = post.author.handle,
                 authorLabels = post.author.labels,
                 postLabels = post.labels,
+                threadgate = post.threadgate,
                 verified = post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
                 facets = content.facets,
