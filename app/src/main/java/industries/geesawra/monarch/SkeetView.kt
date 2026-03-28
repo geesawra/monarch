@@ -57,6 +57,7 @@ import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -79,6 +80,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.atproto.label.Label
+import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.Did
@@ -101,6 +103,8 @@ fun SkeetView(
     inThread: Boolean = false,
     showInReplyTo: Boolean = true,
     showLabels: Boolean = true,
+    postTextSize: PostTextSize = PostTextSize.Medium,
+    avatarShape: Shape = CircleShape,
     renderingReplyNotif: Boolean = false,
     renderingMention: Boolean = false,
     onShowThread: (SkeetData) -> Unit = {},
@@ -152,7 +156,7 @@ fun SkeetView(
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(minSize)
-                        .clip(CircleShape)
+                        .clip(avatarShape)
                         .then(
                             if (onAvatarTap != null && skeet.did != null)
                                 Modifier.clickable { onAvatarTap(skeet.did!!) }
@@ -170,7 +174,7 @@ fun SkeetView(
                 )
             }
 
-            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap)
+            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize)
         }
     } else {
         // Top-level posts: two-column layout, thread line spans full height
@@ -200,7 +204,7 @@ fun SkeetView(
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(minSize)
-                        .clip(CircleShape)
+                        .clip(avatarShape)
                         .then(
                             if (onAvatarTap != null && skeet.did != null)
                                 Modifier.clickable { onAvatarTap(skeet.did!!) }
@@ -242,7 +246,7 @@ fun SkeetView(
                     labelerAvatar = { viewModel?.labelerAvatar(it) }
                 )
 
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap)
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize)
 
                 if (!disableEmbeds) {
                     TimelinePostActionsView(
@@ -268,14 +272,20 @@ private fun SkeetContent(
     onShowThread: (SkeetData) -> Unit,
     viewModel: TimelineViewModel? = null,
     onMentionClick: ((Did) -> Unit)? = null,
+    postTextSize: PostTextSize = PostTextSize.Medium,
 ) {
     val context = LocalContext.current
 
     if (skeet.content.isNotEmpty()) {
+        val textStyle = when (postTextSize) {
+            PostTextSize.Small -> MaterialTheme.typography.bodySmall
+            PostTextSize.Medium -> MaterialTheme.typography.bodyMedium
+            PostTextSize.Large -> MaterialTheme.typography.bodyLarge
+        }
         Text(
             text = skeet.annotatedContent(onMentionClick = onMentionClick),
             color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyLarge,
+            style = textStyle,
         )
     }
 

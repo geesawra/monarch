@@ -37,7 +37,11 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
+import androidx.compose.foundation.isSystemInDarkTheme
 import industries.geesawra.monarch.datalayer.BlueskyConn
+import industries.geesawra.monarch.datalayer.SettingsState
+import industries.geesawra.monarch.datalayer.SettingsViewModel
+import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.ui.theme.MonarchTheme
 import sh.christian.ozone.api.Did
@@ -51,6 +55,7 @@ enum class ViewList() {
     Main,
     ShowThread,
     Profile,
+    Settings,
 }
 
 @AndroidEntryPoint
@@ -64,8 +69,19 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val firstLoadDone = remember { mutableStateOf(false) }
+            val settingsViewModel = hiltViewModel<SettingsViewModel>()
+            val settings = settingsViewModel.settingsState
 
-            MonarchTheme {
+            val darkTheme = when (settings.themeMode) {
+                ThemeMode.System -> isSystemInDarkTheme()
+                ThemeMode.Light -> false
+                ThemeMode.Dark -> true
+            }
+
+            MonarchTheme(
+                darkTheme = darkTheme,
+                dynamicColor = settings.dynamicColor,
+            ) {
                 val context = LocalContext.current
                 SingletonImageLoader.setSafe {
                     ImageLoader.Builder(context)
@@ -130,6 +146,7 @@ class MainActivity : ComponentActivity() {
                         composable(route = ViewList.Main.name) {
                             MainView(
                                 timelineViewModel = timelineViewModel,
+                                settingsState = settings,
                                 coroutineScope = rememberCoroutineScope(),
                                 onLoginError = {
                                     navController.navigate(ViewList.Login.name)
@@ -140,6 +157,9 @@ class MainActivity : ComponentActivity() {
                                 onProfileTap = { did ->
                                     timelineViewModel.openProfile(did)
                                     navController.navigate(ViewList.Profile.name)
+                                },
+                                onSettingsTap = {
+                                    navController.navigate(ViewList.Settings.name)
                                 },
                                 onFirstLoad = {
                                     if (firstLoadDone.value) {
@@ -155,6 +175,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .windowInsetsPadding(WindowInsets.statusBars),
                                 timelineViewModel = timelineViewModel,
+                                settingsState = settings,
                                 coroutineScope = rememberCoroutineScope(),
                                 backButton = {
                                     navController.popBackStack()
@@ -168,6 +189,7 @@ class MainActivity : ComponentActivity() {
                         composable(route = ViewList.Profile.name) {
                             ProfileView(
                                 timelineViewModel = timelineViewModel,
+                                settingsState = settings,
                                 coroutineScope = rememberCoroutineScope(),
                                 backButton = {
                                     navController.popBackStack()
@@ -178,6 +200,14 @@ class MainActivity : ComponentActivity() {
                                 onProfileTap = { did ->
                                     timelineViewModel.openProfile(did)
                                     navController.navigate(ViewList.Profile.name)
+                                },
+                            )
+                        }
+                        composable(route = ViewList.Settings.name) {
+                            SettingsView(
+                                settingsViewModel = settingsViewModel,
+                                backButton = {
+                                    navController.popBackStack()
                                 },
                             )
                         }

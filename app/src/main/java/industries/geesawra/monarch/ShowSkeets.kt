@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -31,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
+import industries.geesawra.monarch.datalayer.AvatarShape
+import industries.geesawra.monarch.datalayer.PostTextSize
+import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -45,10 +49,12 @@ fun ShowSkeets(
     data: List<SkeetData>,
     isShowingThread: Boolean = false,
     shouldFetchMoreData: Boolean = true,
+    settingsState: SettingsState = SettingsState(),
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onSeeMoreTap: ((SkeetData) -> Unit)? = null,
     onProfileTap: ((Did) -> Unit)? = null,
 ) {
+    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
     // Collect CIDs already shown as thread context (root/parent) to avoid duplicates
     val threadContextCids = remember(data) {
         if (isShowingThread) emptySet()
@@ -99,6 +105,9 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
+                                postTextSize = settingsState.postTextSize,
+                                avatarShape = avatarClipShape,
+                                showLabels = settingsState.showLabels,
                                 onAvatarTap = onProfileTap,
                                 onShowThread = { skeet ->
                                     if (onSeeMoreTap != null) {
@@ -152,6 +161,9 @@ fun ShowSkeets(
                                 skeet = it,
                                 onReplyTap = onReplyTap,
                                 inThread = true,
+                                postTextSize = settingsState.postTextSize,
+                                avatarShape = avatarClipShape,
+                                showLabels = settingsState.showLabels,
                                 onAvatarTap = onProfileTap,
                                 onShowThread = { skeet ->
                                     if (onSeeMoreTap != null) {
@@ -169,6 +181,9 @@ fun ShowSkeets(
                     skeet = skeet,
                     onReplyTap = onReplyTap,
                     showInReplyTo = parent == null,
+                    postTextSize = settingsState.postTextSize,
+                    avatarShape = avatarClipShape,
+                    showLabels = settingsState.showLabels,
                     onAvatarTap = onProfileTap,
                     onShowThread = { skeet ->
                         if (onSeeMoreTap != null) {
