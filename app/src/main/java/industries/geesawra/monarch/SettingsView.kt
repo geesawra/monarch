@@ -242,7 +242,7 @@ fun SettingsView(
                     "Bluesky" to "did:web:api.bsky.app#bsky_appview",
                     "Blacksky" to "did:web:api.blacksky.community#bsky_appview",
                 )
-                val currentProxy = timelineViewModel.appviewProxy() ?: ""
+                var currentProxy by remember { mutableStateOf(timelineViewModel.appviewProxy() ?: "") }
                 var showCustomDialog by remember { mutableStateOf(false) }
 
                 knownAppviews.forEach { (name, did) ->
@@ -254,6 +254,7 @@ fun SettingsView(
                                 selected = currentProxy == did,
                                 onClick = {
                                     if (currentProxy != did) {
+                                        currentProxy = did
                                         timelineViewModel.changeAppview(did)
                                     }
                                 }
@@ -261,6 +262,7 @@ fun SettingsView(
                         },
                         modifier = Modifier.clickable {
                             if (currentProxy != did) {
+                                currentProxy = did
                                 timelineViewModel.changeAppview(did)
                             }
                         }
@@ -308,6 +310,7 @@ fun SettingsView(
                             TextButton(
                                 onClick = {
                                     if (customDid.isNotBlank()) {
+                                        currentProxy = customDid.trim()
                                         timelineViewModel.changeAppview(customDid.trim())
                                         showCustomDialog = false
                                     }

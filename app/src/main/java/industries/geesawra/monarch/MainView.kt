@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
@@ -153,7 +154,9 @@ fun MainView(
         onFirstLoad()
     }
 
+    val focusManager = LocalFocusManager.current
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
+        focusManager.clearFocus()
         coroutineScope.launch {
             scaffoldState.bottomSheetState.hide()
         }
