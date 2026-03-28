@@ -43,11 +43,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraRoll
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -58,6 +67,8 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
@@ -82,6 +93,10 @@ import app.bsky.richtext.FacetFeatureUnion
 import app.bsky.richtext.FacetLink
 import app.bsky.richtext.FacetTag
 import com.atproto.repo.StrongRef
+import app.bsky.feed.ThreadgateAllowUnion
+import app.bsky.feed.ThreadgateFollowerRule
+import app.bsky.feed.ThreadgateFollowingRule
+import app.bsky.feed.ThreadgateMentionRule
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
@@ -134,6 +149,7 @@ fun ComposeView(
     val facets = remember { mutableListOf<Facet>() }
     val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val mediaSelectedIsVideo = remember { mutableStateOf(false) }
+    val threadgateRules = remember { mutableStateOf<List<ThreadgateAllowUnion>?>(null) }
     val mentionResults = remember { mutableStateOf(listOf<ProfileViewBasic>()) }
     val showMentionDropdown = remember { mutableStateOf(false) }
     val mentionDids = remember { mutableStateMapOf<String, Did>() }
@@ -634,7 +650,8 @@ fun ComposeView(
                     inReplyTo.value,
                     isQuotePost.value,
                     facets = facets,
-                    linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null
+                    linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
+                    threadgateRules = threadgateRules,
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -698,23 +715,46 @@ fun ActionRow(
     inReplyToData: SkeetData? = null,
     isQuotePost: Boolean = false,
     facets: List<Facet> = listOf(),
-    linkPreview: LinkPreviewData? = null
+    linkPreview: LinkPreviewData? = null,
+    threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
 ) {
+    var showThreadgateSheet by remember { mutableStateOf(false) }
+
+    if (showThreadgateSheet) {
+        ThreadgateSheet(
+            currentRules = threadgateRules.value,
+            onDismiss = { showThreadgateSheet = false },
+            onApply = { rules ->
+                threadgateRules.value = rules
+                showThreadgateSheet = false
+            }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
                 vertical = 8.dp,
-            ), // Internal padding for the button row
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TextButton(
-            onClick = {
-                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+        Row {
+            TextButton(
+                onClick = {
+                    pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                }
+            ) {
+                Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
             }
-        ) {
-            Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
+            TextButton(onClick = { showThreadgateSheet = true }) {
+                Icon(
+                    Icons.Default.Shield,
+                    contentDescription = "Reply settings",
+                    tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
+            }
         }
 
         val postButtonEnabled = remember(postText, mediaSelected.value) {
@@ -751,7 +791,8 @@ fun ActionRow(
                             } else {
                                 null
                             },
-                            linkPreview = linkPreview
+                            linkPreview = linkPreview,
+                            threadgateRules = threadgateRules.value,
                         ).onSuccess {
                             coroutineScope.launch {
                                 scaffoldState.bottomSheetState.hide()
@@ -858,4 +899,114 @@ private fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap())
     }
 
     return facets
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThreadgateSheet(
+    currentRules: List<ThreadgateAllowUnion>?,
+    onDismiss: () -> Unit,
+    onApply: (List<ThreadgateAllowUnion>?) -> Unit,
+) {
+    var nobody by remember { mutableStateOf(currentRules != null && currentRules.isEmpty()) }
+    var followers by remember {
+        mutableStateOf(currentRules?.any { it is ThreadgateAllowUnion.FollowerRule } == true)
+    }
+    var following by remember {
+        mutableStateOf(currentRules?.any { it is ThreadgateAllowUnion.FollowingRule } == true)
+    }
+    var mentions by remember {
+        mutableStateOf(currentRules?.any { it is ThreadgateAllowUnion.MentionRule } == true)
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp)
+        ) {
+            Text(
+                text = "Who can reply",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                SegmentedButton(
+                    selected = !nobody,
+                    onClick = { nobody = false },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                ) { Text("Anyone") }
+                SegmentedButton(
+                    selected = nobody,
+                    onClick = {
+                        nobody = true
+                        followers = false
+                        following = false
+                        mentions = false
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                ) { Text("Nobody") }
+            }
+
+            ListItem(
+                headlineContent = { Text("Your followers") },
+                leadingContent = {
+                    Checkbox(
+                        checked = followers,
+                        onCheckedChange = { followers = it },
+                        enabled = !nobody,
+                    )
+                },
+                modifier = Modifier.clickable(enabled = !nobody) { followers = !followers }
+            )
+            ListItem(
+                headlineContent = { Text("People you follow") },
+                leadingContent = {
+                    Checkbox(
+                        checked = following,
+                        onCheckedChange = { following = it },
+                        enabled = !nobody,
+                    )
+                },
+                modifier = Modifier.clickable(enabled = !nobody) { following = !following }
+            )
+            ListItem(
+                headlineContent = { Text("People you mention") },
+                leadingContent = {
+                    Checkbox(
+                        checked = mentions,
+                        onCheckedChange = { mentions = it },
+                        enabled = !nobody,
+                    )
+                },
+                modifier = Modifier.clickable(enabled = !nobody) { mentions = !mentions }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    if (nobody) {
+                        onApply(emptyList())
+                    } else if (!followers && !following && !mentions) {
+                        onApply(null)
+                    } else {
+                        val rules = mutableListOf<ThreadgateAllowUnion>()
+                        if (followers) rules += ThreadgateAllowUnion.FollowerRule(ThreadgateFollowerRule)
+                        if (following) rules += ThreadgateAllowUnion.FollowingRule(ThreadgateFollowingRule)
+                        if (mentions) rules += ThreadgateAllowUnion.MentionRule(ThreadgateMentionRule)
+                        onApply(rules)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Done") }
+        }
+    }
 }

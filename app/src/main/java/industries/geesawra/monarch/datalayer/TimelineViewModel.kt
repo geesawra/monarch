@@ -25,6 +25,7 @@ import app.bsky.feed.PostEmbedUnion
 import app.bsky.feed.PostReplyRef
 import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.Repost
+import app.bsky.feed.ThreadgateAllowUnion
 import app.bsky.feed.ThreadViewPostReplieUnion
 import app.bsky.graph.Follow
 import app.bsky.notification.ListNotificationsReason
@@ -669,6 +670,7 @@ class TimelineViewModel @AssistedInject constructor(
         quotePostRef: StrongRef? = null,
         facets: List<Facet> = listOf(),
         linkPreview: LinkPreviewData? = null,
+        threadgateRules: List<ThreadgateAllowUnion>? = null,
     ): Result<Unit> {
         return bskyConn.post(
             content,
@@ -677,8 +679,9 @@ class TimelineViewModel @AssistedInject constructor(
             replyRef,
             quotePostRef,
             facets,
-            linkPreview = linkPreview
-        ) // TODO: maybe refactor this to use uistate.Error?
+            linkPreview = linkPreview,
+            threadgateRules = threadgateRules,
+        )
     }
 
     fun feeds(): Job {
