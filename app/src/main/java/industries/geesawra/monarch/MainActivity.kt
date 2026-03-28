@@ -243,8 +243,14 @@ class MainActivity : ComponentActivity() {
                                         .verticalScroll(rememberScrollState()),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    LoginView {
-                                        navController.navigate(ViewList.Main.name)
+                                    LoginView(
+                                        blueskyConn = conn,
+                                    ) {
+                                        timelineViewModel.onNewLogin()
+                                        firstLoadDone.value = false
+                                        navController.navigate(ViewList.Main.name) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
                                     }
                                 }
                             }

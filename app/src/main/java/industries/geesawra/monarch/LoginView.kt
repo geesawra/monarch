@@ -49,6 +49,7 @@ import sh.christian.ozone.api.Handle
 @Composable
 fun LoginView(
     modifier: Modifier = Modifier,
+    blueskyConn: BlueskyConn? = null,
     navigate: () -> Unit
 ) {
     var password by remember { mutableStateOf("") }
@@ -56,7 +57,7 @@ fun LoginView(
     var passwordVisible by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
-    val bc = BlueskyConn(ctx)
+    val bc = blueskyConn ?: BlueskyConn(ctx)
     val appPasswordRegex = "[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}".toRegex()
     var currentPDS by remember { mutableStateOf("") }
     var lookingUpPDS by remember { mutableStateOf(false) }
