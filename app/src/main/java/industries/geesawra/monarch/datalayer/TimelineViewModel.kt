@@ -417,7 +417,7 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Like -> {
                         val l: Like = it.record.decodeAs()
-                        val lp = posts[l.subject.uri]!!
+                        val lp = posts[l.subject.uri] ?: return@mapNotNull null
 
                         repeatable += Notification.RawLike(
                             l.subject,
@@ -459,9 +459,9 @@ class TimelineViewModel @AssistedInject constructor(
                         }
 
                         if (quotedUrl == null) {
-                            throw Exception("quote notification without a record or record media!")
+                            return@mapNotNull null
                         }
-                        val lp = posts[quotedUrl]!!
+                        val lp = posts[quotedUrl] ?: return@mapNotNull null
                         val skeetData = lp.first
                         val post = lp.second
                         Notification.Quote(
@@ -516,7 +516,7 @@ class TimelineViewModel @AssistedInject constructor(
 
                     ListNotificationsReason.Repost -> {
                         val p: Repost = it.record.decodeAs()
-                        val rpp = posts[p.subject.uri]!!
+                        val rpp = posts[p.subject.uri] ?: return@mapNotNull null
                         repeatable += Notification.RawRepost(
                             p.subject,
                             rpp.first,
