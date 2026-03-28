@@ -92,6 +92,8 @@ import coil3.request.crossfade
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -412,6 +414,8 @@ private fun InnerTimelineView(
                                     val user = timelineViewModel.uiState.user!!
                                     var showAccountSwitcher by remember { mutableStateOf(false) }
 
+                                    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
+
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(user.avatar?.uri)
@@ -421,8 +425,8 @@ private fun InnerTimelineView(
                                         contentDescription = "${user.displayName ?: user.handle.handle}'s avatar",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
-                                            .size(55.dp)
-                                            .clip(CircleShape)
+                                            .size(40.dp)
+                                            .clip(avatarClipShape)
                                             .combinedClickable(
                                                 onClick = { onProfileTap(user.did) },
                                                 onLongClick = { showAccountSwitcher = true }

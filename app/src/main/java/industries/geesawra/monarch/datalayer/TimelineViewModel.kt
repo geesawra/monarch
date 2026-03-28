@@ -204,6 +204,11 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    fun onNewLogin() {
+        bskyConn.resetClients()
+        uiState = TimelineUiState(authenticated = true, sessionChecked = true)
+    }
+
     fun loadSession() {
         viewModelScope.launch {
             if (!bskyConn.hasSession()) {
