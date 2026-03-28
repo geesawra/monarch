@@ -41,8 +41,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -708,37 +707,43 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = authorName,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            if (skeet.verified) {
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.Filled.Verified,
-                    contentDescription = "Verified",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = authorName,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-            if (isBot) {
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.Filled.SmartToy,
-                    contentDescription = "Bot account",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (skeet.verified) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Filled.Verified,
+                        contentDescription = "Verified",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                if (isBot) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Filled.SmartToy,
+                        contentDescription = "Bot account",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             skeet.createdAt?.let {
-                Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = HumanReadable.timeAgo(it),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
         }
@@ -774,26 +779,36 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                     }
                     val description = labelDescription(it)
 
-                    val chipIcon: @Composable () -> Unit = {
-                        val avatarUrl = labelerAvatar(it)
-                        if (avatarUrl != null) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(avatarUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                contentDescription = definition.plaintext,
-                                modifier = Modifier
-                                    .size(SuggestionChipDefaults.IconSize)
-                                    .clip(CircleShape)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = definition.icon,
-                                contentDescription = definition.plaintext,
-                                modifier = Modifier.size(SuggestionChipDefaults.IconSize),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    val chipContent = @Composable {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val avatarUrl = labelerAvatar(it)
+                            if (avatarUrl != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(avatarUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentDescription = definition.plaintext,
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = definition.icon,
+                                    contentDescription = definition.plaintext,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = definition.plaintext,
+                                style = MaterialTheme.typography.labelSmall,
                             )
                         }
                     }
@@ -826,16 +841,17 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                             }
                         }
 
-                        SuggestionChip(
+                        Surface(
                             onClick = { showSheet = true },
-                            label = { Text(text = definition.plaintext) },
-                            icon = chipIcon,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            content = chipContent,
                         )
                     } else {
-                        SuggestionChip(
-                            onClick = {},
-                            label = { Text(text = definition.plaintext) },
-                            icon = chipIcon,
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            content = chipContent,
                         )
                     }
                 }
