@@ -407,28 +407,23 @@ private fun InnerTimelineView(
                         actions = {
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> {
-                                    if (timelineViewModel.uiState.user == null) {
-                                        return@TopAppBar
-                                    }
-
-                                    val user = timelineViewModel.uiState.user!!
+                                    val user = timelineViewModel.uiState.user
                                     var showAccountSwitcher by remember { mutableStateOf(false) }
-
                                     val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
 
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
-                                            .data(user.avatar?.uri)
+                                            .data(user?.avatar?.uri)
                                             .crossfade(true)
                                             .build(),
                                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentDescription = "${user.displayName ?: user.handle.handle}'s avatar",
+                                        contentDescription = "Profile avatar",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(avatarClipShape)
                                             .combinedClickable(
-                                                onClick = { onProfileTap(user.did) },
+                                                onClick = { user?.let { onProfileTap(it.did) } },
                                                 onLongClick = { showAccountSwitcher = true }
                                             )
                                     )

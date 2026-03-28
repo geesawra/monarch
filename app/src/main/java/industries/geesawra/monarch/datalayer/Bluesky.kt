@@ -1045,14 +1045,21 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException(it.message))
             }
             val prefs = pdsClient!!.getPreferences().requireResponse()
-            val feedUris = (prefs.preferences.first {
-                when (it) {
-                    is PreferencesUnion.SavedFeedsPrefV2 -> true
-                    else -> false
-                }
-            } as PreferencesUnion.SavedFeedsPrefV2).value.items.filter {
+            val savedFeeds = prefs.preferences.firstOrNull {
+                it is PreferencesUnion.SavedFeedsPrefV2
+            } as? PreferencesUnion.SavedFeedsPrefV2
+
+            if (savedFeeds == null) {
+                return Result.success(emptyList())
+            }
+
+            val feedUris = savedFeeds.value.items.filter {
                 it.type.value != "timeline"
             }.map { AtUri(it.value) }
+
+            if (feedUris.isEmpty()) {
+                return Result.success(emptyList())
+            }
 
             val resp = client!!.getFeedGenerators(
                 GetFeedGeneratorsQueryParams(
@@ -1067,12 +1074,15 @@ class BlueskyConn(val context: Context) {
     suspend fun subscribedLabelers(): Result<Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>> {
         return runCatching {
             val prefs = pdsClient!!.getPreferences().requireResponse()
-            val labelers = (prefs.preferences.first {
-                when (it) {
-                    is PreferencesUnion.LabelersPref -> true
-                    else -> false
-                }
-            } as PreferencesUnion.LabelersPref).value.labelers.map { it.did }.toMutableList()
+            val labelersPref = prefs.preferences.firstOrNull {
+                it is PreferencesUnion.LabelersPref
+            } as? PreferencesUnion.LabelersPref
+
+            if (labelersPref == null) {
+                return Result.success(emptyMap())
+            }
+
+            val labelers = labelersPref.value.labelers.map { it.did }.toMutableList()
 
             val res = client!!.getServices(
                 GetServicesQueryParams(
