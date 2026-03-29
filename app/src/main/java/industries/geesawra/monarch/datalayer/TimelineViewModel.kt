@@ -26,6 +26,7 @@ import app.bsky.feed.PostReplyRef
 import app.bsky.feed.PostViewEmbedUnion
 import app.bsky.feed.Repost
 import app.bsky.feed.ThreadgateAllowUnion
+import app.bsky.feed.ThreadViewPostParentUnion
 import app.bsky.feed.ThreadViewPostReplieUnion
 import app.bsky.graph.Follow
 import app.bsky.notification.ListNotificationsReason
@@ -802,8 +803,18 @@ class TimelineViewModel @AssistedInject constructor(
                     level = level
                 )
 
-                else -> ThreadPost(level = level) // Default for unknown
+                else -> ThreadPost(level = level)
             }
+        }
+
+        val parents = mutableListOf<SkeetData>()
+        if (level == 0) {
+            var current = threadUnion.value.parent
+            while (current is ThreadViewPostParentUnion.ThreadViewPost) {
+                parents.add(SkeetData.fromPostView(current.value.post, current.value.post.author))
+                current = current.value.parent
+            }
+            parents.reverse()
         }
 
         val currentPostSkeetData =
@@ -830,6 +841,14 @@ class TimelineViewModel @AssistedInject constructor(
                 },
                 level = level + 1
             )
+        }
+
+        if (parents.isNotEmpty()) {
+            var result = ThreadPost(post = currentPostSkeetData, level = parents.size, replies = replies)
+            for (i in parents.indices.reversed()) {
+                result = ThreadPost(post = parents[i], level = i, replies = listOf(result))
+            }
+            return result
         }
 
         return ThreadPost(
