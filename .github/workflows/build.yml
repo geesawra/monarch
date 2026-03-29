@@ -19,6 +19,12 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/android-sdk
+          key: android-sdk-36-build-tools-36.1.0
+
       - name: Set up Android SDK
         run: |
           source install-android-sdk.sh
