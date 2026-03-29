@@ -188,10 +188,12 @@ fun SkeetView(
             if (!contentRevealed && warningLabel != null) {
                 ContentWarningCard(
                     label = labelDefinition(warningLabel.`val`).plaintext,
-                    onShow = { contentRevealed = true },
+                    revealed = contentRevealed,
+                    onToggle = { contentRevealed = !contentRevealed },
                     wrapWithCard = false,
                 )
-            } else {
+            }
+            if (contentRevealed) {
                 SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
             }
         }
@@ -267,13 +269,15 @@ fun SkeetView(
                     labelerAvatar = { viewModel?.labelerAvatar(it) }
                 )
 
-                if (!contentRevealed && warningLabel != null) {
+                if (warningLabel != null) {
                     ContentWarningCard(
                         label = labelDefinition(warningLabel.`val`).plaintext,
-                        onShow = { contentRevealed = true },
+                        revealed = contentRevealed,
+                        onToggle = { contentRevealed = !contentRevealed },
                         wrapWithCard = false,
                     )
-                } else {
+                }
+                if (contentRevealed) {
                     SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
 
                     if (!disableEmbeds) {
@@ -962,7 +966,8 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
 @Composable
 private fun ContentWarningCard(
     label: String,
-    onShow: () -> Unit,
+    revealed: Boolean = false,
+    onToggle: () -> Unit,
     wrapWithCard: Boolean = true,
 ) {
     val content = @Composable {
@@ -987,9 +992,9 @@ private fun ContentWarningCard(
             val haptic = LocalHapticFeedback.current
             TextButton(onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onShow()
+                onToggle()
             }) {
-                Text("Show")
+                Text(if (revealed) "Hide" else "Show")
             }
         }
     }
