@@ -76,7 +76,10 @@ fun NotificationsView(
                     defaultElevation = if (notif.new() && viewModel.uiState.unreadNotificationsAmt != 0) 4.dp else 1.dp,
                 ),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    containerColor = if (notif.new() && viewModel.uiState.unreadNotificationsAmt != 0)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceContainerLow
                 ),
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {

@@ -201,9 +201,19 @@ class BlueskyConn(val context: Context) {
 
                 val httpClient = HttpClient(OkHttp) {
                     install(HttpTimeout) {
-                        requestTimeoutMillis = 15000
-                        connectTimeoutMillis = 15000
-                        socketTimeoutMillis = 15000
+                        requestTimeoutMillis = 30000
+                        connectTimeoutMillis = 30000
+                        socketTimeoutMillis = 30000
+                    }
+                    install(HttpRequestRetry) {
+                        maxRetries = 3
+                        retryIf { _, response ->
+                            response.status.value in 500..599
+                        }
+                        retryOnExceptionIf { _, cause ->
+                            cause is java.io.IOException
+                        }
+                        exponentialDelay()
                     }
                 }
 
@@ -214,6 +224,8 @@ class BlueskyConn(val context: Context) {
                         path(did)
                     }
                 }
+
+                httpClient.close()
 
                 if (rawDoc.status != HttpStatusCode.OK) {
                     return Result.failure(Exception("PLC lookup HTTP status code ${rawDoc.status}"))
@@ -381,43 +393,56 @@ class BlueskyConn(val context: Context) {
                 url(pdsURL)
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 15000
-                connectTimeoutMillis = 15000
-                socketTimeoutMillis = 15000
+                requestTimeoutMillis = 30000
+                connectTimeoutMillis = 30000
+                socketTimeoutMillis = 30000
+            }
+            install(HttpRequestRetry) {
+                maxRetries = 3
+                retryIf { _, response ->
+                    response.status.value in 500..599
+                }
+                retryOnExceptionIf { _, cause ->
+                    cause is java.io.IOException
+                }
+                exponentialDelay()
             }
         }
 
-        val client = XrpcBlueskyApi(httpClient)
+        try {
+            val client = XrpcBlueskyApi(httpClient)
 
-        val s = client.createSession(CreateSessionRequest(handle, password))
-        val sessionResponse: CreateSessionResponse = when (s) {
-            is AtpResponse.Failure<*> -> {
-                createMutex.unlock()
-                return Result.failure(
-                    Exception(
-                        "Failed to create session: ${
-                            s.error?.message?.toLowerCase(
-                                Locale.current
-                            )
-                        }"
+            val s = client.createSession(CreateSessionRequest(handle, password))
+            val sessionResponse: CreateSessionResponse = when (s) {
+                is AtpResponse.Failure<*> -> {
+                    return Result.failure(
+                        Exception(
+                            "Failed to create session: ${
+                                s.error?.message?.toLowerCase(
+                                    Locale.current
+                                )
+                            }"
+                        )
                     )
-                )
+                }
+
+                is AtpResponse.Success<CreateSessionResponse> -> s.response
             }
 
-            is AtpResponse.Success<CreateSessionResponse> -> s.response
+            storeSessionData(
+                pdsURL,
+                appviewProxy,
+                SessionData.fromCreateSessionResponse(sessionResponse)
+            )
+            session = null
+            this.client = null
+            this.pdsClient = null
+
+            return Result.success(Unit)
+        } finally {
+            httpClient.close()
+            createMutex.unlock()
         }
-
-        storeSessionData(
-            pdsURL,
-            appviewProxy,
-            SessionData.fromCreateSessionResponse(sessionResponse)
-        )
-        session = null
-        this.client = null
-        this.pdsClient = null
-
-        createMutex.unlock()
-        return Result.success(Unit)
     }
 
     @Serializable
@@ -439,17 +464,17 @@ class BlueskyConn(val context: Context) {
                 headers["atproto-proxy"] = appviewProxy
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 15000
-                connectTimeoutMillis = 15000
-                socketTimeoutMillis = 15000
+                requestTimeoutMillis = 30000
+                connectTimeoutMillis = 30000
+                socketTimeoutMillis = 30000
             }
             install(HttpRequestRetry) {
-                maxRetries = 5
+                maxRetries = 3
                 retryIf { _, response ->
-                    response.status.value == 503
+                    response.status.value in 500..599
                 }
                 retryOnExceptionIf { _, cause ->
-                    cause.message?.contains("upstream service unavailable", ignoreCase = true) == true
+                    cause is java.io.IOException
                 }
                 exponentialDelay()
             }
@@ -470,17 +495,17 @@ class BlueskyConn(val context: Context) {
                 url(pds)
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 15000
-                connectTimeoutMillis = 15000
-                socketTimeoutMillis = 15000
+                requestTimeoutMillis = 30000
+                connectTimeoutMillis = 30000
+                socketTimeoutMillis = 30000
             }
             install(HttpRequestRetry) {
-                maxRetries = 5
+                maxRetries = 3
                 retryIf { _, response ->
-                    response.status.value == 503
+                    response.status.value in 500..599
                 }
                 retryOnExceptionIf { _, cause ->
-                    cause.message?.contains("upstream service unavailable", ignoreCase = true) == true
+                    cause is java.io.IOException
                 }
                 exponentialDelay()
             }
@@ -497,18 +522,28 @@ class BlueskyConn(val context: Context) {
         appviewProxy: String,
         token: SessionData,
     ): Result<Unit> {
-        return runCatching {
-            val httpClient = HttpClient(OkHttp) {
-                defaultRequest {
-                    url(pdsURL)
-                }
-                install(HttpTimeout) {
-                    requestTimeoutMillis = 15000
-                    connectTimeoutMillis = 15000
-                    socketTimeoutMillis = 15000
-                }
+        val httpClient = HttpClient(OkHttp) {
+            defaultRequest {
+                url(pdsURL)
             }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 30000
+                connectTimeoutMillis = 30000
+                socketTimeoutMillis = 30000
+            }
+            install(HttpRequestRetry) {
+                maxRetries = 3
+                retryIf { _, response ->
+                    response.status.value in 500..599
+                }
+                retryOnExceptionIf { _, cause ->
+                    cause is java.io.IOException
+                }
+                exponentialDelay()
+            }
+        }
 
+        try {
             val gs = httpClient.get {
                 headers["Authorization"] = "Bearer " + token.accessJwt
                 url {
@@ -518,12 +553,12 @@ class BlueskyConn(val context: Context) {
             }
 
             when (gs.status) {
-                HttpStatusCode.OK -> run {
+                HttpStatusCode.OK -> {
                     this.session = token
                     return Result.success(Unit)
                 }
 
-                else -> run {
+                else -> {
                     val body: String = gs.body()
 
                     val error: atpError =
@@ -532,10 +567,13 @@ class BlueskyConn(val context: Context) {
                             body
                         )
                     if (error.error == "ExpiredToken") {
-                        return@run
+                        // fall through to refresh
+                    } else if (gs.status.value in 500..599) {
+                        return Result.failure(Exception("Server error during session check: ${gs.status}"))
+                    } else {
+                        cleanSessionData()
+                        return Result.failure(LoginException("Session checking failed, status code ${gs.status}: ${error.message}"))
                     }
-                    cleanSessionData()
-                    return Result.failure(Exception("Session checking failed, status code ${gs.status}: ${error.message}"))
                 }
             }
 
@@ -548,7 +586,7 @@ class BlueskyConn(val context: Context) {
             }
 
             when (rs.status) {
-                HttpStatusCode.OK -> run {
+                HttpStatusCode.OK -> {
                     val body: String = rs.body()
                     val rs: RefreshSessionResponse =
                         BlueskyJson.decodeFromString(
@@ -561,7 +599,7 @@ class BlueskyConn(val context: Context) {
                     return Result.success(Unit)
                 }
 
-                else -> run {
+                else -> {
                     val body: String = rs.body()
 
                     val error: atpError =
@@ -569,19 +607,24 @@ class BlueskyConn(val context: Context) {
                             atpError.serializer(),
                             body
                         )
+                    if (rs.status.value in 500..599) {
+                        return Result.failure(Exception("Server error during token refresh: ${rs.status}"))
+                    }
                     cleanSessionData()
-                    return Result.failure(Exception("Login refresh failed, status code ${rs.status}: ${error.message}"))
+                    return Result.failure(LoginException("Login refresh failed, status code ${rs.status}: ${error.message}"))
                 }
             }
-
+        } catch (e: Exception) {
+            return Result.failure(e)
+        } finally {
+            httpClient.close()
         }
     }
 
     suspend fun create(): Result<Unit> {
-        return runCatching {
-            createMutex.lock()
+        createMutex.lock()
+        try {
             if (session != null && client != null && pdsClient != null && pdsURL != null) {
-                createMutex.unlock()
                 return Result.success(Unit)
             }
 
@@ -601,14 +644,12 @@ class BlueskyConn(val context: Context) {
             val appviewProxy = appviewProxyFlow.first()
 
             if (pdsURL.isEmpty() || sessionDataString.isEmpty() || appviewProxy.isEmpty()) {
-                createMutex.unlock()
                 return Result.failure(Exception("No session data found"))
             }
 
             val sessionData = SessionData.decodeFromJson(sessionDataString)
 
             refreshIfNeeded(pdsURL, appviewProxy, sessionData).onFailure {
-                createMutex.unlock()
                 return Result.failure(it)
             }
             this.pdsURL = pdsURL
@@ -621,7 +662,7 @@ class BlueskyConn(val context: Context) {
                 sessionData,
             )
 
-            val labelerMap = this.subscribedLabelers().getOrThrow()
+            val labelerMap = this.subscribedLabelers().getOrDefault(emptyMap())
             buildLabelCache(labelerMap)
             labelCacheFetchCount = 0
             val labelers = labelerMap.keys.mapNotNull { it?.did }
@@ -632,6 +673,10 @@ class BlueskyConn(val context: Context) {
                 labelers
             )
 
+            return Result.success(Unit)
+        } catch (e: Exception) {
+            return Result.failure(e)
+        } finally {
             createMutex.unlock()
         }
     }
@@ -639,7 +684,7 @@ class BlueskyConn(val context: Context) {
     suspend fun fetchFeed(feed: String, cursor: String? = null): Result<Timeline> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val timeline = client!!.getFeed(
@@ -666,7 +711,7 @@ class BlueskyConn(val context: Context) {
     ): Result<Timeline> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val timeline = client!!.getTimeline(
@@ -699,7 +744,7 @@ class BlueskyConn(val context: Context) {
     ): Result<Unit> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             var postEmbed: PostEmbedUnion? = null
@@ -808,7 +853,7 @@ class BlueskyConn(val context: Context) {
     suspend fun fetchRecord(uri: AtUri): Result<JsonContent> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = pdsClient!!.getRecord(
@@ -829,7 +874,7 @@ class BlueskyConn(val context: Context) {
     suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = client!!.getProfile(
@@ -848,7 +893,7 @@ class BlueskyConn(val context: Context) {
     suspend fun fetchSelf(): Result<ProfileViewDetailed> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             return fetchActor(session!!.did)
@@ -859,19 +904,32 @@ class BlueskyConn(val context: Context) {
     private suspend fun uploadBlobFromUrl(imageUrl: String): Blob? {
         val httpClient = HttpClient(OkHttp) {
             install(HttpTimeout) {
-                requestTimeoutMillis = 10000
-                connectTimeoutMillis = 5000
-                socketTimeoutMillis = 10000
+                requestTimeoutMillis = 30000
+                connectTimeoutMillis = 30000
+                socketTimeoutMillis = 30000
+            }
+            install(HttpRequestRetry) {
+                maxRetries = 3
+                retryIf { _, response ->
+                    response.status.value in 500..599
+                }
+                retryOnExceptionIf { _, cause ->
+                    cause is java.io.IOException
+                }
+                exponentialDelay()
             }
         }
-        val response = httpClient.get(imageUrl)
-        if (!response.status.isSuccess()) return null
-        val bytes: ByteArray = response.body()
-        httpClient.close()
-        val uploadResponse = pdsClient!!.uploadBlob(bytes)
-        return when (uploadResponse) {
-            is AtpResponse.Failure<*> -> null
-            is AtpResponse.Success<UploadBlobResponse> -> uploadResponse.response.blob
+        try {
+            val response = httpClient.get(imageUrl)
+            if (!response.status.isSuccess()) return null
+            val bytes: ByteArray = response.body()
+            val uploadResponse = pdsClient!!.uploadBlob(bytes)
+            return when (uploadResponse) {
+                is AtpResponse.Failure<*> -> null
+                is AtpResponse.Success<UploadBlobResponse> -> uploadResponse.response.blob
+            }
+        } finally {
+            httpClient.close()
         }
     }
     private data class MediaBlob(
@@ -885,7 +943,7 @@ class BlueskyConn(val context: Context) {
 
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val uploadedBlobs = mutableListOf<MediaBlob>()
@@ -923,7 +981,7 @@ class BlueskyConn(val context: Context) {
     private suspend fun uploadVideo(video: Uri): Result<MediaBlob> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val retriever = MediaMetadataRetriever()
@@ -967,9 +1025,19 @@ class BlueskyConn(val context: Context) {
                     url("https://video.bsky.app")
                 }
                 install(HttpTimeout) {
-                    requestTimeoutMillis = 15000
-                    connectTimeoutMillis = 15000
-                    socketTimeoutMillis = 15000
+                    requestTimeoutMillis = 300000
+                    connectTimeoutMillis = 30000
+                    socketTimeoutMillis = 300000
+                }
+                install(HttpRequestRetry) {
+                    maxRetries = 3
+                    retryIf { _, response ->
+                        response.status.value in 500..599
+                    }
+                    retryOnExceptionIf { _, cause ->
+                        cause is java.io.IOException
+                    }
+                    exponentialDelay()
                 }
                 install(ContentNegotiation) {
                     register(
@@ -1020,6 +1088,7 @@ class BlueskyConn(val context: Context) {
                     }
 
                     else -> {
+                        httpClient.close()
                         return Result.failure(Exception("Failed uploading video: status code ${rs.status}"))
                     }
                 }
@@ -1031,9 +1100,12 @@ class BlueskyConn(val context: Context) {
                         videoBskyAppClient.getJobStatus(GetJobStatusQueryParams(uploadRes!!.jobId))
 
                     val resp = when (response) {
-                        is AtpResponse.Failure<*> -> return Result.failure(
-                            Exception("Failed video processing job status check: ${response.error}")
-                        )
+                        is AtpResponse.Failure<*> -> {
+                            httpClient.close()
+                            return Result.failure(
+                                Exception("Failed video processing job status check: ${response.error}")
+                            )
+                        }
 
                         is AtpResponse.Success<GetJobStatusResponse> -> response.response.jobStatus
                     }
@@ -1045,16 +1117,20 @@ class BlueskyConn(val context: Context) {
 
                     when (resp.state) {
                         State.JOBSTATECOMPLETED -> {} // ignore, as we check blobk anyway
-                        State.JOBSTATEFAILED -> return Result.failure(Exception("Video processing failed, ${resp.error}: ${resp.message}"))
+                        State.JOBSTATEFAILED -> {
+                            httpClient.close()
+                            return Result.failure(Exception("Video processing failed, ${resp.error}: ${resp.message}"))
+                        }
                         is State.Unknown -> delay(1000)
                     }
                 } catch (e: Exception) {
-                    // Network or other error. Return the failure and exit the loop.
+                    httpClient.close()
                     return Result.failure(e)
                 }
             }
 
 
+            httpClient.close()
             return Result.success(
                 MediaBlob(
                     blob = uploadedBlobs.first(),
@@ -1068,7 +1144,7 @@ class BlueskyConn(val context: Context) {
     suspend fun feeds(): Result<List<GeneratorView>> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
             val prefs = pdsClient!!.getPreferences().requireResponse()
             val savedFeeds = prefs.preferences.firstOrNull {
@@ -1141,7 +1217,7 @@ class BlueskyConn(val context: Context) {
     ): Result<ListNotificationsResponse> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = client!!.listNotifications(
@@ -1159,7 +1235,7 @@ class BlueskyConn(val context: Context) {
     suspend fun updateSeenNotifications(): Result<Unit> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = pdsClient!!.updateSeen(
@@ -1178,7 +1254,7 @@ class BlueskyConn(val context: Context) {
     suspend fun getPosts(uri: List<AtUri>): Result<List<PostView>> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = client!!.getPosts(
@@ -1197,7 +1273,7 @@ class BlueskyConn(val context: Context) {
     suspend fun like(uri: AtUri, cid: Cid): Result<RKey> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val like = BlueskyJson.encodeAsJsonContent(
@@ -1228,7 +1304,7 @@ class BlueskyConn(val context: Context) {
     suspend fun repost(uri: AtUri, cid: Cid): Result<RKey> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val like = BlueskyJson.encodeAsJsonContent(
@@ -1267,7 +1343,7 @@ class BlueskyConn(val context: Context) {
     suspend fun getThread(uri: AtUri): Result<GetPostThreadResponse> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val res = client!!.getPostThread(
@@ -1286,7 +1362,7 @@ class BlueskyConn(val context: Context) {
     suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val res = client!!.searchActorsTypeahead(
@@ -1310,7 +1386,7 @@ class BlueskyConn(val context: Context) {
     ): Result<Timeline> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = client!!.getAuthorFeed(
@@ -1334,7 +1410,7 @@ class BlueskyConn(val context: Context) {
     suspend fun follow(did: Did): Result<RKey> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val follow = BlueskyJson.encodeAsJsonContent(
@@ -1368,7 +1444,7 @@ class BlueskyConn(val context: Context) {
     suspend fun muteActor(did: Did): Result<Unit> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = pdsClient!!.muteActor(
@@ -1385,7 +1461,7 @@ class BlueskyConn(val context: Context) {
     suspend fun getProfileRecord(): Result<Profile> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = pdsClient!!.getRecord(
@@ -1413,7 +1489,7 @@ class BlueskyConn(val context: Context) {
     ): Result<Unit> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             // First get the current profile to preserve fields we don't change
@@ -1478,7 +1554,7 @@ class BlueskyConn(val context: Context) {
     ): Result<Pair<List<PostView>, String?>> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = client!!.searchPosts(
@@ -1506,7 +1582,7 @@ class BlueskyConn(val context: Context) {
     ): Result<Pair<List<app.bsky.actor.ProfileView>, String?>> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = client!!.searchActors(
@@ -1529,7 +1605,7 @@ class BlueskyConn(val context: Context) {
     suspend fun unmuteActor(did: Did): Result<Unit> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val ret = pdsClient!!.unmuteActor(
@@ -1546,7 +1622,7 @@ class BlueskyConn(val context: Context) {
     private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> {
         return runCatching {
             create().onFailure {
-                return Result.failure(LoginException(it.message))
+                return Result.failure(it)
             }
 
             val delRes = pdsClient!!.deleteRecord(

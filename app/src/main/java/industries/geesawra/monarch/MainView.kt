@@ -269,6 +269,7 @@ private fun InnerTimelineView(
     LaunchedEffect(timelineViewModel.uiState.error) {
         timelineViewModel.uiState.error?.let {
             onError(it)
+            timelineViewModel.clearError()
         }
     }
 
@@ -365,6 +366,7 @@ private fun InnerTimelineView(
                                         AsyncImage(
                                             model = timelineViewModel.uiState.feedAvatar,
                                             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                             modifier = Modifier
                                                 .size(40.dp)
                                                 .clip(CircleShape),
@@ -420,6 +422,7 @@ private fun InnerTimelineView(
                                             .crossfade(true)
                                             .build(),
                                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentDescription = "Profile avatar",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
@@ -705,6 +708,7 @@ fun FeedsDrawer(
                             .crossfade(true)
                             .build(),
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                         modifier = Modifier
                             .size(20.dp)
                             .clip(CircleShape),

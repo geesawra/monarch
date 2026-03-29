@@ -129,6 +129,10 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    fun clearError() {
+        uiState = uiState.copy(error = null)
+    }
+
     fun labelDisplayName(label: Label): String = bskyConn.labelDisplayName(label)
     fun labelDescription(label: Label): String? = bskyConn.labelDescription(label)
     fun labelerAvatar(label: Label): String? = bskyConn.labelerAvatar(label)

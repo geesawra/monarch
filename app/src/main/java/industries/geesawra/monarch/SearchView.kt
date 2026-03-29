@@ -370,6 +370,7 @@ private fun ActorCard(
                     .crossfade(true)
                     .build(),
                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 contentDescription = "${actor.displayName ?: actor.handle.handle}'s avatar",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

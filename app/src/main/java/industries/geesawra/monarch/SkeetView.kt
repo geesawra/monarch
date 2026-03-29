@@ -123,19 +123,7 @@ fun SkeetView(
     }
 
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
-    if (warningLabel != null) {
-        var revealed by remember { mutableStateOf(false) }
-        val definition = labelDefinition(warningLabel.`val`)
-
-        if (!revealed) {
-            ContentWarningCard(
-                label = definition.plaintext,
-                onShow = { revealed = true },
-                wrapWithCard = !nested,
-            )
-            return
-        }
-    }
+    var contentRevealed by remember { mutableStateOf(warningLabel == null) }
 
     val minSize = 40.dp
 
@@ -173,6 +161,7 @@ fun SkeetView(
                         .crossfade(true)
                         .build(),
                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(minSize)
@@ -194,7 +183,15 @@ fun SkeetView(
                 )
             }
 
-            SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
+            if (!contentRevealed && warningLabel != null) {
+                ContentWarningCard(
+                    label = labelDefinition(warningLabel.`val`).plaintext,
+                    onShow = { contentRevealed = true },
+                    wrapWithCard = false,
+                )
+            } else {
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
+            }
         }
     } else {
         // Top-level posts: two-column layout, thread line spans full height
@@ -221,6 +218,7 @@ fun SkeetView(
                         .crossfade(true)
                         .build(),
                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(minSize)
@@ -267,18 +265,26 @@ fun SkeetView(
                     labelerAvatar = { viewModel?.labelerAvatar(it) }
                 )
 
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
-
-                if (!disableEmbeds) {
-                    TimelinePostActionsView(
-                        onReplyTap = onReplyTap,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        timelineViewModel = viewModel,
-                        skeet = skeet,
-                        inThread = inThread
+                if (!contentRevealed && warningLabel != null) {
+                    ContentWarningCard(
+                        label = labelDefinition(warningLabel.`val`).plaintext,
+                        onShow = { contentRevealed = true },
+                        wrapWithCard = false,
                     )
+                } else {
+                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
+
+                    if (!disableEmbeds) {
+                        TimelinePostActionsView(
+                            onReplyTap = onReplyTap,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            timelineViewModel = viewModel,
+                            skeet = skeet,
+                            inThread = inThread
+                        )
+                    }
                 }
             }
         }
@@ -491,6 +497,7 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal) {
                         .crossfade(true)
                         .build(),
                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
                     contentDescription = "External link thumbnail",
@@ -679,6 +686,7 @@ private fun SkeetReason(
                                     .crossfade(true)
                                     .build(),
                                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(18.dp)
@@ -878,6 +886,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                                         .crossfade(true)
                                         .build(),
                                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     contentDescription = definition.plaintext,
                                     modifier = Modifier
                                         .size(14.dp)

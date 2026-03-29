@@ -195,6 +195,7 @@ fun LikeRepostRowView(
                                     .crossfade(true)
                                     .build(),
                                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                 contentDescription = "Avatar",
                                 modifier = Modifier
                                     .size(avatarSize + 4.dp)
@@ -234,6 +235,7 @@ fun LikeRepostRowView(
                                 .crossfade(true)
                                 .build(),
                             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                             contentDescription = "Avatar",
                             modifier = Modifier
                                 .size(avatarSize)

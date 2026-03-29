@@ -215,6 +215,7 @@ private fun DeletableImageView(
                 .crossfade(true)
                 .build(),
             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             contentDescription = image.alt,
             contentScale = ContentScale.Crop,
             modifier = if (aspectRatio != null) {

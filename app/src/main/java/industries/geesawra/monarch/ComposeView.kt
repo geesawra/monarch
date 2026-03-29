@@ -514,6 +514,7 @@ fun ComposeView(
                                             .data(profile.avatar?.uri)
                                             .build(),
                                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentDescription = "${profile.displayName ?: profile.handle.handle}'s avatar",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
@@ -572,6 +573,7 @@ fun ComposeView(
                                             .data(imgUrl)
                                             .build(),
                                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentScale = ContentScale.Crop,
                                         contentDescription = "Link preview thumbnail",
                                         modifier = Modifier

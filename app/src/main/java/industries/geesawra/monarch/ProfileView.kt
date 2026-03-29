@@ -176,6 +176,7 @@ fun ProfileView(
                                             .crossfade(true)
                                             .build(),
                                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                         contentDescription = null,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
@@ -374,6 +375,7 @@ private fun ProfileHeader(
                     .crossfade(true)
                     .build(),
                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 contentDescription = "Profile banner",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -405,6 +407,7 @@ private fun ProfileHeader(
                     .crossfade(true)
                     .build(),
                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 contentDescription = "${profile.displayName ?: profile.handle.handle}'s avatar",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -650,6 +653,7 @@ private fun EditProfileSheet(
                     AsyncImage(
                         model = bannerUri ?: profile.banner?.uri,
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                         contentDescription = "Banner",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -672,6 +676,7 @@ private fun EditProfileSheet(
                     AsyncImage(
                         model = avatarUri ?: profile.avatar?.uri,
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                         contentDescription = "Avatar",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier

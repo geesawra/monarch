@@ -83,6 +83,7 @@ fun AccountSwitcherSheet(
                             .crossfade(true)
                             .build(),
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                         contentDescription = "Avatar",
                         modifier = Modifier
                             .size(44.dp)
