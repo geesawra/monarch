@@ -16,11 +16,13 @@ Monarch isn't on the Play Store. The easiest way to install it (and keep it upda
 4. Obtanium will find the latest APK and install it
 5. Future updates show up automatically — Obtanium checks periodically and lets you know
 
-That's it. No account needed, no store listing, no tracking.
+That's it. 
 
 ### Manual install
 
-If you'd rather not use Obtanium, go to [monarch.geesawra.industries](https://monarch.geesawra.industries) in your phone's browser, tap the APK link, and install it. You'll need to allow installs from unknown sources.
+If you'd rather not use Obtanium, go to [monarch.geesawra.industries](http://monarch.geesawra.industries/index.html) in your phone's browser, tap the APK link, and install it. You'll need to allow installs from unknown sources.
+
+To make Obtanium's life easier, set `monarch-release-(.+)` as custom APK link filter.
 
 ## Building from source
 
