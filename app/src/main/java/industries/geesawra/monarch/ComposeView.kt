@@ -68,6 +68,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -763,11 +765,13 @@ fun ActionRow(
             (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars
         }
 
+        val haptic = LocalHapticFeedback.current
         if (uploadingPost.value) {
             CircularWavyProgressIndicator()
         } else {
             Button(
                 onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                     coroutineScope.launch {
                         uploadingPost.value = true // Show progress immediately
                         timelineViewModel.post(

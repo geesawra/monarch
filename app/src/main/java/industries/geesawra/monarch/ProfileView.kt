@@ -93,6 +93,8 @@ import app.bsky.actor.VerifiedStatus
 import app.bsky.feed.GetAuthorFeedFilter
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -509,10 +511,14 @@ private fun FollowButton(
     timelineViewModel: TimelineViewModel,
 ) {
     val isFollowing = profile.viewer?.following != null
+    val haptic = LocalHapticFeedback.current
 
     if (isFollowing) {
         FilledTonalButton(
-            onClick = { timelineViewModel.unfollowProfile() },
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                timelineViewModel.unfollowProfile()
+            },
         ) {
             Icon(
                 Icons.Default.PersonRemove,
@@ -524,7 +530,10 @@ private fun FollowButton(
         }
     } else {
         Button(
-            onClick = { timelineViewModel.followProfile() },
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                timelineViewModel.followProfile()
+            },
         ) {
             Icon(
                 Icons.Default.PersonAdd,

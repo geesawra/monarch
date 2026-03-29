@@ -3,6 +3,8 @@
 package industries.geesawra.monarch
 
 import android.widget.Toast
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -256,6 +258,7 @@ private fun InnerTimelineView(
         timelineViewModel.uiState.isFetchingMoreTimeline || timelineViewModel.uiState.isFetchingMoreNotifications
     val isScrollEnabled = true
     val ctx = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
 
     LaunchedEffect(timelineViewModel.uiState.loginError) {
@@ -499,6 +502,7 @@ private fun InnerTimelineView(
                                         modifier = Modifier
                                             .size(40.dp),
                                         onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             coroutineScope.launch {
                                                 launch {
                                                     if (timelineState.firstVisibleItemIndex > 8) {
@@ -526,7 +530,10 @@ private fun InnerTimelineView(
                                 }
 
                                 FloatingActionButton(
-                                    onClick = fobOnClick
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        fobOnClick()
+                                    }
                                 ) {
                                     Icon(Icons.Filled.Create, "Post")
                                 }
@@ -545,6 +552,7 @@ private fun InnerTimelineView(
                                     modifier = Modifier
                                         .size(40.dp),
                                     onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         coroutineScope.launch {
                                             launch {
                                                 if (notificationsState.firstVisibleItemIndex > 8) {
@@ -612,7 +620,10 @@ private fun InnerTimelineView(
                                 },
                                 label = { Text(stringResource(it.label)) },
                                 selected = it == currentDestination,
-                                onClick = { currentDestination = it }
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    currentDestination = it
+                                }
                             )
                         }
                     }

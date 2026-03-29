@@ -1,6 +1,14 @@
 package industries.geesawra.monarch
 
 import android.content.Intent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -33,10 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import industries.geesawra.monarch.datalayer.SkeetData
@@ -53,7 +64,8 @@ private fun IconWithNumber(
     imageVector: ImageVector,
     contentDescription: String,
     number: MutableLongState,
-    tint: Color
+    tint: Color,
+    scale: Float = 1f,
 ) {
     Row(
         horizontalArrangement = Arrangement.Center,
@@ -62,7 +74,9 @@ private fun IconWithNumber(
         Icon(
             imageVector,
             contentDescription = contentDescription,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier
+                .size(18.dp)
+                .scale(scale),
             tint = tint
         )
         Text(
@@ -99,6 +113,7 @@ fun TimelinePostActionsView(
     val likes = remember { mutableLongStateOf(skeet.likes ?: 0) }
     val reposts = remember { mutableLongStateOf(skeet.reposts ?: 0) }
     val replies = remember { mutableLongStateOf(skeet.replies ?: 0) }
+    val haptic = LocalHapticFeedback.current
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -113,6 +128,7 @@ fun TimelinePostActionsView(
 
         IconButton(
             onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 val sendIntent: Intent = Intent().apply {
                     action = Intent.ACTION_SEND
                     type = "text/plain"
@@ -133,6 +149,7 @@ fun TimelinePostActionsView(
 
         IconButton(
             onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onReplyTap(skeet, false)
             }
         ) {
@@ -157,8 +174,30 @@ fun TimelinePostActionsView(
         }
 
         var isLiked by rememberSaveable { mutableStateOf(skeet.didLike) }
+        var likeBounce by remember { mutableStateOf(false) }
+        val likeScale by animateFloatAsState(
+            targetValue = if (likeBounce) 1.3f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "likeScale"
+        )
+        LaunchedEffect(likeBounce) {
+            if (likeBounce) {
+                delay(150)
+                likeBounce = false
+            }
+        }
+        val likeColor by animateColorAsState(
+            targetValue = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            label = "likeColor"
+        )
+
         IconButton(
             onClick = {
+                likeBounce = true
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                 when (isLiked) {
                     false -> timelineViewModel?.like(skeet.uri, skeet.cid) {
                         isLiked = true
@@ -176,13 +215,36 @@ fun TimelinePostActionsView(
                 if (isLiked) HeartFilled else Heart,
                 contentDescription = "Like",
                 number = likes,
-                tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = likeColor,
+                scale = likeScale,
             )
         }
 
         var isReposted by rememberSaveable { mutableStateOf(skeet.didRepost) }
+        var repostBounce by remember { mutableStateOf(false) }
+        val repostScale by animateFloatAsState(
+            targetValue = if (repostBounce) 1.3f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "repostScale"
+        )
+        LaunchedEffect(repostBounce) {
+            if (repostBounce) {
+                delay(150)
+                repostBounce = false
+            }
+        }
+        val repostColor by animateColorAsState(
+            targetValue = if (isReposted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+            label = "repostColor"
+        )
+
         LongPressIconButton(
             onClick = {
+                repostBounce = true
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                 when (isReposted) {
                     false -> timelineViewModel?.repost(skeet.uri, skeet.cid) {
                         isReposted = true
@@ -196,6 +258,7 @@ fun TimelinePostActionsView(
                 }
             },
             onLongClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onReplyTap(skeet, true)
             }
         ) {
@@ -203,7 +266,8 @@ fun TimelinePostActionsView(
                 if (isReposted) Icons.Default.RepeatOn else Icons.Default.Repeat,
                 contentDescription = "Repost",
                 number = reposts,
-                if (isReposted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = repostColor,
+                scale = repostScale,
             )
         }
     }
