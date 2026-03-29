@@ -48,6 +48,7 @@ import com.atproto.label.Label
 import sh.christian.ozone.api.model.JsonContent
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -118,6 +119,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
+    private var seenNotificationsAt: Instant? = null
 
     fun appviewName(): String = bskyConn.appviewName()
     fun appviewProxy(): String? = bskyConn.appviewProxy
@@ -653,7 +655,12 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    fun isNotificationNew(notif: Notification): Boolean {
+        return notif.new() && (seenNotificationsAt == null || notif.createdAt() > seenNotificationsAt!!)
+    }
+
     fun updateSeenNotifications() {
+        seenNotificationsAt = Clock.System.now()
         viewModelScope.launch {
             bskyConn.updateSeenNotifications().onFailure {
                 uiState = when (it) {
