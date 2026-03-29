@@ -71,13 +71,14 @@ fun NotificationsView(
             items = viewModel.uiState.notifications,
             key = { it.createdAt() }
         ) { notif ->
+            val isUnread = viewModel.isNotificationNew(notif)
             ElevatedCard(
                 elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = if (notif.new() && viewModel.uiState.unreadNotificationsAmt != 0) 4.dp else 1.dp,
+                    defaultElevation = if (isUnread) 4.dp else 1.dp,
                 ),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = if (notif.new() && viewModel.uiState.unreadNotificationsAmt != 0)
-                        MaterialTheme.colorScheme.primaryContainer
+                    containerColor = if (isUnread)
+                        MaterialTheme.colorScheme.surfaceContainerHigh
                     else
                         MaterialTheme.colorScheme.surfaceContainerLow
                 ),
