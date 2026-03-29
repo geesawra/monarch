@@ -1,0 +1,54 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        run: |
+          source install-android-sdk.sh
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decrypt keystore
+        env:
+          AGE_KEY: ${{ secrets.AGE_KEY }}
+        run: |
+          sudo apt-get install -y age
+          echo "$AGE_KEY" > age-key.txt
+          age --decrypt -i age-key.txt -o app/keystore.jks keystore.jks.age
+          rm age-key.txt
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          sed -i '/toolchainVendor/d' gradle/gradle-daemon-jvm.properties
+          ./gradlew assembleRelease --no-daemon -Dorg.gradle.java.installations.auto-download=false
+
+      - name: Upload to Cloudflare R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npm i -D wrangler@latest
+          source ./generate-root.sh app/build/outputs/apk/release/app-release.apk
+          npx wrangler r2 object put monarch-releases/$MONARCH_APK_FILENAME --remote true --file=$MONARCH_APK_PATH
+          npx wrangler r2 object put monarch-releases/index.html --remote true --file=./index.html
