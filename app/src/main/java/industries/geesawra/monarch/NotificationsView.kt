@@ -87,7 +87,7 @@ fun NotificationsView(
                     else
                         MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier
             ) {
                 RenderNotification(
                     viewModel = viewModel,
