@@ -7,7 +7,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
@@ -15,6 +18,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -233,39 +237,57 @@ fun MainView(
             }
         },
         content = { paddingValues ->
-            InnerTimelineView(
-                modifier = Modifier.padding(paddingValues),
-                coroutineScope = coroutineScope,
-                timelineViewModel = timelineViewModel,
-                settingsState = settingsState,
-                onProfileTap = onProfileTap,
-                onSettingsTap = onSettingsTap,
-                onAddAccount = onAddAccount,
-                fobOnClick = {
-                    coroutineScope.launch {
-                        scaffoldState.bottomSheetState.expand()
+            Box {
+                InnerTimelineView(
+                    modifier = Modifier.padding(paddingValues),
+                    coroutineScope = coroutineScope,
+                    timelineViewModel = timelineViewModel,
+                    settingsState = settingsState,
+                    onProfileTap = onProfileTap,
+                    onSettingsTap = onSettingsTap,
+                    onAddAccount = onAddAccount,
+                    fobOnClick = {
+                        coroutineScope.launch {
+                            scaffoldState.bottomSheetState.expand()
+                        }
+                    },
+                    onReplyTap = { skeetData, quotePost ->
+                        inReplyTo.value = skeetData
+                        isQuotePost.value = quotePost
+                        coroutineScope.launch {
+                            scaffoldState.bottomSheetState.expand()
+                        }
+                    },
+                    loginError = onLoginError,
+                    onError = {
+                        coroutineScope.launch {
+                            scaffoldState.snackbarHostState.showSnackbar(
+                                message = "Error: $it",
+                                withDismissAction = true,
+                            )
+                        }
+                    },
+                    onSeeMoreTap = {
+                        onThreadTap(it)
                     }
-                },
-                onReplyTap = { skeetData, quotePost ->
-                    inReplyTo.value = skeetData
-                    isQuotePost.value = quotePost
-                    coroutineScope.launch {
-                        scaffoldState.bottomSheetState.expand()
-                    }
-                },
-                loginError = onLoginError,
-                onError = {
-                    coroutineScope.launch {
-                        scaffoldState.snackbarHostState.showSnackbar(
-                            message = "Error: $it",
-                            withDismissAction = true,
-                        )
-                    }
-                },
-                onSeeMoreTap = {
-                    onThreadTap(it)
+                )
+
+                if (scaffoldState.bottomSheetState.isVisible) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() },
+                            ) {
+                                coroutineScope.launch {
+                                    scaffoldState.bottomSheetState.hide()
+                                }
+                            }
+                    )
                 }
-            )
+            }
         }
     )
 }
