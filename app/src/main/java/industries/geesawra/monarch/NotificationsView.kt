@@ -214,6 +214,8 @@ private fun RenderNotification(
             avatarShape = avatarClipShape,
             showLabels = settingsState.showLabels,
             renderingMention = true,
+            onShowThread = onShowThread,
+            onAvatarTap = onProfileTap,
         )
 
         is Notification.Quote -> SkeetView(
@@ -228,6 +230,8 @@ private fun RenderNotification(
             postTextSize = settingsState.postTextSize,
             avatarShape = avatarClipShape,
             showLabels = settingsState.showLabels,
+            onShowThread = onShowThread,
+            onAvatarTap = onProfileTap,
         )
 
         is Notification.Reply -> SkeetView(
@@ -242,6 +246,8 @@ private fun RenderNotification(
             avatarShape = avatarClipShape,
             showLabels = settingsState.showLabels,
             renderingReplyNotif = true,
+            onShowThread = onShowThread,
+            onAvatarTap = onProfileTap,
         )
 
         is Notification.Repost -> LikeRepostRowView(

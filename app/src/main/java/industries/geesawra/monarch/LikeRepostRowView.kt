@@ -223,6 +223,8 @@ fun LikeRepostRowView(
                         .clickable {
                             if (data.authors.count() > 1) {
                                 showAvatars.value = !showAvatars.value
+                            } else if (data.authors.count() == 1) {
+                                onProfileTap?.invoke(data.authors.first().author.did)
                             }
                         }
                         .fillMaxWidth()
@@ -268,7 +270,7 @@ fun LikeRepostRowView(
                 viewModel = null,
                 skeet = data.post,
                 nested = true,
-                showLabels = settingsState.showLabels,
+                showLabels = false,
                 postTextSize = settingsState.postTextSize,
                 avatarShape = avatarClipShape,
                 onShowThread = onShowThread,
