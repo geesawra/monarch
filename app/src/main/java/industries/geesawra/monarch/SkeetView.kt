@@ -484,49 +484,76 @@ private fun isTenorUrl(uri: String): Boolean {
     return host == "tenor.com" || host.endsWith(".tenor.com")
 }
 
-private fun tenorPngToGif(pngUrl: String): String? {
+private fun tenorPngToMp4(pngUrl: String): String? {
     val regex = Regex("""https://media\.tenor\.com/([^/]+?)AAAAe/(.+)\.png""")
     val match = regex.find(pngUrl) ?: return null
     val id = match.groupValues[1]
     val name = match.groupValues[2]
-    return "https://media1.tenor.com/m/${id}AAAAC/${name}.gif"
+    return "https://media.tenor.com/${id}AAAAPo/${name}.mp4"
 }
 
 @Composable
 private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
-    var gifUrl by remember(ev.uri.uri) { mutableStateOf<String?>(null) }
+    var mp4Url by remember(ev.uri.uri) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(ev.uri.uri) {
         val preview = LinkPreviewFetcher.fetch(ev.uri.uri)
-        gifUrl = preview?.imageUrl?.let { tenorPngToGif(it) } ?: preview?.imageUrl
+        mp4Url = preview?.imageUrl?.let { tenorPngToMp4(it) }
     }
 
-    val imageModel = gifUrl ?: ev.thumb?.uri
-
-    if (imageModel != null) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(imageModel)
-                .decoderFactory(coil3.gif.GifDecoder.Factory())
-                .build(),
-            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            contentScale = ContentScale.Fit,
-            alignment = Alignment.Center,
-            contentDescription = ev.title.ifEmpty { "GIF" },
+    if (mp4Url != null) {
+        VideoPlayer(
+            mediaItems = listOf(
+                VideoPlayerMediaItem.NetworkMediaItem(
+                    url = mp4Url!!,
+                    mimeType = MimeTypes.VIDEO_MP4,
+                )
+            ),
+            handleLifecycle = true,
+            autoPlay = true,
+            usePlayerController = false,
+            enablePip = false,
+            handleAudioFocus = false,
+            volume = 0f,
+            controllerConfig = VideoPlayerControllerConfig(
+                showSpeedAndPitchOverlay = false,
+                showSubtitleButton = false,
+                showCurrentTimeAndTotalTime = false,
+                showBufferingProgress = false,
+                showForwardIncrementButton = false,
+                showBackwardIncrementButton = false,
+                showBackTrackButton = false,
+                showNextTrackButton = false,
+                showRepeatModeButton = false,
+                controllerShowTimeMilliSeconds = 0,
+                controllerAutoShow = false,
+                showFullScreenButton = false,
+            ),
+            repeatMode = RepeatMode.ALL,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 300.dp)
                 .padding(top = 4.dp)
                 .clip(MaterialTheme.shapes.medium)
-                .clickable {
-                    val customTabsIntent = CustomTabsIntent.Builder()
-                        .setShowTitle(true)
-                        .setUrlBarHidingEnabled(true)
-                        .build()
-                    customTabsIntent.launchUrl(context, ev.uri.uri.toUri())
-                }
         )
+    } else {
+        ev.thumb?.let {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(it.uri)
+                    .crossfade(true)
+                    .build(),
+                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                contentScale = ContentScale.Fit,
+                contentDescription = ev.title.ifEmpty { "GIF" },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .padding(top = 4.dp)
+                    .clip(MaterialTheme.shapes.medium)
+            )
+        }
     }
 }
 
