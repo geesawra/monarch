@@ -765,6 +765,19 @@ sealed class Notification {
         }
     }
 
+    fun uniqueKey(): String {
+        return when (this) {
+            is RawLike -> "rawlike_${subject.cid}_${author.did}"
+            is RawRepost -> "rawrepost_${subject.cid}_${author.did}"
+            is Like -> "like_${data.post.cid}_${data.timestamp}"
+            is Repost -> "repost_${data.post.cid}_${data.timestamp}"
+            is Reply -> "reply_${parent.first}_${author.did}"
+            is Follow -> "follow_${follow.did}"
+            is Mention -> "mention_${parent.first}_${author.did}"
+            is Quote -> "quote_${parent.first}_${author.did}"
+        }
+    }
+
     fun new(): Boolean {
         return when (this) {
             is RawLike -> this.new

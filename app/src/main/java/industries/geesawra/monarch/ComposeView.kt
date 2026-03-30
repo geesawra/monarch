@@ -182,6 +182,7 @@ fun ComposeView(
             }
 
             SheetValue.PartiallyExpanded, SheetValue.Expanded -> {
+                delay(100)
                 focusRequester.requestFocus()
                 keyboardController?.show()
             }

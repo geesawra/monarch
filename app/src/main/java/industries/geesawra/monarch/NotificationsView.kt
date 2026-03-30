@@ -69,7 +69,7 @@ fun NotificationsView(
     ) {
         items(
             items = viewModel.uiState.notifications,
-            key = { it.createdAt() }
+            key = { it.uniqueKey() }
         ) { notif ->
             val isUnread = viewModel.isNotificationNew(notif)
             ElevatedCard(

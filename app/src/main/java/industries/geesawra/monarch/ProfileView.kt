@@ -3,6 +3,7 @@
 package industries.geesawra.monarch
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -66,6 +68,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -85,6 +88,7 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -124,6 +128,21 @@ fun ProfileView(
     val listState = rememberLazyListState()
     val profile = timelineViewModel.uiState.profileUser
     val isLoading = timelineViewModel.uiState.isFetchingProfile || timelineViewModel.uiState.isFetchingProfileFeed
+    val scaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+        )
+    )
+    val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
+    val isQuotePost = remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
+    BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
+        focusManager.clearFocus()
+        coroutineScope.launch {
+            scaffoldState.bottomSheetState.hide()
+        }
+    }
 
     // Show avatar in top bar once the header item is scrolled past
     val showAvatarInBar by remember {
@@ -132,8 +151,28 @@ fun ProfileView(
         }
     }
 
-    PullToRefreshBox(
+    BottomSheetScaffold(
         modifier = modifier.windowInsetsPadding(WindowInsets.statusBars),
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = 0.dp,
+        sheetDragHandle = {},
+        sheetSwipeEnabled = false,
+        sheetShadowElevation = 16.dp,
+        sheetContent = {
+            ComposeView(
+                context = LocalContext.current,
+                coroutineScope = coroutineScope,
+                timelineViewModel = timelineViewModel,
+                settingsState = settingsState,
+                scaffoldState = scaffoldState,
+                scrollState = rememberScrollState(),
+                inReplyTo = inReplyTo,
+                isQuotePost = isQuotePost,
+            )
+        },
+    ) { scaffoldPadding ->
+    PullToRefreshBox(
+        modifier = Modifier.padding(scaffoldPadding),
         isRefreshing = isLoading,
         onRefresh = {
             profile?.did?.let { timelineViewModel.openProfile(it) }
@@ -230,8 +269,16 @@ fun ProfileView(
                 listState = listState,
                 onThreadTap = onThreadTap,
                 onProfileTap = onProfileTap,
+                onReplyTap = { skeetData, quotePost ->
+                    inReplyTo.value = skeetData
+                    isQuotePost.value = quotePost
+                    coroutineScope.launch {
+                        scaffoldState.bottomSheetState.expand()
+                    }
+                },
             )
         }
+    }
     }
 }
 
@@ -269,6 +316,7 @@ private fun ProfileContent(
     listState: LazyListState,
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
 ) {
     val posts = timelineViewModel.uiState.profilePosts
     val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
@@ -306,7 +354,7 @@ private fun ProfileContent(
                 SkeetView(
                     viewModel = timelineViewModel,
                     skeet = skeet,
-                    onReplyTap = { _, _ -> },
+                    onReplyTap = onReplyTap,
                     postTextSize = settingsState.postTextSize,
                     avatarShape = avatarClipShape,
                     showLabels = settingsState.showLabels,

@@ -880,8 +880,9 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun openProfile(did: Did) {
+        val cachedProfile = if (did == bskyConn.session?.did) uiState.user else null
         uiState = uiState.copy(
-            profileUser = null,
+            profileUser = cachedProfile,
             profilePosts = listOf(),
             profileFeedCursor = null,
             profileFeedFilter = null,
