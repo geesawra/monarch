@@ -136,14 +136,6 @@ fun ProfileView(
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
-            confirmValueChange = { targetValue ->
-                if (targetValue == SheetValue.Hidden && wasEdited.value) {
-                    showDiscardDialog = true
-                    false
-                } else {
-                    true
-                }
-            }
         )
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
@@ -198,7 +190,7 @@ fun ProfileView(
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
         sheetDragHandle = {},
-        sheetSwipeEnabled = true,
+        sheetSwipeEnabled = !wasEdited.value,
         sheetShadowElevation = 16.dp,
         sheetContent = {
             ComposeView(
