@@ -280,11 +280,10 @@ fun MainView(
                     }
                 )
 
-                if (scrimAlpha > 0f) {
+                if (scaffoldState.bottomSheetState.isVisible) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha))
                             .clickable(
                                 indication = null,
                                 interactionSource = remember { MutableInteractionSource() },

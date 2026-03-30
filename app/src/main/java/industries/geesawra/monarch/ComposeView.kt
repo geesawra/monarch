@@ -284,6 +284,7 @@ fun ComposeView(
                     facets = facets,
                     linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
                     threadgateRules = threadgateRules,
+                    wasEdited = wasEdited,
                 )
 
                 inReplyTo.value?.let {
@@ -709,6 +710,7 @@ fun ActionRow(
     facets: List<Facet> = listOf(),
     linkPreview: LinkPreviewData? = null,
     threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
+    wasEdited: MutableState<Boolean> = mutableStateOf(false),
 ) {
     var showThreadgateSheet by remember { mutableStateOf(false) }
 
@@ -788,9 +790,9 @@ fun ActionRow(
                             linkPreview = linkPreview,
                             threadgateRules = threadgateRules.value,
                         ).onSuccess {
+                            wasEdited.value = false
                             coroutineScope.launch {
                                 scaffoldState.bottomSheetState.hide()
-                                // State reset is now in LaunchedEffect for isVisible
                             }
                         }.onFailure {
                             Toast.makeText(
