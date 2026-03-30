@@ -218,34 +218,34 @@ fun MainView(
         label = "scrimAlpha"
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        BottomSheetScaffold(
-            modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars),
-            scaffoldState = scaffoldState,
-            sheetPeekHeight = 0.dp,
-            sheetDragHandle = {},
-            sheetSwipeEnabled = true,
-            sheetShadowElevation = 16.dp,
-            sheetContent = {
-                ComposeView(
-                    context = LocalContext.current,
-                    coroutineScope = coroutineScope,
-                    timelineViewModel = timelineViewModel,
-                    settingsState = settingsState,
-                    scaffoldState = scaffoldState,
-                    scrollState = scrollState,
-                    inReplyTo = inReplyTo,
-                    isQuotePost = isQuotePost,
-                    wasEdited = wasEdited,
-                )
-            },
-            snackbarHost = {
-                SnackbarHost(it) { sd ->
-                    Snackbar(snackbarData = sd, actionOnNewLine = true)
-                }
-            },
-            content = { paddingValues ->
+    BottomSheetScaffold(
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.statusBars),
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = 0.dp,
+        sheetDragHandle = {},
+        sheetSwipeEnabled = true,
+        sheetShadowElevation = 16.dp,
+        sheetContent = {
+            ComposeView(
+                context = LocalContext.current,
+                coroutineScope = coroutineScope,
+                timelineViewModel = timelineViewModel,
+                settingsState = settingsState,
+                scaffoldState = scaffoldState,
+                scrollState = scrollState,
+                inReplyTo = inReplyTo,
+                isQuotePost = isQuotePost,
+                wasEdited = wasEdited,
+            )
+        },
+        snackbarHost = {
+            SnackbarHost(it) { sd ->
+                Snackbar(snackbarData = sd, actionOnNewLine = true)
+            }
+        },
+        content = { paddingValues ->
+            Box(modifier = Modifier.fillMaxSize()) {
                 InnerTimelineView(
                     modifier = Modifier.padding(paddingValues),
                     coroutineScope = coroutineScope,
@@ -279,25 +279,25 @@ fun MainView(
                         onThreadTap(it)
                     }
                 )
-            }
-        )
 
-        if (scrimAlpha > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha))
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                    ) {
-                        coroutineScope.launch {
-                            scaffoldState.bottomSheetState.hide()
-                        }
-                    }
-            )
+                if (scrimAlpha > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha))
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() },
+                            ) {
+                                coroutineScope.launch {
+                                    scaffoldState.bottomSheetState.hide()
+                                }
+                            }
+                    )
+                }
+            }
         }
-    }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
