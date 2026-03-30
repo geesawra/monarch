@@ -323,7 +323,7 @@ internal fun VideoPlayerSurface(
                 defaultPlayerView.apply {
                     useController = usePlayerController
                     resizeMode = surfaceResizeMode.toPlayerViewResizeMode()
-                    setBackgroundColor(Color.BLACK)
+                    setBackgroundColor(Color.TRANSPARENT)
                 }
             },
         ),

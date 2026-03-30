@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
@@ -222,7 +223,7 @@ fun ProfileView(
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
                                             .size(32.dp)
-                                            .clip(CircleShape)
+                                            .clip(if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(6.dp) else CircleShape)
                                     )
                                 }
                                 Text(
@@ -333,6 +334,7 @@ private fun ProfileContent(
             ProfileHeader(
                 profile = profile,
                 timelineViewModel = timelineViewModel,
+                avatarShape = avatarClipShape,
             )
         }
 
@@ -406,6 +408,7 @@ private fun ProfileContent(
 private fun ProfileHeader(
     profile: ProfileViewDetailed,
     timelineViewModel: TimelineViewModel,
+    avatarShape: Shape = CircleShape,
 ) {
     var showImageViewer by remember { mutableStateOf<String?>(null) }
 
@@ -462,7 +465,7 @@ private fun ProfileHeader(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(80.dp)
-                    .clip(CircleShape)
+                    .clip(avatarShape)
                     .then(
                         if (profile.avatar != null)
                             Modifier.clickable { showImageViewer = profile.avatar?.uri }
