@@ -130,7 +130,7 @@ fun ProfileView(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listState = rememberLazyListState()
     val profile = timelineViewModel.uiState.profileUser
-    val isLoading = timelineViewModel.uiState.isFetchingProfile || timelineViewModel.uiState.isFetchingProfileFeed
+    val isLoading = timelineViewModel.uiState.isFetchingProfile && profile == null
     val wasEdited = remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     val scaffoldState = rememberBottomSheetScaffoldState(
