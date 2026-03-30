@@ -167,9 +167,6 @@ class MainActivity : ComponentActivity() {
                                 onAddAccount = {
                                     navController.navigate(ViewList.Login.name)
                                 },
-                                onSetDefaultFeed = { uri, name, avatar ->
-                                    settingsViewModel.setDefaultFeed(uri, name, avatar)
-                                },
                                 onFirstLoad = {
                                     if (firstLoadDone.value) {
                                         return@MainView

@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -227,6 +228,59 @@ fun SettingsView(
                     )
                 },
             )
+
+            if (timelineViewModel != null) {
+                var showFeedPicker by remember { mutableStateOf(false) }
+                val feeds = timelineViewModel.uiState.feeds
+
+                ListItem(
+                    headlineContent = { Text("Default feed") },
+                    supportingContent = { Text(settings.defaultFeed.displayName) },
+                    modifier = Modifier.clickable { showFeedPicker = true },
+                )
+
+                if (showFeedPicker) {
+                    AlertDialog(
+                        onDismissRequest = { showFeedPicker = false },
+                        title = { Text("Default feed") },
+                        text = {
+                            Column {
+                                ListItem(
+                                    headlineContent = { Text("Following") },
+                                    modifier = Modifier.clickable {
+                                        settingsViewModel.setDefaultFeed("following", "Following", null)
+                                        showFeedPicker = false
+                                    },
+                                    trailingContent = {
+                                        if (settings.defaultFeed.uri == "following") {
+                                            Icon(Icons.Default.Home, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                )
+                                feeds.forEach { feed ->
+                                    ListItem(
+                                        headlineContent = { Text(feed.displayName) },
+                                        modifier = Modifier.clickable {
+                                            settingsViewModel.setDefaultFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
+                                            showFeedPicker = false
+                                        },
+                                        trailingContent = {
+                                            if (settings.defaultFeed.uri == feed.uri.atUri) {
+                                                Icon(Icons.Default.Home, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showFeedPicker = false }) {
+                                Text("Cancel")
+                            }
+                        },
+                    )
+                }
+            }
 
             if (timelineViewModel != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
