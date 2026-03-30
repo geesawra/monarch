@@ -161,6 +161,13 @@ fun MainView(
         onFirstLoad()
     }
 
+    LaunchedEffect(scaffoldState.bottomSheetState.currentValue) {
+        if (scaffoldState.bottomSheetState.currentValue == SheetValue.Hidden && wasEdited.value) {
+            scaffoldState.bottomSheetState.expand()
+            showDiscardDialog = true
+        }
+    }
+
     val focusManager = LocalFocusManager.current
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
         if (wasEdited.value) {
@@ -204,7 +211,7 @@ fun MainView(
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
         sheetDragHandle = {},
-        sheetSwipeEnabled = !wasEdited.value,
+        sheetSwipeEnabled = true,
         sheetShadowElevation = 16.dp,
         sheetContent = {
             ComposeView(
