@@ -185,7 +185,7 @@ fun TimelinePostActionsView(
                     modifier = Modifier.size(18.dp),
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
