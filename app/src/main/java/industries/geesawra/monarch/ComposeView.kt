@@ -302,13 +302,9 @@ fun ComposeView(
                     }
                 }
 
-                LaunchedEffect(textfieldState.text) {
-                    if (textfieldState.text.isEmpty()) {
-                        wasEdited.value = false
-                    } else {
-                        wasEdited.value = true
-                        charCount.intValue = textfieldState.text.length
-                    }
+                LaunchedEffect(textfieldState.text, mediaSelected.value) {
+                    charCount.intValue = textfieldState.text.length
+                    wasEdited.value = textfieldState.text.isNotEmpty() || mediaSelected.value.isNotEmpty()
                 }
 
                 // Mention typeahead: detect @query and search
