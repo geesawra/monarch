@@ -12,23 +12,42 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.ReplyAll
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.text.style.TextOverflow
+import coil3.compose.AsyncImage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
@@ -316,6 +335,248 @@ fun TimelinePostActionsView(
                 tint = repostColor,
                 scale = repostScale,
             )
+        }
+
+        var showMenu by remember { mutableStateOf(false) }
+        var showLikesSheet by remember { mutableStateOf(false) }
+        var showRepostsSheet by remember { mutableStateOf(false) }
+        var showQuotesSheet by remember { mutableStateOf(false) }
+
+        Box {
+            IconButton(onClick = { showMenu = true }) {
+                Icon(
+                    modifier = Modifier.size(18.dp),
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Liked by") },
+                    onClick = { showMenu = false; showLikesSheet = true },
+                )
+                DropdownMenuItem(
+                    text = { Text("Reposted by") },
+                    onClick = { showMenu = false; showRepostsSheet = true },
+                )
+                DropdownMenuItem(
+                    text = { Text("Quotes") },
+                    onClick = { showMenu = false; showQuotesSheet = true },
+                )
+            }
+        }
+
+        if (showLikesSheet) {
+            UserListSheet(
+                title = "Liked by",
+                onDismiss = { showLikesSheet = false },
+                fetchUsers = { cursor ->
+                    timelineViewModel?.getLikes(skeet.uri, cursor)?.getOrNull()?.let {
+                        it.likes.map { like -> like.actor } to it.cursor
+                    }
+                },
+            )
+        }
+
+        if (showRepostsSheet) {
+            UserListSheet(
+                title = "Reposted by",
+                onDismiss = { showRepostsSheet = false },
+                fetchUsers = { cursor ->
+                    timelineViewModel?.getRepostedBy(skeet.uri, cursor)?.getOrNull()?.let {
+                        it.repostedBy to it.cursor
+                    }
+                },
+            )
+        }
+
+        if (showQuotesSheet) {
+            QuotesSheet(
+                onDismiss = { showQuotesSheet = false },
+                fetchQuotes = { cursor ->
+                    timelineViewModel?.getQuotes(skeet.uri, cursor)?.getOrNull()?.let {
+                        it.posts.map { pv -> SkeetData.fromPostView(pv, pv.author) } to it.cursor
+                    }
+                },
+                timelineViewModel = timelineViewModel,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UserListSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    fetchUsers: suspend (cursor: String?) -> Pair<List<app.bsky.actor.ProfileView>, String?>?,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var users by remember { mutableStateOf<List<app.bsky.actor.ProfileView>>(emptyList()) }
+    var cursor by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val result = fetchUsers(null)
+        if (result != null) {
+            users = result.first
+            cursor = result.second
+        }
+        isLoading = false
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .heightIn(min = 200.dp, max = 500.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (users.isEmpty()) {
+                Text(
+                    text = "None yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(users.size) { idx ->
+                        val user = users[idx]
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            AsyncImage(
+                                model = user.avatar?.uri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = user.displayName ?: user.handle.handle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = "@${user.handle.handle}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuotesSheet(
+    onDismiss: () -> Unit,
+    fetchQuotes: suspend (cursor: String?) -> Pair<List<SkeetData>, String?>?,
+    timelineViewModel: TimelineViewModel?,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var quotes by remember { mutableStateOf<List<SkeetData>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val result = fetchQuotes(null)
+        if (result != null) {
+            quotes = result.first
+        }
+        isLoading = false
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .heightIn(min = 200.dp, max = 500.dp)
+        ) {
+            Text(
+                text = "Quotes",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (quotes.isEmpty()) {
+                Text(
+                    text = "No quotes yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(quotes.size) { idx ->
+                        ElevatedCard(
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                        ) {
+                            SkeetView(
+                                viewModel = timelineViewModel,
+                                skeet = quotes[idx],
+                                nested = true,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
         }
     }
 }

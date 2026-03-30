@@ -767,6 +767,10 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    suspend fun getLikes(uri: AtUri, cursor: String? = null) = bskyConn.getLikes(uri, cursor)
+    suspend fun getRepostedBy(uri: AtUri, cursor: String? = null) = bskyConn.getRepostedBy(uri, cursor)
+    suspend fun getQuotes(uri: AtUri, cursor: String? = null) = bskyConn.getQuotes(uri, cursor)
+
     fun deletePost(uri: AtUri, then: () -> Unit) {
         viewModelScope.launch {
             bskyConn.deletePost(uri.rkey()).onFailure {

@@ -37,7 +37,13 @@ import app.bsky.feed.GetFeedResponse
 import app.bsky.feed.GetPostThreadQueryParams
 import app.bsky.feed.GetPostThreadResponse
 import app.bsky.feed.GetPostsQueryParams
+import app.bsky.feed.GetLikesQueryParams
+import app.bsky.feed.GetLikesResponse
 import app.bsky.feed.GetPostsResponse
+import app.bsky.feed.GetQuotesQueryParams
+import app.bsky.feed.GetQuotesResponse
+import app.bsky.feed.GetRepostedByQueryParams
+import app.bsky.feed.GetRepostedByResponse
 import app.bsky.feed.GetTimelineQueryParams
 import app.bsky.feed.GetTimelineResponse
 import app.bsky.feed.Like
@@ -1247,6 +1253,39 @@ class BlueskyConn(val context: Context) {
             return when (ret) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to update seen notifications: ${ret.error}"))
                 is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun getLikes(uri: AtUri, cursor: String? = null): Result<GetLikesResponse> {
+        return runCatching {
+            create().onFailure { return Result.failure(it) }
+            val ret = client!!.getLikes(GetLikesQueryParams(uri = uri, cursor = cursor))
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch likes: ${ret.error}"))
+                is AtpResponse.Success<GetLikesResponse> -> Result.success(ret.response)
+            }
+        }
+    }
+
+    suspend fun getRepostedBy(uri: AtUri, cursor: String? = null): Result<GetRepostedByResponse> {
+        return runCatching {
+            create().onFailure { return Result.failure(it) }
+            val ret = client!!.getRepostedBy(GetRepostedByQueryParams(uri = uri, cursor = cursor))
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch reposts: ${ret.error}"))
+                is AtpResponse.Success<GetRepostedByResponse> -> Result.success(ret.response)
+            }
+        }
+    }
+
+    suspend fun getQuotes(uri: AtUri, cursor: String? = null): Result<GetQuotesResponse> {
+        return runCatching {
+            create().onFailure { return Result.failure(it) }
+            val ret = client!!.getQuotes(GetQuotesQueryParams(uri = uri, cursor = cursor))
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch quotes: ${ret.error}"))
+                is AtpResponse.Success<GetQuotesResponse> -> Result.success(ret.response)
             }
         }
     }
