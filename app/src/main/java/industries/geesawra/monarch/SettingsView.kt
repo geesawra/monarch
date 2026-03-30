@@ -2,7 +2,19 @@ package industries.geesawra.monarch
 
 import android.os.Build
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -244,31 +256,27 @@ fun SettingsView(
                         onDismissRequest = { showFeedPicker = false },
                         title = { Text("Default feed") },
                         text = {
-                            Column {
-                                ListItem(
-                                    headlineContent = { Text("Following") },
-                                    modifier = Modifier.clickable {
+                            Column(
+                                modifier = Modifier.verticalScroll(rememberScrollState())
+                            ) {
+                                FeedPickerItem(
+                                    name = "Following",
+                                    avatarUrl = null,
+                                    isDefault = settings.defaultFeed.uri == "following",
+                                    onClick = {
                                         settingsViewModel.setDefaultFeed("following", "Following", null)
                                         showFeedPicker = false
                                     },
-                                    trailingContent = {
-                                        if (settings.defaultFeed.uri == "following") {
-                                            Icon(Icons.Default.Home, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                    }
                                 )
                                 feeds.forEach { feed ->
-                                    ListItem(
-                                        headlineContent = { Text(feed.displayName) },
-                                        modifier = Modifier.clickable {
+                                    FeedPickerItem(
+                                        name = feed.displayName,
+                                        avatarUrl = feed.avatar?.uri,
+                                        isDefault = settings.defaultFeed.uri == feed.uri.atUri,
+                                        onClick = {
                                             settingsViewModel.setDefaultFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
                                             showFeedPicker = false
                                         },
-                                        trailingContent = {
-                                            if (settings.defaultFeed.uri == feed.uri.atUri) {
-                                                Icon(Icons.Default.Home, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                            }
-                                        }
                                     )
                                 }
                             }
@@ -391,6 +399,55 @@ fun SettingsView(
             ) {
                 Text("Log out")
             }
+        }
+    }
+}
+
+@Composable
+private fun FeedPickerItem(
+    name: String,
+    avatarUrl: String?,
+    isDefault: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (avatarUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(avatarUrl)
+                    .crossfade(true)
+                    .build(),
+                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape),
+                contentDescription = null,
+            )
+        } else {
+            Spacer(modifier = Modifier.size(28.dp))
+        }
+
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+
+        if (isDefault) {
+            Icon(
+                Icons.Default.Home,
+                contentDescription = "Default",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
