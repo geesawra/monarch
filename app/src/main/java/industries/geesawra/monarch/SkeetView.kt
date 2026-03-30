@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -500,43 +501,47 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
     val aspectRatio = if (ww != null && hh != null && hh > 0) ww / hh else null
 
     if (webmUrl != null) {
-        VideoPlayer(
-            mediaItems = listOf(
-                VideoPlayerMediaItem.NetworkMediaItem(
-                    url = webmUrl,
-                    mimeType = MimeTypes.VIDEO_WEBM,
-                )
-            ),
-            handleLifecycle = true,
-            autoPlay = true,
-            usePlayerController = false,
-            enablePip = false,
-            handleAudioFocus = false,
-            volume = 0f,
-            controllerConfig = VideoPlayerControllerConfig(
-                showSpeedAndPitchOverlay = false,
-                showSubtitleButton = false,
-                showCurrentTimeAndTotalTime = false,
-                showBufferingProgress = false,
-                showForwardIncrementButton = false,
-                showBackwardIncrementButton = false,
-                showBackTrackButton = false,
-                showNextTrackButton = false,
-                showRepeatModeButton = false,
-                controllerShowTimeMilliSeconds = 0,
-                controllerAutoShow = false,
-                showFullScreenButton = false,
-            ),
-            repeatMode = RepeatMode.ALL,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(top = 4.dp)
+                .clip(MaterialTheme.shapes.medium)
                 .then(
                     if (aspectRatio != null) Modifier.aspectRatio(aspectRatio)
                     else Modifier.heightIn(max = 300.dp)
                 )
-                .padding(top = 4.dp)
-                .clip(MaterialTheme.shapes.medium)
-        )
+        ) {
+            VideoPlayer(
+                mediaItems = listOf(
+                    VideoPlayerMediaItem.NetworkMediaItem(
+                        url = webmUrl,
+                        mimeType = MimeTypes.VIDEO_WEBM,
+                    )
+                ),
+                handleLifecycle = true,
+                autoPlay = true,
+                usePlayerController = false,
+                enablePip = false,
+                handleAudioFocus = false,
+                volume = 0f,
+                controllerConfig = VideoPlayerControllerConfig(
+                    showSpeedAndPitchOverlay = false,
+                    showSubtitleButton = false,
+                    showCurrentTimeAndTotalTime = false,
+                    showBufferingProgress = false,
+                    showForwardIncrementButton = false,
+                    showBackwardIncrementButton = false,
+                    showBackTrackButton = false,
+                    showNextTrackButton = false,
+                    showRepeatModeButton = false,
+                    controllerShowTimeMilliSeconds = 0,
+                    controllerAutoShow = false,
+                    showFullScreenButton = false,
+                ),
+                repeatMode = RepeatMode.ALL,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
     } else {
         ev.thumb?.let {
             AsyncImage(
