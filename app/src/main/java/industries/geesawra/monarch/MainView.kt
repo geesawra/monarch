@@ -14,6 +14,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -237,7 +239,7 @@ fun MainView(
             }
         },
         content = { paddingValues ->
-            Box {
+            Box(modifier = Modifier.fillMaxSize()) {
                 InnerTimelineView(
                     modifier = Modifier.padding(paddingValues),
                     coroutineScope = coroutineScope,
@@ -272,7 +274,11 @@ fun MainView(
                     }
                 )
 
-                if (scaffoldState.bottomSheetState.isVisible) {
+                AnimatedVisibility(
+                    visible = scaffoldState.bottomSheetState.isVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
