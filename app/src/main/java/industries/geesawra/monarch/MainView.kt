@@ -151,6 +151,7 @@ fun MainView(
     onProfileTap: (Did) -> Unit,
     onSettingsTap: () -> Unit,
     onAddAccount: () -> Unit = {},
+    onSetDefaultFeed: (String, String, String?) -> Unit = { _, _, _ -> },
     onFirstLoad: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
@@ -254,6 +255,15 @@ fun MainView(
                     onProfileTap = onProfileTap,
                     onSettingsTap = onSettingsTap,
                     onAddAccount = onAddAccount,
+                    onSetDefaultFeed = { uri, name, avatar ->
+                        onSetDefaultFeed(uri, name, avatar)
+                        coroutineScope.launch {
+                            scaffoldState.snackbarHostState.showSnackbar(
+                                message = "Default feed set to $name",
+                                withDismissAction = true,
+                            )
+                        }
+                    },
                     fobOnClick = {
                         coroutineScope.launch {
                             scaffoldState.bottomSheetState.expand()
@@ -310,6 +320,7 @@ private fun InnerTimelineView(
     onProfileTap: (Did) -> Unit = {},
     onSettingsTap: () -> Unit = {},
     onAddAccount: () -> Unit = {},
+    onSetDefaultFeed: (String, String, String?) -> Unit = { _, _, _ -> },
     fobOnClick: () -> Unit,
     loginError: () -> Unit,
     onError: (String) -> Unit,
@@ -389,7 +400,7 @@ private fun InnerTimelineView(
                 content = {
                     FeedsDrawer(
                         state = drawerState.targetValue,
-                        { uri: String, displayName: String, avatar: String? ->
+                        selectFeed = { uri: String, displayName: String, avatar: String? ->
                             coroutineScope.launch {
                                 drawerState.collapse()
                             }
@@ -405,7 +416,12 @@ private fun InnerTimelineView(
                                 }
                             }
                         },
-                        timelineViewModel
+                        onLongPressFeed = { uri, displayName, avatar ->
+                            onSetDefaultFeed(uri, displayName, avatar)
+                            coroutineScope.launch { drawerState.collapse() }
+                        },
+                        defaultFeedUri = settingsState.defaultFeed.uri,
+                        timelineViewModel = timelineViewModel,
                     )
                 }
             )
@@ -751,60 +767,100 @@ private fun InnerTimelineView(
 }
 
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FeedsDrawer(
     state: WideNavigationRailValue,
     selectFeed: (uri: String, displayName: String, avatar: String?) -> Unit,
+    onLongPressFeed: (uri: String, displayName: String, avatar: String?) -> Unit,
+    defaultFeedUri: String,
     timelineViewModel: TimelineViewModel,
 ) {
-    WideNavigationRailItem(
-        label = {
-            Text(text = "Following")
-        },
-        selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
-        onClick = {
-            selectFeed("following", "Following", null)
-        },
-        icon = {
-            Spacer(modifier = Modifier.size(20.dp))
-        },
-        railExpanded = state == WideNavigationRailValue.Expanded,
-    )
+    val haptic = LocalHapticFeedback.current
+    val isDefaultFollowing = defaultFeedUri == "following"
 
-    timelineViewModel.uiState.feeds.forEach { feed ->
+    Box(modifier = Modifier.combinedClickable(
+        onClick = { selectFeed("following", "Following", null) },
+        onLongClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onLongPressFeed("following", "Following", null)
+        },
+    )) {
         WideNavigationRailItem(
             label = {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(text = feed.displayName)
+                    Text(text = "Following")
+                    if (isDefaultFollowing) {
+                        Icon(
+                            Icons.Default.Home,
+                            contentDescription = "Default feed",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             },
-            selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
-            onClick = {
-                selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
-            },
+            selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
+            onClick = {},
             icon = {
-                if (feed.avatar != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(feed.avatar?.uri)
-                            .crossfade(true)
-                            .build(),
-                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape),
-                        contentDescription = "Feed avatar",
-                    )
-                } else {
-                    Spacer(modifier = Modifier.size(20.dp))
-                }
+                Spacer(modifier = Modifier.size(20.dp))
             },
             railExpanded = state == WideNavigationRailValue.Expanded,
         )
+    }
+
+    timelineViewModel.uiState.feeds.forEach { feed ->
+        val isDefault = defaultFeedUri == feed.uri.atUri
+        Box(modifier = Modifier.combinedClickable(
+            onClick = { selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri) },
+            onLongClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onLongPressFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
+            },
+        )) {
+            WideNavigationRailItem(
+                label = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = feed.displayName)
+                        if (isDefault) {
+                            Icon(
+                                Icons.Default.Home,
+                                contentDescription = "Default feed",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                },
+                selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
+                onClick = {},
+                icon = {
+                    if (feed.avatar != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(feed.avatar?.uri)
+                                .crossfade(true)
+                                .build(),
+                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape),
+                            contentDescription = "Feed avatar",
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.size(20.dp))
+                    }
+                },
+                railExpanded = state == WideNavigationRailValue.Expanded,
+            )
+        }
     }
 }
 

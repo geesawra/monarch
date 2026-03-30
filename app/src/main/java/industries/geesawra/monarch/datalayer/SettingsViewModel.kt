@@ -34,6 +34,12 @@ enum class AvatarShape {
     RoundedSquare,
 }
 
+data class DefaultFeed(
+    val uri: String = "following",
+    val displayName: String = "Following",
+    val avatar: String? = null,
+)
+
 data class SettingsState(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
@@ -41,6 +47,7 @@ data class SettingsState(
     val avatarShape: AvatarShape = AvatarShape.Circle,
     val replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads,
     val showLabels: Boolean = true,
+    val defaultFeed: DefaultFeed = DefaultFeed(),
 )
 
 @HiltViewModel
@@ -55,6 +62,9 @@ class SettingsViewModel @Inject constructor(
         private val AVATAR_SHAPE = stringPreferencesKey("avatar_shape")
         private val REPLY_FILTER_MODE = stringPreferencesKey("reply_filter_mode")
         private val SHOW_LABELS = stringPreferencesKey("show_labels")
+        private val DEFAULT_FEED_URI = stringPreferencesKey("default_feed_uri")
+        private val DEFAULT_FEED_NAME = stringPreferencesKey("default_feed_name")
+        private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
     }
 
     var settingsState by mutableStateOf(SettingsState())
@@ -70,6 +80,11 @@ class SettingsViewModel @Inject constructor(
                     avatarShape = prefs[AVATAR_SHAPE]?.let { runCatching { AvatarShape.valueOf(it) }.getOrNull() } ?: AvatarShape.Circle,
                     replyFilterMode = prefs[REPLY_FILTER_MODE]?.let { runCatching { ReplyFilterMode.valueOf(it) }.getOrNull() } ?: ReplyFilterMode.OnlyFilterDeepThreads,
                     showLabels = prefs[SHOW_LABELS]?.toBooleanStrictOrNull() ?: true,
+                    defaultFeed = DefaultFeed(
+                        uri = prefs[DEFAULT_FEED_URI] ?: "following",
+                        displayName = prefs[DEFAULT_FEED_NAME] ?: "Following",
+                        avatar = prefs[DEFAULT_FEED_AVATAR],
+                    ),
                 )
             }.collect {
                 settingsState = it
@@ -110,6 +125,17 @@ class SettingsViewModel @Inject constructor(
     fun setShowLabels(show: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[SHOW_LABELS] = show.toString() }
+        }
+    }
+
+    fun setDefaultFeed(uri: String, displayName: String, avatar: String?) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit {
+                it[DEFAULT_FEED_URI] = uri
+                it[DEFAULT_FEED_NAME] = displayName
+                if (avatar != null) it[DEFAULT_FEED_AVATAR] = avatar
+                else it.remove(DEFAULT_FEED_AVATAR)
+            }
         }
     }
 }

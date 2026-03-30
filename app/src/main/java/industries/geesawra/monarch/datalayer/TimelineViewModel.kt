@@ -695,10 +695,13 @@ class TimelineViewModel @AssistedInject constructor(
             threadgateRules = threadgateRules,
         )
         result.onSuccess { uri ->
-            bskyConn.getPosts(listOf(uri)).onSuccess { posts ->
-                val newSkeet = posts.firstOrNull()?.let { SkeetData.fromPostView(it, it.author) }
-                if (newSkeet != null) {
-                    uiState = uiState.copy(skeets = listOf(newSkeet) + uiState.skeets)
+            if (uiState.selectedFeed == "following") {
+                kotlinx.coroutines.delay(500)
+                bskyConn.getPosts(listOf(uri)).onSuccess { posts ->
+                    val newSkeet = posts.firstOrNull()?.let { SkeetData.fromPostView(it, it.author) }
+                    if (newSkeet != null) {
+                        uiState = uiState.copy(skeets = listOf(newSkeet) + uiState.skeets)
+                    }
                 }
             }
         }

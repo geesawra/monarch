@@ -167,12 +167,20 @@ class MainActivity : ComponentActivity() {
                                 onAddAccount = {
                                     navController.navigate(ViewList.Login.name)
                                 },
+                                onSetDefaultFeed = { uri, name, avatar ->
+                                    settingsViewModel.setDefaultFeed(uri, name, avatar)
+                                },
                                 onFirstLoad = {
                                     if (firstLoadDone.value) {
                                         return@MainView
                                     }
-                                    timelineViewModel.fetchAllNewData()
-                                    firstLoadDone.value = true
+                                    val df = settings.defaultFeed
+                                    timelineViewModel.selectFeed(df.uri, df.displayName, df.avatar) {
+                                        firstLoadDone.value = true
+                                    }
+                                    timelineViewModel.fetchNotifications(fresh = true)
+                                    timelineViewModel.fetchSelf()
+                                    timelineViewModel.feeds()
                                 }
                             )
                         }
