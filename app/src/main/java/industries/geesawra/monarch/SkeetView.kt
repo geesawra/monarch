@@ -489,7 +489,7 @@ private fun tenorPngToMp4(pngUrl: String): String? {
     val match = regex.find(pngUrl) ?: return null
     val id = match.groupValues[1]
     val name = match.groupValues[2]
-    return "https://media.tenor.com/${id}AAAAPo/${name}.mp4"
+    return "https://media.tenor.com/${id}AAAPo/${name}.mp4"
 }
 
 @Composable
