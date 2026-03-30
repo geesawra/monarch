@@ -429,6 +429,7 @@ private fun InnerTimelineView(
                                         contentDescription = "Profile avatar",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
+                                            .padding(end = 8.dp)
                                             .size(40.dp)
                                             .clip(avatarClipShape)
                                             .combinedClickable(

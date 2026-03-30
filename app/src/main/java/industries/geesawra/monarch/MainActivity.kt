@@ -85,7 +85,10 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 SingletonImageLoader.setSafe {
                     ImageLoader.Builder(context)
-                        .components { add(OkHttpNetworkFetcherFactory()) }
+                        .components {
+                            add(OkHttpNetworkFetcherFactory())
+                            add(coil3.gif.GifDecoder.Factory())
+                        }
                         .memoryCache {
                             MemoryCache.Builder()
                                 .maxSizePercent(context, 0.25)

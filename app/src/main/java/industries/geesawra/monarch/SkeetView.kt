@@ -49,6 +49,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,6 +85,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.atproto.label.Label
+import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -477,8 +479,56 @@ fun VideoView(uri: Uri, aspectRatio: Float? = null) {
     }
 }
 
+private fun isTenorUrl(uri: String): Boolean {
+    val host = runCatching { uri.toUri().host?.lowercase() }.getOrNull() ?: return false
+    return host == "tenor.com" || host.endsWith(".tenor.com")
+}
+
+@Composable
+private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
+    var gifUrl by remember(ev.uri.uri) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(ev.uri.uri) {
+        val preview = LinkPreviewFetcher.fetch(ev.uri.uri)
+        gifUrl = preview?.imageUrl
+    }
+
+    val imageModel = gifUrl ?: ev.thumb?.uri
+
+    if (imageModel != null) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(imageModel)
+                .crossfade(gifUrl == null)
+                .build(),
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.Center,
+            contentDescription = ev.title.ifEmpty { "GIF" },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 300.dp)
+                .padding(top = 4.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .clickable {
+                    val customTabsIntent = CustomTabsIntent.Builder()
+                        .setShowTitle(true)
+                        .setUrlBarHidingEnabled(true)
+                        .build()
+                    customTabsIntent.launchUrl(context, ev.uri.uri.toUri())
+                }
+        )
+    }
+}
+
 @Composable
 private fun ExternalView(context: Context, ev: ExternalViewExternal) {
+    if (isTenorUrl(ev.uri.uri)) {
+        TenorGifView(context, ev)
+        return
+    }
+
     val domain = runCatching { ev.uri.uri.toUri().host }.getOrNull() ?: ""
 
     OutlinedCard(

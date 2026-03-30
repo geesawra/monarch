@@ -66,6 +66,7 @@ dependencies {
     implementation("sh.christian.ozone:bluesky:0.3.3")
     implementation("androidx.navigation:navigation-compose:2.9.5")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    implementation("io.coil-kt.coil3:coil-gif:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("io.github.fornewid:placeholder-material3:2.0.0")
     implementation("androidx.media3:media3-exoplayer:1.8.0") // [Required] androidx.media3 ExoPlayer dependency
