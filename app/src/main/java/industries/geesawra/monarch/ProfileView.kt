@@ -144,8 +144,8 @@ fun ProfileView(
 
     LaunchedEffect(scaffoldState.bottomSheetState.currentValue) {
         if (scaffoldState.bottomSheetState.currentValue == SheetValue.Hidden && wasEdited.value) {
-            scaffoldState.bottomSheetState.expand()
             showDiscardDialog = true
+            scaffoldState.bottomSheetState.expand()
         }
     }
 
