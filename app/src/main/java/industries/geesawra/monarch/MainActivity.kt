@@ -172,12 +172,10 @@ class MainActivity : ComponentActivity() {
                                         return@MainView
                                     }
                                     val df = settings.defaultFeed
-                                    timelineViewModel.selectFeed(df.uri, df.displayName, df.avatar) {
+                                    timelineViewModel.applyFeedState(df.uri, df.displayName, df.avatar)
+                                    timelineViewModel.fetchAllNewData {
                                         firstLoadDone.value = true
                                     }
-                                    timelineViewModel.fetchNotifications(fresh = true)
-                                    timelineViewModel.fetchSelf()
-                                    timelineViewModel.feeds()
                                 }
                             )
                         }

@@ -721,13 +721,16 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun selectFeed(uri: String, displayName: String, avatar: String?, then: () -> Unit = {}) {
+    fun applyFeedState(uri: String, displayName: String, avatar: String?) {
         uiState = uiState.copy(
             selectedFeed = uri,
             feedName = displayName,
             feedAvatar = avatar,
         )
+    }
 
+    fun selectFeed(uri: String, displayName: String, avatar: String?, then: () -> Unit = {}) {
+        applyFeedState(uri, displayName, avatar)
         fetchTimeline(fresh = true) { then() }
     }
 
