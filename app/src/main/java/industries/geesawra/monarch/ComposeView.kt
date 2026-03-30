@@ -72,6 +72,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -302,9 +303,12 @@ fun ComposeView(
                     }
                 }
 
-                LaunchedEffect(textfieldState.text, mediaSelected.value) {
-                    charCount.intValue = textfieldState.text.length
-                    wasEdited.value = textfieldState.text.isNotEmpty() || mediaSelected.value.isNotEmpty()
+                LaunchedEffect(Unit) {
+                    snapshotFlow { textfieldState.text.toString() to mediaSelected.value }
+                        .collect { (text, media) ->
+                            charCount.intValue = text.length
+                            wasEdited.value = text.isNotEmpty() || media.isNotEmpty()
+                        }
                 }
 
                 // Mention typeahead: detect @query and search
