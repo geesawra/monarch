@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animate
@@ -212,34 +213,39 @@ fun MainView(
         )
     }
 
-    BottomSheetScaffold(
-        modifier = Modifier
-            .windowInsetsPadding(WindowInsets.statusBars),
-        scaffoldState = scaffoldState,
-        sheetPeekHeight = 0.dp,
-        sheetDragHandle = {},
-        sheetSwipeEnabled = true,
-        sheetShadowElevation = 16.dp,
-        sheetContent = {
-            ComposeView(
-                context = LocalContext.current,
-                coroutineScope = coroutineScope,
-                timelineViewModel = timelineViewModel,
-                settingsState = settingsState,
-                scaffoldState = scaffoldState,
-                scrollState = scrollState,
-                inReplyTo = inReplyTo,
-                isQuotePost = isQuotePost,
-                wasEdited = wasEdited,
-            )
-        },
-        snackbarHost = {
-            SnackbarHost(it) { sd ->
-                Snackbar(snackbarData = sd, actionOnNewLine = true)
-            }
-        },
-        content = { paddingValues ->
-            Box(modifier = Modifier.fillMaxSize()) {
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (scaffoldState.bottomSheetState.isVisible) 0.32f else 0f,
+        label = "scrimAlpha"
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        BottomSheetScaffold(
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.statusBars),
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = 0.dp,
+            sheetDragHandle = {},
+            sheetSwipeEnabled = true,
+            sheetShadowElevation = 16.dp,
+            sheetContent = {
+                ComposeView(
+                    context = LocalContext.current,
+                    coroutineScope = coroutineScope,
+                    timelineViewModel = timelineViewModel,
+                    settingsState = settingsState,
+                    scaffoldState = scaffoldState,
+                    scrollState = scrollState,
+                    inReplyTo = inReplyTo,
+                    isQuotePost = isQuotePost,
+                    wasEdited = wasEdited,
+                )
+            },
+            snackbarHost = {
+                SnackbarHost(it) { sd ->
+                    Snackbar(snackbarData = sd, actionOnNewLine = true)
+                }
+            },
+            content = { paddingValues ->
                 InnerTimelineView(
                     modifier = Modifier.padding(paddingValues),
                     coroutineScope = coroutineScope,
@@ -273,29 +279,25 @@ fun MainView(
                         onThreadTap(it)
                     }
                 )
-
-                AnimatedVisibility(
-                    visible = scaffoldState.bottomSheetState.isVisible,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() },
-                            ) {
-                                coroutineScope.launch {
-                                    scaffoldState.bottomSheetState.hide()
-                                }
-                            }
-                    )
-                }
             }
+        )
+
+        if (scrimAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha))
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) {
+                        coroutineScope.launch {
+                            scaffoldState.bottomSheetState.hide()
+                        }
+                    }
+            )
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
