@@ -134,7 +134,9 @@ data class SkeetData(
                 authorHandle = post.post.author.handle,
                 authorLabels = post.post.author.labels,
                 postLabels = post.post.labels,
-                threadgate = post.post.threadgate,
+                threadgate = post.post.threadgate
+                    ?: (post.reply?.root as? ReplyRefRootUnion.PostView)?.value?.threadgate
+                    ?: (post.reply?.parent as? ReplyRefParentUnion.PostView)?.value?.threadgate,
                 verified = post.post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
                 embed = post.post.embed,

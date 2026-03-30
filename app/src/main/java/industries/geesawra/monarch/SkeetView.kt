@@ -925,25 +925,6 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             style = MaterialTheme.typography.labelMedium,
         )
 
-        if (skeet.threadgate != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Shield,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = MaterialTheme.colorScheme.outline,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Replies limited",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-        }
 
         if (showLabels) {
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {

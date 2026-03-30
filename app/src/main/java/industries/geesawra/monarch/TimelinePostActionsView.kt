@@ -190,7 +190,10 @@ fun TimelinePostActionsView(
             }
         }
 
+        val replyDisabled = skeet.threadgate != null && !isOwnPost
+
         IconButton(
+            enabled = !replyDisabled,
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onReplyTap(skeet, false)
@@ -212,7 +215,8 @@ fun TimelinePostActionsView(
                 }(),
                 contentDescription = "Reply",
                 number = replies,
-                MaterialTheme.colorScheme.onSurfaceVariant
+                if (replyDisabled) MaterialTheme.colorScheme.outlineVariant
+                else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
