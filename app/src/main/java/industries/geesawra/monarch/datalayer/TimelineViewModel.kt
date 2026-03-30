@@ -57,7 +57,7 @@ import kotlin.time.Instant
 data class TimelineUiState(
     val user: ProfileViewDetailed? = null,
     val selectedFeed: String = "following",
-    val feedName: String = "Following",
+    val feedName: String = "",
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
     val skeets: List<SkeetData> = listOf(),

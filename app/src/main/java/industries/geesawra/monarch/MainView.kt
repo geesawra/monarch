@@ -770,7 +770,23 @@ fun FeedsDrawer(
             selectFeed("following", "Following", null)
         },
         icon = {
-            Spacer(modifier = Modifier.size(20.dp))
+            val userAvatar = timelineViewModel.uiState.user?.avatar?.uri
+            if (userAvatar != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(userAvatar)
+                        .crossfade(true)
+                        .build(),
+                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape),
+                    contentDescription = "Following feed",
+                )
+            } else {
+                Spacer(modifier = Modifier.size(20.dp))
+            }
         },
         railExpanded = state == WideNavigationRailValue.Expanded,
     )
