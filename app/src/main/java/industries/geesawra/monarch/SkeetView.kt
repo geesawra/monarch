@@ -49,7 +49,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -85,7 +84,6 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.atproto.label.Label
-import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -484,29 +482,29 @@ private fun isTenorUrl(uri: String): Boolean {
     return host == "tenor.com" || host.endsWith(".tenor.com")
 }
 
-private fun tenorPngToMp4(pngUrl: String): String? {
-    val regex = Regex("""https://media\.tenor\.com/([^/]+?)AAAAe/(.+)\.png""")
-    val match = regex.find(pngUrl) ?: return null
+private fun tenorGifToWebm(gifUrl: String): String? {
+    val regex = Regex("""https://media\d*\.tenor\.com/([^/]+?)AAAAC/(.+)\.gif""")
+    val match = regex.find(gifUrl.split("?").first()) ?: return null
     val id = match.groupValues[1]
     val name = match.groupValues[2]
-    return "https://media.tenor.com/${id}AAAPo/${name}.mp4"
+    return "https://t.gifs.bsky.app/${id}AAAP3/${name}.webm"
 }
 
 @Composable
 private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
-    var mp4Url by remember(ev.uri.uri) { mutableStateOf<String?>(null) }
+    val uri = ev.uri.uri
+    val parsedUri = uri.toUri()
+    val webmUrl = tenorGifToWebm(uri)
+    val ww = parsedUri.getQueryParameter("ww")?.toFloatOrNull()
+    val hh = parsedUri.getQueryParameter("hh")?.toFloatOrNull()
+    val aspectRatio = if (ww != null && hh != null && hh > 0) ww / hh else null
 
-    LaunchedEffect(ev.uri.uri) {
-        val preview = LinkPreviewFetcher.fetch(ev.uri.uri)
-        mp4Url = preview?.imageUrl?.let { tenorPngToMp4(it) }
-    }
-
-    if (mp4Url != null) {
+    if (webmUrl != null) {
         VideoPlayer(
             mediaItems = listOf(
                 VideoPlayerMediaItem.NetworkMediaItem(
-                    url = mp4Url!!,
-                    mimeType = MimeTypes.VIDEO_MP4,
+                    url = webmUrl,
+                    mimeType = MimeTypes.VIDEO_WEBM,
                 )
             ),
             handleLifecycle = true,
@@ -532,7 +530,10 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
             repeatMode = RepeatMode.ALL,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 300.dp)
+                .then(
+                    if (aspectRatio != null) Modifier.aspectRatio(aspectRatio)
+                    else Modifier.heightIn(max = 300.dp)
+                )
                 .padding(top = 4.dp)
                 .clip(MaterialTheme.shapes.medium)
         )
