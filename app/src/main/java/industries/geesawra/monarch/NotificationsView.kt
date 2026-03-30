@@ -62,9 +62,14 @@ fun NotificationsView(
 
     LazyColumn(
         state = state,
-        modifier = modifier
-            .padding(scaffoldPadding),
+        modifier = modifier,
         userScrollEnabled = isScrollEnabled,
+        contentPadding = PaddingValues(
+            top = scaffoldPadding.calculateTopPadding(),
+            bottom = scaffoldPadding.calculateBottomPadding(),
+            start = 16.dp,
+            end = 16.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(

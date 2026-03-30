@@ -484,13 +484,21 @@ private fun isTenorUrl(uri: String): Boolean {
     return host == "tenor.com" || host.endsWith(".tenor.com")
 }
 
+private fun tenorPngToGif(pngUrl: String): String? {
+    val regex = Regex("""https://media\.tenor\.com/([^/]+?)AAAAe/(.+)\.png""")
+    val match = regex.find(pngUrl) ?: return null
+    val id = match.groupValues[1]
+    val name = match.groupValues[2]
+    return "https://media1.tenor.com/m/${id}AAAAC/${name}.gif"
+}
+
 @Composable
 private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
     var gifUrl by remember(ev.uri.uri) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(ev.uri.uri) {
         val preview = LinkPreviewFetcher.fetch(ev.uri.uri)
-        gifUrl = preview?.imageUrl
+        gifUrl = preview?.imageUrl?.let { tenorPngToGif(it) } ?: preview?.imageUrl
     }
 
     val imageModel = gifUrl ?: ev.thumb?.uri
@@ -499,7 +507,7 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(imageModel)
-                .crossfade(gifUrl == null)
+                .decoderFactory(coil3.gif.GifDecoder.Factory())
                 .build(),
             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
