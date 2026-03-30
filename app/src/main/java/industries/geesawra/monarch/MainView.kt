@@ -152,6 +152,14 @@ fun MainView(
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
+            confirmValueChange = { targetValue ->
+                if (targetValue == SheetValue.Hidden && wasEdited.value) {
+                    showDiscardDialog = true
+                    false
+                } else {
+                    true
+                }
+            }
         )
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
@@ -159,13 +167,6 @@ fun MainView(
 
     LaunchedEffect(Unit) {
         onFirstLoad()
-    }
-
-    LaunchedEffect(scaffoldState.bottomSheetState.currentValue) {
-        if (scaffoldState.bottomSheetState.currentValue == SheetValue.Hidden && wasEdited.value) {
-            showDiscardDialog = true
-            scaffoldState.bottomSheetState.expand()
-        }
     }
 
     val focusManager = LocalFocusManager.current

@@ -136,18 +136,19 @@ fun ProfileView(
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
+            confirmValueChange = { targetValue ->
+                if (targetValue == SheetValue.Hidden && wasEdited.value) {
+                    showDiscardDialog = true
+                    false
+                } else {
+                    true
+                }
+            }
         )
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
     val isQuotePost = remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-
-    LaunchedEffect(scaffoldState.bottomSheetState.currentValue) {
-        if (scaffoldState.bottomSheetState.currentValue == SheetValue.Hidden && wasEdited.value) {
-            showDiscardDialog = true
-            scaffoldState.bottomSheetState.expand()
-        }
-    }
 
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
         if (wasEdited.value) {
