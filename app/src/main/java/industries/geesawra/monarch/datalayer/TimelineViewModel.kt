@@ -683,8 +683,8 @@ class TimelineViewModel @AssistedInject constructor(
         facets: List<Facet> = listOf(),
         linkPreview: LinkPreviewData? = null,
         threadgateRules: List<ThreadgateAllowUnion>? = null,
-    ): Result<Unit> {
-        return bskyConn.post(
+    ): Result<AtUri> {
+        val result = bskyConn.post(
             content,
             images,
             video,
@@ -694,6 +694,15 @@ class TimelineViewModel @AssistedInject constructor(
             linkPreview = linkPreview,
             threadgateRules = threadgateRules,
         )
+        result.onSuccess { uri ->
+            bskyConn.getPosts(listOf(uri)).onSuccess { posts ->
+                val newSkeet = posts.firstOrNull()?.let { SkeetData.fromPostView(it, it.author) }
+                if (newSkeet != null) {
+                    uiState = uiState.copy(skeets = listOf(newSkeet) + uiState.skeets)
+                }
+            }
+        }
+        return result
     }
 
     fun feeds(): Job {

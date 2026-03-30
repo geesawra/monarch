@@ -741,7 +741,7 @@ class BlueskyConn(val context: Context) {
         facets: List<Facet> = listOf(),
         linkPreview: LinkPreviewData? = null,
         threadgateRules: List<ThreadgateAllowUnion>? = null,
-    ): Result<Unit> {
+    ): Result<AtUri> {
         return runCatching {
             create().onFailure {
                 return Result.failure(it)
@@ -826,7 +826,7 @@ class BlueskyConn(val context: Context) {
                     if (threadgateRules != null) {
                         createThreadgate(postRes.response.uri, threadgateRules)
                     }
-                    Result.success(Unit)
+                    Result.success(postRes.response.uri)
                 }
             }
         }
