@@ -93,7 +93,10 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.shape.RoundedCornerShape
 import industries.geesawra.monarch.datalayer.AvatarShape
@@ -144,9 +147,19 @@ fun MainView(
     onFirstLoad: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
+    val wasEdited = remember { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
+            confirmValueChange = { targetValue ->
+                if (targetValue == SheetValue.Hidden && wasEdited.value) {
+                    showDiscardDialog = true
+                    false
+                } else {
+                    true
+                }
+            }
         )
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
@@ -158,10 +171,39 @@ fun MainView(
 
     val focusManager = LocalFocusManager.current
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
-        focusManager.clearFocus()
-        coroutineScope.launch {
-            scaffoldState.bottomSheetState.hide()
+        if (wasEdited.value) {
+            showDiscardDialog = true
+        } else {
+            focusManager.clearFocus()
+            coroutineScope.launch {
+                scaffoldState.bottomSheetState.hide()
+            }
         }
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard post?") },
+            text = { Text("You have unsaved changes that will be lost.") },
+            confirmButton = {
+                Button(onClick = {
+                    showDiscardDialog = false
+                    wasEdited.value = false
+                    focusManager.clearFocus()
+                    coroutineScope.launch {
+                        scaffoldState.bottomSheetState.hide()
+                    }
+                }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDiscardDialog = false }) {
+                    Text("Keep editing")
+                }
+            }
+        )
     }
 
     BottomSheetScaffold(
@@ -170,7 +212,7 @@ fun MainView(
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
         sheetDragHandle = {},
-        sheetSwipeEnabled = false,
+        sheetSwipeEnabled = true,
         sheetShadowElevation = 16.dp,
         sheetContent = {
             ComposeView(
@@ -181,7 +223,8 @@ fun MainView(
                 scaffoldState = scaffoldState,
                 scrollState = scrollState,
                 inReplyTo = inReplyTo,
-                isQuotePost = isQuotePost
+                isQuotePost = isQuotePost,
+                wasEdited = wasEdited,
             )
         },
         snackbarHost = {

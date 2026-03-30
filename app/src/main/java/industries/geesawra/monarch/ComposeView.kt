@@ -139,13 +139,13 @@ fun ComposeView(
     inReplyTo: MutableState<SkeetData?>,
     isQuotePost: MutableState<Boolean>,
     scaffoldState: BottomSheetScaffoldState,
-    scrollState: ScrollState
+    scrollState: ScrollState,
+    wasEdited: MutableState<Boolean> = mutableStateOf(false),
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val charCount = remember { mutableIntStateOf(0) }
-    val wasEdited = remember { mutableStateOf(false) }
     val maxChars = 300
     val textfieldState = rememberTextFieldState()
     val facets = remember { mutableListOf<Facet>() }
@@ -265,17 +265,23 @@ fun ComposeView(
                     .fillMaxWidth(), // Takes full width of the Inner Box
                 horizontalAlignment = Alignment.End
             ) {
-                Row {
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                scaffoldState.bottomSheetState.hide()
-                            }
-                        }
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close compose view")
-                    }
-                }
+                ActionRow(
+                    context,
+                    uploadingPost,
+                    pickMedia,
+                    textfieldState.text.toString(),
+                    mediaSelected,
+                    mediaSelectedIsVideo,
+                    coroutineScope,
+                    maxChars,
+                    timelineViewModel,
+                    scaffoldState,
+                    inReplyTo.value,
+                    isQuotePost.value,
+                    facets = facets,
+                    linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
+                    threadgateRules = threadgateRules,
+                )
 
                 inReplyTo.value?.let {
                     OutlinedCard(
@@ -641,26 +647,6 @@ fun ComposeView(
                     }
                 }
 
-                ActionRow(
-                    context,
-                    uploadingPost,
-                    pickMedia,
-                    textfieldState.text.toString(),
-                    mediaSelected,
-                    mediaSelectedIsVideo,
-                    coroutineScope,
-                    maxChars,
-                    timelineViewModel,
-                    scaffoldState,
-                    inReplyTo.value,
-                    isQuotePost.value,
-                    facets = facets,
-                    linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
-                    threadgateRules = threadgateRules,
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
                 if (mediaSelected.value.isNotEmpty()) {
                     Card(
                         modifier = Modifier
@@ -697,8 +683,7 @@ fun ComposeView(
                     }
                 }
 
-                // Spacer at the end of scrollable content to prevent overlap with fixed buttons
-                Spacer(modifier = Modifier.height(80.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

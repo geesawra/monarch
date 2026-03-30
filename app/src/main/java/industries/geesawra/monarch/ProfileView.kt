@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -64,6 +65,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -129,9 +131,19 @@ fun ProfileView(
     val listState = rememberLazyListState()
     val profile = timelineViewModel.uiState.profileUser
     val isLoading = timelineViewModel.uiState.isFetchingProfile || timelineViewModel.uiState.isFetchingProfileFeed
+    val wasEdited = remember { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
+            confirmValueChange = { targetValue ->
+                if (targetValue == SheetValue.Hidden && wasEdited.value) {
+                    showDiscardDialog = true
+                    false
+                } else {
+                    true
+                }
+            }
         )
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
@@ -139,10 +151,39 @@ fun ProfileView(
     val focusManager = LocalFocusManager.current
 
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
-        focusManager.clearFocus()
-        coroutineScope.launch {
-            scaffoldState.bottomSheetState.hide()
+        if (wasEdited.value) {
+            showDiscardDialog = true
+        } else {
+            focusManager.clearFocus()
+            coroutineScope.launch {
+                scaffoldState.bottomSheetState.hide()
+            }
         }
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard post?") },
+            text = { Text("You have unsaved changes that will be lost.") },
+            confirmButton = {
+                Button(onClick = {
+                    showDiscardDialog = false
+                    wasEdited.value = false
+                    focusManager.clearFocus()
+                    coroutineScope.launch {
+                        scaffoldState.bottomSheetState.hide()
+                    }
+                }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDiscardDialog = false }) {
+                    Text("Keep editing")
+                }
+            }
+        )
     }
 
     // Show avatar in top bar once the header item is scrolled past
@@ -157,7 +198,7 @@ fun ProfileView(
         scaffoldState = scaffoldState,
         sheetPeekHeight = 0.dp,
         sheetDragHandle = {},
-        sheetSwipeEnabled = false,
+        sheetSwipeEnabled = true,
         sheetShadowElevation = 16.dp,
         sheetContent = {
             ComposeView(
@@ -169,6 +210,7 @@ fun ProfileView(
                 scrollState = rememberScrollState(),
                 inReplyTo = inReplyTo,
                 isQuotePost = isQuotePost,
+                wasEdited = wasEdited,
             )
         },
     ) { scaffoldPadding ->
