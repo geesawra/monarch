@@ -174,8 +174,10 @@ fun MainView(
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
     val isQuotePost = remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        onFirstLoad()
+    LaunchedEffect(settingsState.loaded) {
+        if (settingsState.loaded) {
+            onFirstLoad()
+        }
     }
 
     val focusManager = LocalFocusManager.current

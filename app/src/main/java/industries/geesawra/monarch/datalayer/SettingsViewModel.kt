@@ -48,6 +48,7 @@ data class SettingsState(
     val replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads,
     val showLabels: Boolean = true,
     val defaultFeed: DefaultFeed = DefaultFeed(),
+    val loaded: Boolean = false,
 )
 
 @HiltViewModel
@@ -85,6 +86,7 @@ class SettingsViewModel @Inject constructor(
                         displayName = prefs[DEFAULT_FEED_NAME] ?: "Following",
                         avatar = prefs[DEFAULT_FEED_AVATAR],
                     ),
+                    loaded = true,
                 )
             }.collect {
                 settingsState = it

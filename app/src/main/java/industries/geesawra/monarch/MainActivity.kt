@@ -168,7 +168,7 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(ViewList.Login.name)
                                 },
                                 onFirstLoad = {
-                                    if (firstLoadDone.value) {
+                                    if (firstLoadDone.value || !settings.loaded) {
                                         return@MainView
                                     }
                                     val df = settings.defaultFeed
