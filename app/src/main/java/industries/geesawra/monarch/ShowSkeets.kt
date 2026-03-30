@@ -1,15 +1,19 @@
 package industries.geesawra.monarch
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
+import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
+import io.github.fornewid.placeholder.material3.fade
+import io.github.fornewid.placeholder.material3.placeholder
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SettingsState
@@ -51,6 +58,7 @@ fun ShowSkeets(
     data: List<SkeetData>,
     isShowingThread: Boolean = false,
     shouldFetchMoreData: Boolean = true,
+    isLoading: Boolean = false,
     settingsState: SettingsState = SettingsState(),
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onSeeMoreTap: ((SkeetData) -> Unit)? = null,
@@ -81,6 +89,12 @@ fun ShowSkeets(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (isLoading && data.isEmpty()) {
+            items(8, key = { "skeleton_$it" }) {
+                SkeletonPost()
+            }
+            return@LazyColumn
+        }
         itemsIndexed(
             items = data.filter { !it.replyToNotFollowing && it.cid !in threadContextCids },
             key = { _, skeet -> skeet.key() }
@@ -227,6 +241,98 @@ fun ShowSkeets(
     LaunchedEffect(endOfListReached) {
         if (endOfListReached && viewModel.uiState.skeets.isNotEmpty() && shouldFetchMoreData) {
             viewModel.fetchTimeline()
+        }
+    }
+}
+
+@Composable
+private fun SkeletonPost() {
+    ElevatedCard(
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .placeholder(
+                        visible = true,
+                        highlight = PlaceholderHighlight.fade(),
+                    )
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.4f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.fade(),
+                        )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.fade(),
+                        )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.fade(),
+                        )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.fade(),
+                        )
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    repeat(3) {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .placeholder(
+                                    visible = true,
+                                    highlight = PlaceholderHighlight.fade(),
+                                )
+                        )
+                    }
+                }
+            }
         }
     }
 }

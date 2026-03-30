@@ -642,6 +642,7 @@ private fun InnerTimelineView(
                         modifier = Modifier.padding(values),
                         onReplyTap = onReplyTap,
                         data = timelineViewModel.uiState.skeets,
+                        isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
                         isScrollEnabled = isScrollEnabled,
                         onSeeMoreTap = onSeeMoreTap,
                         onProfileTap = onProfileTap,
