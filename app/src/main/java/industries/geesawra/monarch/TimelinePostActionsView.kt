@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.ReplyAll
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.Share
@@ -114,6 +115,32 @@ fun TimelinePostActionsView(
     val reposts = remember { mutableLongStateOf(skeet.reposts ?: 0) }
     val replies = remember { mutableLongStateOf(skeet.replies ?: 0) }
     val haptic = LocalHapticFeedback.current
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    val isOwnPost = timelineViewModel?.isOwnPost(skeet) == true
+
+    if (showDeleteDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { androidx.compose.material3.Text("Delete post?") },
+            text = { androidx.compose.material3.Text("This cannot be undone.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showDeleteDialog = false
+                    timelineViewModel?.deletePost(skeet.uri) {}
+                }) {
+                    androidx.compose.material3.Text(
+                        "Delete",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showDeleteDialog = false }) {
+                    androidx.compose.material3.Text("Cancel")
+                }
+            }
+        )
+    }
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -145,6 +172,22 @@ fun TimelinePostActionsView(
                 contentDescription = "Share",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        if (isOwnPost) {
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showDeleteDialog = true
+                }
+            ) {
+                Icon(
+                    modifier = Modifier.size(18.dp),
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
         }
 
         IconButton(

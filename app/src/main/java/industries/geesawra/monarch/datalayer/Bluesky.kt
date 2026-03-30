@@ -1340,6 +1340,10 @@ class BlueskyConn(val context: Context) {
         return deleteRecord(rKey, "app.bsky.feed.repost")
     }
 
+    suspend fun deletePost(rKey: RKey): Result<Unit> {
+        return deleteRecord(rKey, "app.bsky.feed.post")
+    }
+
     suspend fun getThread(uri: AtUri): Result<GetPostThreadResponse> {
         return runCatching {
             create().onFailure {

@@ -41,6 +41,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toStdlibInstant
 import kotlinx.serialization.json.Json
+import industries.geesawra.monarch.rkey
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
@@ -764,6 +765,27 @@ class TimelineViewModel @AssistedInject constructor(
                 then()
             }
         }
+    }
+
+    fun deletePost(uri: AtUri, then: () -> Unit) {
+        viewModelScope.launch {
+            bskyConn.deletePost(uri.rkey()).onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }.onSuccess {
+                uiState = uiState.copy(
+                    skeets = uiState.skeets.filter { it.uri != uri },
+                    profilePosts = uiState.profilePosts.filter { it.uri != uri },
+                )
+                then()
+            }
+        }
+    }
+
+    fun isOwnPost(skeet: SkeetData): Boolean {
+        return skeet.did == bskyConn.session?.did
     }
 
     fun deleteLike(cid: Cid, then: () -> Unit) {
