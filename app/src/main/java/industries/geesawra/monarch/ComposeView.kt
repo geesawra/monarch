@@ -165,21 +165,23 @@ fun ComposeView(
     LaunchedEffect(scaffoldState.bottomSheetState.targetValue) {
         when (scaffoldState.bottomSheetState.targetValue) {
             SheetValue.Hidden -> {
-                textfieldState.clearText()
                 keyboardController?.hide()
                 focusManager.clearFocus()
-                charCount.intValue = 0
-                inReplyTo.value = null
-                isQuotePost.value = false
-                mediaSelected.value = listOf()
-                mediaSelectedIsVideo.value = false
-                mentionResults.value = listOf()
-                showMentionDropdown.value = false
-                mentionDids.clear()
-                linkPreview.value = null
-                linkPreviewLoading.value = false
-                linkPreviewDismissed.value = false
-                linkPreviewCache.clear()
+                if (!wasEdited.value) {
+                    textfieldState.clearText()
+                    charCount.intValue = 0
+                    inReplyTo.value = null
+                    isQuotePost.value = false
+                    mediaSelected.value = listOf()
+                    mediaSelectedIsVideo.value = false
+                    mentionResults.value = listOf()
+                    showMentionDropdown.value = false
+                    mentionDids.clear()
+                    linkPreview.value = null
+                    linkPreviewLoading.value = false
+                    linkPreviewDismissed.value = false
+                    linkPreviewCache.clear()
+                }
             }
 
             SheetValue.PartiallyExpanded, SheetValue.Expanded -> {
