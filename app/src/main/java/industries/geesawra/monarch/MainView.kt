@@ -10,6 +10,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.annotation.StringRes
@@ -767,7 +769,6 @@ private fun InnerTimelineView(
 }
 
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FeedsDrawer(
     state: WideNavigationRailValue,
@@ -779,21 +780,53 @@ fun FeedsDrawer(
     val haptic = LocalHapticFeedback.current
     val isDefaultFollowing = defaultFeedUri == "following"
 
-    Box(modifier = Modifier.combinedClickable(
-        onClick = { selectFeed("following", "Following", null) },
-        onLongClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onLongPressFeed("following", "Following", null)
+    WideNavigationRailItem(
+        modifier = Modifier.pointerInput(Unit) {
+            detectTapGestures(onLongPress = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onLongPressFeed("following", "Following", null)
+            })
         },
-    )) {
+        label = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "Following")
+                if (isDefaultFollowing) {
+                    Icon(
+                        Icons.Default.Home,
+                        contentDescription = "Default feed",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        },
+        selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
+        onClick = { selectFeed("following", "Following", null) },
+        icon = {
+            Spacer(modifier = Modifier.size(20.dp))
+        },
+        railExpanded = state == WideNavigationRailValue.Expanded,
+    )
+
+    timelineViewModel.uiState.feeds.forEach { feed ->
+        val isDefault = defaultFeedUri == feed.uri.atUri
         WideNavigationRailItem(
+            modifier = Modifier.pointerInput(feed.uri.atUri) {
+                detectTapGestures(onLongPress = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPressFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
+                })
+            },
             label = {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "Following")
-                    if (isDefaultFollowing) {
+                    Text(text = feed.displayName)
+                    if (isDefault) {
                         Icon(
                             Icons.Default.Home,
                             contentDescription = "Default feed",
@@ -803,64 +836,28 @@ fun FeedsDrawer(
                     }
                 }
             },
-            selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
-            onClick = {},
+            selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
+            onClick = { selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri) },
             icon = {
-                Spacer(modifier = Modifier.size(20.dp))
+                if (feed.avatar != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(feed.avatar?.uri)
+                            .crossfade(true)
+                            .build(),
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape),
+                        contentDescription = "Feed avatar",
+                    )
+                } else {
+                    Spacer(modifier = Modifier.size(20.dp))
+                }
             },
             railExpanded = state == WideNavigationRailValue.Expanded,
         )
-    }
-
-    timelineViewModel.uiState.feeds.forEach { feed ->
-        val isDefault = defaultFeedUri == feed.uri.atUri
-        Box(modifier = Modifier.combinedClickable(
-            onClick = { selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri) },
-            onLongClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onLongPressFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
-            },
-        )) {
-            WideNavigationRailItem(
-                label = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = feed.displayName)
-                        if (isDefault) {
-                            Icon(
-                                Icons.Default.Home,
-                                contentDescription = "Default feed",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                },
-                selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
-                onClick = {},
-                icon = {
-                    if (feed.avatar != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(feed.avatar?.uri)
-                                .crossfade(true)
-                                .build(),
-                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape),
-                            contentDescription = "Feed avatar",
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.size(20.dp))
-                    }
-                },
-                railExpanded = state == WideNavigationRailValue.Expanded,
-            )
-        }
     }
 }
 
