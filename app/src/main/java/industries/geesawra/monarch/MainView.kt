@@ -566,96 +566,18 @@ private fun InnerTimelineView(
                 floatingActionButton = {
                     when (currentDestination) {
                         TabBarDestinations.TIMELINE -> {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
+                            FloatingActionButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    fobOnClick()
+                                }
                             ) {
-                                AnimatedVisibility(
-                                    visible = timelineState.canScrollBackward,
-                                    enter = slideInVertically(),
-                                    exit = slideOutVertically()
-                                ) {
-                                    FloatingActionButton(
-                                        modifier = Modifier
-                                            .size(40.dp),
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            coroutineScope.launch {
-                                                launch {
-                                                    if (timelineState.firstVisibleItemIndex > 8) {
-                                                        timelineState.scrollToItem(0)
-                                                    } else {
-                                                        timelineState.animateScrollToItem(0)
-                                                    }
-                                                }
-
-                                                launch {
-                                                    animate(
-                                                        initialValue = scrollBehavior.state.heightOffset,
-                                                        targetValue = 0f
-                                                    ) { value, /* velocity */ _ ->
-                                                        scrollBehavior.state.heightOffset =
-                                                            value
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        shape = FloatingActionButtonDefaults.smallShape,
-                                    ) {
-                                        Icon(Icons.Default.ArrowUpward, "Scroll to top")
-                                    }
-                                }
-
-                                FloatingActionButton(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        fobOnClick()
-                                    }
-                                ) {
-                                    Icon(Icons.Filled.Create, "Post")
-                                }
+                                Icon(Icons.Filled.Create, "Post")
                             }
                         }
 
                         TabBarDestinations.SEARCH -> {}
-
-                        TabBarDestinations.NOTIFICATIONS -> {
-                            AnimatedVisibility(
-                                visible = notificationsState.canScrollBackward,
-                                enter = slideInVertically(),
-                                exit = slideOutVertically()
-                            ) {
-                                FloatingActionButton(
-                                    modifier = Modifier
-                                        .size(40.dp),
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        coroutineScope.launch {
-                                            launch {
-                                                if (notificationsState.firstVisibleItemIndex > 8) {
-                                                    notificationsState.scrollToItem(0)
-                                                } else {
-                                                    notificationsState.animateScrollToItem(0)
-                                                }
-                                            }
-
-                                            launch {
-                                                animate(
-                                                    initialValue = scrollBehavior.state.heightOffset,
-                                                    targetValue = 0f
-                                                ) { value, /* velocity */ _ ->
-                                                    scrollBehavior.state.heightOffset = value
-                                                }
-                                            }
-                                        }
-                                    },
-                                    shape = FloatingActionButtonDefaults.smallShape,
-                                ) {
-                                    Icon(Icons.Default.ArrowUpward, "Scroll to top")
-                                }
-                            }
-
-                        }
+                        TabBarDestinations.NOTIFICATIONS -> {}
                     }
                 },
                 bottomBar = {
@@ -699,7 +621,32 @@ private fun InnerTimelineView(
                                 selected = it == currentDestination,
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    currentDestination = it
+                                    if (it == currentDestination) {
+                                        val state = when (it) {
+                                            TabBarDestinations.TIMELINE -> timelineState
+                                            TabBarDestinations.SEARCH -> searchPostsState
+                                            TabBarDestinations.NOTIFICATIONS -> notificationsState
+                                        }
+                                        coroutineScope.launch {
+                                            launch {
+                                                if (state.firstVisibleItemIndex > 8) {
+                                                    state.scrollToItem(0)
+                                                } else {
+                                                    state.animateScrollToItem(0)
+                                                }
+                                            }
+                                            launch {
+                                                animate(
+                                                    initialValue = scrollBehavior.state.heightOffset,
+                                                    targetValue = 0f
+                                                ) { value, _ ->
+                                                    scrollBehavior.state.heightOffset = value
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        currentDestination = it
+                                    }
                                 }
                             )
                         }

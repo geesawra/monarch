@@ -135,7 +135,9 @@ fun ProfileView(
     onSettingsTap: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    val listState = rememberLazyListState()
+    val listStates = profileNavTabs.associate { it.filter to rememberLazyListState() }
+    val currentFilter = timelineViewModel.uiState.profileFeedFilter
+    val listState = listStates[currentFilter] ?: rememberLazyListState()
     val profile = timelineViewModel.uiState.profileUser
     val isLoading = timelineViewModel.uiState.isFetchingProfile && profile == null
     val wasEdited = remember { mutableStateOf(false) }
@@ -321,7 +323,15 @@ fun ProfileView(
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
                             label = { Text(tab.label) },
                             selected = tab.filter == currentFilter,
-                            onClick = { timelineViewModel.setProfileFeedFilter(tab.filter) },
+                            onClick = {
+                                if (tab.filter == currentFilter) {
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem(0)
+                                    }
+                                } else {
+                                    timelineViewModel.setProfileFeedFilter(tab.filter)
+                                }
+                            },
                         )
                     }
                 }
