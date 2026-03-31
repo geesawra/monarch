@@ -270,53 +270,58 @@ fun SettingsView(
             if (pushNotificationManager != null && timelineViewModel != null) {
                 val context = LocalContext.current
                 val coroutineScope = rememberCoroutineScope()
-                val permissionLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission()
-                ) { granted ->
-                    if (granted) {
-                        settingsViewModel.setPushNotificationsEnabled(true)
-                        val did = timelineViewModel.uiState.user?.did?.did
-                        if (did != null) {
-                            coroutineScope.launch {
-                                pushNotificationManager.getAndRegisterToken(did)
+                var pushError by remember { mutableStateOf<String?>(null) }
+
+                val enablePush: () -> Unit = {
+                    settingsViewModel.setPushNotificationsEnabled(true)
+                    val did = timelineViewModel.uiState.user?.did?.did
+                    if (did != null) {
+                        coroutineScope.launch {
+                            pushNotificationManager.getAndRegisterToken(did).onFailure {
+                                pushError = it.message ?: "Failed to register"
+                                settingsViewModel.setPushNotificationsEnabled(false)
+                            }.onSuccess {
+                                pushError = null
                             }
                         }
                     }
                 }
 
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    if (granted) enablePush()
+                }
+
                 ListItem(
                     headlineContent = { Text("Push notifications") },
-                    supportingContent = { Text("Receive push notifications") },
+                    supportingContent = {
+                        if (pushError != null) {
+                            Text(
+                                "Registration failed: $pushError",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            Text("Receive push notifications")
+                        }
+                    },
                     trailingContent = {
                         Switch(
                             checked = settings.pushNotificationsEnabled,
                             onCheckedChange = { enabled ->
                                 if (enabled) {
+                                    pushError = null
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         val hasPermission = ContextCompat.checkSelfPermission(
                                             context, Manifest.permission.POST_NOTIFICATIONS
                                         ) == PackageManager.PERMISSION_GRANTED
-                                        if (hasPermission) {
-                                            settingsViewModel.setPushNotificationsEnabled(true)
-                                            val did = timelineViewModel.uiState.user?.did?.did
-                                            if (did != null) {
-                                                coroutineScope.launch {
-                                                    pushNotificationManager.getAndRegisterToken(did)
-                                                }
-                                            }
-                                        } else {
-                                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                        }
+                                        if (hasPermission) enablePush()
+                                        else permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     } else {
-                                        settingsViewModel.setPushNotificationsEnabled(true)
-                                        val did = timelineViewModel.uiState.user?.did?.did
-                                        if (did != null) {
-                                            coroutineScope.launch {
-                                                pushNotificationManager.getAndRegisterToken(did)
-                                            }
-                                        }
+                                        enablePush()
                                     }
                                 } else {
+                                    pushError = null
                                     settingsViewModel.setPushNotificationsEnabled(false)
                                 }
                             }

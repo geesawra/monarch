@@ -12,8 +12,10 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -48,26 +50,29 @@ class PushNotificationManager @Inject constructor(
         }
     }
 
-    suspend fun registerToken(token: String, did: String) {
-        runCatching {
-            httpClient.post(REGISTER_URL) {
+    suspend fun registerToken(token: String, did: String): Result<Unit> {
+        return runCatching {
+            val response = httpClient.post(REGISTER_URL) {
                 contentType(ContentType.Application.Json)
                 setBody(PushRegistrationRequest(token = token, did = did))
             }
+            if (!response.status.isSuccess()) {
+                throw Exception("Server returned ${response.status.value}: ${response.bodyAsText()}")
+            }
+            Log.d(TAG, "Push token registered for DID: $did")
+            Unit
         }.onFailure {
             Log.e(TAG, "Failed to register push token: ${it.message}")
-        }.onSuccess {
-            Log.d(TAG, "Push token registered for DID: $did")
         }
     }
 
-    suspend fun getAndRegisterToken(did: String) {
-        runCatching {
+    suspend fun getAndRegisterToken(did: String): Result<Unit> {
+        return runCatching {
             val token = FirebaseMessaging.getInstance().token.await()
             saveTokenLocally(token)
-            registerToken(token, did)
+            registerToken(token, did).getOrThrow()
         }.onFailure {
-            Log.e(TAG, "Failed to get FCM token: ${it.message}")
+            Log.e(TAG, "Failed to get/register FCM token: ${it.message}")
         }
     }
 
