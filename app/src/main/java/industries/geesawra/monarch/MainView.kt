@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -759,6 +760,7 @@ private fun InnerTimelineView(
                                                     onProfileTap = expandedOnProfileTap,
                                                     onThreadTap = expandedOnSeeMoreTap,
                                                     onReplyTap = onReplyTap,
+                                                    onSettingsTap = onSettingsTap,
                                                     onClose = { detailPaneContent = DetailPaneContent.Empty },
                                                 )
                                                 is DetailPaneContent.Empty -> Box(
@@ -897,6 +899,7 @@ private fun DetailProfilePane(
     onProfileTap: (Did) -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit,
+    onSettingsTap: () -> Unit = {},
     onClose: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -923,6 +926,11 @@ private fun DetailProfilePane(
                     )
                 },
                 actions = {
+                    if (profile != null && timelineViewModel.isOwnProfile()) {
+                        IconButton(onClick = onSettingsTap) {
+                            Icon(Icons.Default.Settings, "Settings")
+                        }
+                    }
                     IconButton(onClick = onClose) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
