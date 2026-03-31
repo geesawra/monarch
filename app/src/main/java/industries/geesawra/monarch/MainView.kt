@@ -45,6 +45,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
@@ -746,6 +747,7 @@ private fun InnerTimelineView(
                                                     onProfileTap = expandedOnProfileTap,
                                                     onReplyTap = onReplyTap,
                                                     onSeeMoreTap = expandedOnSeeMoreTap,
+                                                    onClose = { detailPaneContent = DetailPaneContent.Empty },
                                                 )
                                                 is DetailPaneContent.Profile -> DetailProfilePane(
                                                     did = content.did,
@@ -754,6 +756,7 @@ private fun InnerTimelineView(
                                                     onProfileTap = expandedOnProfileTap,
                                                     onThreadTap = expandedOnSeeMoreTap,
                                                     onReplyTap = onReplyTap,
+                                                    onClose = { detailPaneContent = DetailPaneContent.Empty },
                                                 )
                                                 is DetailPaneContent.Empty -> Box(
                                                     modifier = Modifier.fillMaxSize(),
@@ -826,6 +829,7 @@ private fun DetailThreadPane(
     onProfileTap: (Did) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit,
     onSeeMoreTap: (SkeetData) -> Unit = {},
+    onClose: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
@@ -841,6 +845,11 @@ private fun DetailThreadPane(
                     scrolledContainerColor = MaterialTheme.colorScheme.surface,
                 ),
                 title = { Text("Thread") },
+                actions = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -874,6 +883,7 @@ private fun DetailProfilePane(
     onProfileTap: (Did) -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit,
+    onClose: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val profile = timelineViewModel.uiState.profileUser
@@ -897,6 +907,11 @@ private fun DetailProfilePane(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                },
+                actions = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
                 },
                 scrollBehavior = scrollBehavior,
             )
