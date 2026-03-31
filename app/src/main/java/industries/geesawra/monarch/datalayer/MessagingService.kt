@@ -9,6 +9,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
+import androidx.core.graphics.drawable.IconCompat
 import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -21,6 +23,7 @@ import industries.geesawra.monarch.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.core.graphics.createBitmap
 
 class MessagingService : FirebaseMessagingService() {
 
@@ -34,7 +37,7 @@ class MessagingService : FirebaseMessagingService() {
 
     private fun toCircularBitmap(source: Bitmap): Bitmap {
         val size = minOf(source.width, source.height)
-        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val output = createBitmap(size, size)
         val canvas = android.graphics.Canvas(output)
         val paint = android.graphics.Paint().apply { isAntiAlias = true }
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
@@ -92,12 +95,15 @@ class MessagingService : FirebaseMessagingService() {
         }
     }
 
+    private fun notificationIdForPerson(key: String): Int = key.hashCode()
+
     override fun onMessageReceived(message: RemoteMessage) {
         Log.d(TAG, "Message received: ${message.data}")
 
         val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
         val body = message.notification?.body ?: message.data["body"] ?: return
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
+        val senderKey = message.data["authorDid"] ?: message.data["authorHandle"] ?: title
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -109,18 +115,31 @@ class MessagingService : FirebaseMessagingService() {
 
         val image = imageUrl?.let { downloadBitmap(it) }
 
+        val personBuilder = Person.Builder()
+            .setName(title)
+            .setKey(senderKey)
+        if (image != null) {
+            personBuilder.setIcon(IconCompat.createWithBitmap(toCircularBitmap(image)))
+        }
+        val person = personBuilder.build()
+
+        val notificationId = notificationIdForPerson(senderKey)
+        val notificationManager = getSystemService(NotificationManager::class.java)
+
+        val existingStyle = notificationManager.activeNotifications
+            .find { it.id == notificationId }
+            ?.notification
+            ?.let { NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it) }
+
+        val style = (existingStyle ?: NotificationCompat.MessagingStyle(person))
+            .addMessage(body, System.currentTimeMillis(), person)
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(body)
+            .setStyle(style)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
 
-        if (image != null) {
-            builder.setLargeIcon(toCircularBitmap(image))
-        }
-
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(message.messageId?.hashCode() ?: 0, builder.build())
+        notificationManager.notify(notificationId, builder.build())
     }
 }
