@@ -5,8 +5,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.EntryPointAccessors
@@ -20,6 +23,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MessagingService : FirebaseMessagingService() {
+
+    private fun downloadBitmap(url: String): Bitmap? {
+        return runCatching {
+            URL(url).openStream().use { BitmapFactory.decodeStream(it) }
+        }.onFailure {
+            Log.e(TAG, "Failed to download notification image: ${it.message}")
+        }.getOrNull()
+    }
+
+    private fun toCircularBitmap(source: Bitmap): Bitmap {
+        val size = minOf(source.width, source.height)
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(output)
+        val paint = android.graphics.Paint().apply { isAntiAlias = true }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        val left = (size - source.width) / 2f
+        val top = (size - source.height) / 2f
+        canvas.drawBitmap(source, left, top, paint)
+        return output
+    }
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -73,6 +97,7 @@ class MessagingService : FirebaseMessagingService() {
 
         val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
         val body = message.notification?.body ?: message.data["body"] ?: return
+        val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -82,15 +107,20 @@ class MessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val image = imageUrl?.let { downloadBitmap(it) }
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .build()
+
+        if (image != null) {
+            builder.setLargeIcon(toCircularBitmap(image))
+        }
 
         val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(message.messageId?.hashCode() ?: 0, notification)
+        notificationManager.notify(message.messageId?.hashCode() ?: 0, builder.build())
     }
 }
