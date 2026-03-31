@@ -146,7 +146,6 @@ fun ShowSkeets(
                                         .fillMaxWidth()
                                         .height(IntrinsicSize.Min)
                                         .padding(start = 16.dp)
-                                        .offset(y = (-14).dp)
                                 ) {
                                     Box(
                                         modifier = Modifier

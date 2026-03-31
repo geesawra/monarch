@@ -450,6 +450,23 @@ private fun InnerTimelineView(
                 NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
             }
 
+            var detailPaneContent by remember { mutableStateOf<DetailPaneContent>(DetailPaneContent.Empty) }
+            val detailRefreshing = remember { mutableStateOf(false) }
+
+            val expandedOnSeeMoreTap: (SkeetData) -> Unit = { skeet ->
+                detailPaneContent = DetailPaneContent.Thread
+                detailRefreshing.value = true
+                timelineViewModel.setThread(skeet)
+                timelineViewModel.getThread {
+                    detailRefreshing.value = false
+                }
+            }
+
+            val expandedOnProfileTap: (Did) -> Unit = { did ->
+                detailPaneContent = DetailPaneContent.Profile(did)
+                timelineViewModel.openProfile(did)
+            }
+
             NavigationSuiteScaffold(
                 layoutType = navLayoutType,
                 navigationSuiteItems = {
@@ -613,7 +630,7 @@ private fun InnerTimelineView(
                                             .size(40.dp)
                                             .clip(avatarClipShape)
                                             .combinedClickable(
-                                                onClick = { user?.let { onProfileTap(it.did) } },
+                                                onClick = { user?.let { (if (isExpandedScreen) expandedOnProfileTap else onProfileTap)(it.did) } },
                                                 onLongClick = { showAccountSwitcher = true }
                                             )
                                     )
@@ -689,23 +706,6 @@ private fun InnerTimelineView(
                     TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = 0
                 }
 
-                var detailPaneContent by remember { mutableStateOf<DetailPaneContent>(DetailPaneContent.Empty) }
-                val detailRefreshing = remember { mutableStateOf(false) }
-
-                val expandedOnSeeMoreTap: (SkeetData) -> Unit = { skeet ->
-                    detailPaneContent = DetailPaneContent.Thread
-                    detailRefreshing.value = true
-                    timelineViewModel.setThread(skeet)
-                    timelineViewModel.getThread {
-                        detailRefreshing.value = false
-                    }
-                }
-
-                val expandedOnProfileTap: (Did) -> Unit = { did ->
-                    detailPaneContent = DetailPaneContent.Profile(did)
-                    timelineViewModel.openProfile(did)
-                }
-
                 val contentModifier = if (!settingsState.forceCompactLayout && !isExpandedScreen) {
                     Modifier.widthIn(max = 600.dp)
                 } else {
@@ -754,7 +754,6 @@ private fun InnerTimelineView(
                                                     onProfileTap = expandedOnProfileTap,
                                                     onThreadTap = expandedOnSeeMoreTap,
                                                     onReplyTap = onReplyTap,
-                                                    onBack = { detailPaneContent = DetailPaneContent.Empty },
                                                 )
                                                 is DetailPaneContent.Empty -> Box(
                                                     modifier = Modifier.fillMaxSize(),
@@ -875,7 +874,6 @@ private fun DetailProfilePane(
     onProfileTap: (Did) -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit,
-    onBack: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val profile = timelineViewModel.uiState.profileUser
@@ -893,14 +891,6 @@ private fun DetailProfilePane(
                     containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surface,
                 ),
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Go back"
-                        )
-                    }
-                },
                 title = {
                     Text(
                         profile?.displayName ?: profile?.handle?.handle ?: "",
