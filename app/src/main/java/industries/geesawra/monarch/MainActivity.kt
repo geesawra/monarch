@@ -39,8 +39,10 @@ import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import androidx.compose.foundation.isSystemInDarkTheme
 import industries.geesawra.monarch.datalayer.BlueskyConn
+import industries.geesawra.monarch.datalayer.PushNotificationManager
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SettingsViewModel
+import jakarta.inject.Inject
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.ui.theme.MonarchTheme
@@ -48,7 +50,12 @@ import sh.christian.ozone.api.Did
 
 
 @HiltAndroidApp
-class Application : Application()
+class Application : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        industries.geesawra.monarch.datalayer.MessagingService.createNotificationChannel(this)
+    }
+}
 
 enum class ViewList() {
     Login,
@@ -61,6 +68,8 @@ enum class ViewList() {
 @AndroidEntryPoint
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var pushNotificationManager: PushNotificationManager
+
     @OptIn(ExperimentalSharedTransitionApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -219,6 +228,7 @@ class MainActivity : ComponentActivity() {
                             SettingsView(
                                 settingsViewModel = settingsViewModel,
                                 timelineViewModel = timelineViewModel,
+                                pushNotificationManager = pushNotificationManager,
                                 backButton = {
                                     navController.popBackStack()
                                 },

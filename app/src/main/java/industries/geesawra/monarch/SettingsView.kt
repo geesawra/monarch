@@ -56,18 +56,27 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.content.ContextCompat
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.PostTextSize
+import industries.geesawra.monarch.datalayer.PushNotificationManager
 import industries.geesawra.monarch.datalayer.ReplyFilterMode
 import industries.geesawra.monarch.datalayer.SettingsViewModel
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsView(
     settingsViewModel: SettingsViewModel,
     timelineViewModel: TimelineViewModel? = null,
+    pushNotificationManager: PushNotificationManager? = null,
     backButton: () -> Unit,
     onLogout: () -> Unit = {},
 ) {
@@ -257,6 +266,64 @@ fun SettingsView(
                     )
                 },
             )
+
+            if (pushNotificationManager != null && timelineViewModel != null) {
+                val context = LocalContext.current
+                val coroutineScope = rememberCoroutineScope()
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    if (granted) {
+                        settingsViewModel.setPushNotificationsEnabled(true)
+                        val did = timelineViewModel.uiState.user?.did?.did
+                        if (did != null) {
+                            coroutineScope.launch {
+                                pushNotificationManager.getAndRegisterToken(did)
+                            }
+                        }
+                    }
+                }
+
+                ListItem(
+                    headlineContent = { Text("Push notifications") },
+                    supportingContent = { Text("Receive push notifications") },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.pushNotificationsEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        val hasPermission = ContextCompat.checkSelfPermission(
+                                            context, Manifest.permission.POST_NOTIFICATIONS
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                        if (hasPermission) {
+                                            settingsViewModel.setPushNotificationsEnabled(true)
+                                            val did = timelineViewModel.uiState.user?.did?.did
+                                            if (did != null) {
+                                                coroutineScope.launch {
+                                                    pushNotificationManager.getAndRegisterToken(did)
+                                                }
+                                            }
+                                        } else {
+                                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        }
+                                    } else {
+                                        settingsViewModel.setPushNotificationsEnabled(true)
+                                        val did = timelineViewModel.uiState.user?.did?.did
+                                        if (did != null) {
+                                            coroutineScope.launch {
+                                                pushNotificationManager.getAndRegisterToken(did)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    settingsViewModel.setPushNotificationsEnabled(false)
+                                }
+                            }
+                        )
+                    },
+                )
+            }
 
             if (timelineViewModel != null) {
                 var showFeedPicker by remember { mutableStateOf(false) }

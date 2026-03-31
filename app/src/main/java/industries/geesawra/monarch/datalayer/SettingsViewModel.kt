@@ -49,6 +49,7 @@ data class SettingsState(
     val showLabels: Boolean = true,
     val defaultFeed: DefaultFeed = DefaultFeed(),
     val forceCompactLayout: Boolean = false,
+    val pushNotificationsEnabled: Boolean = false,
     val loaded: Boolean = false,
 )
 
@@ -68,6 +69,7 @@ class SettingsViewModel @Inject constructor(
         private val DEFAULT_FEED_NAME = stringPreferencesKey("default_feed_name")
         private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
         private val FORCE_COMPACT_LAYOUT = stringPreferencesKey("force_compact_layout")
+        private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
     }
 
     var settingsState by mutableStateOf(SettingsState())
@@ -89,6 +91,7 @@ class SettingsViewModel @Inject constructor(
                         avatar = prefs[DEFAULT_FEED_AVATAR],
                     ),
                     forceCompactLayout = prefs[FORCE_COMPACT_LAYOUT]?.toBooleanStrictOrNull() ?: false,
+                    pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     loaded = true,
                 )
             }.collect {
@@ -136,6 +139,12 @@ class SettingsViewModel @Inject constructor(
     fun setForceCompactLayout(force: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[FORCE_COMPACT_LAYOUT] = force.toString() }
+        }
+    }
+
+    fun setPushNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[PUSH_NOTIFICATIONS_ENABLED] = enabled.toString() }
         }
     }
 
