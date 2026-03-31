@@ -104,7 +104,6 @@ dependencies {
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.firebase.messaging.ktx)
     implementation(libs.firebase.messaging)
     ksp("com.google.dagger:hilt-compiler:2.57.2")
     implementation(libs.androidx.core.ktx)
