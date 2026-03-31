@@ -9,8 +9,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.app.Person
-import androidx.core.graphics.drawable.IconCompat
 import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -24,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 
 class MessagingService : FirebaseMessagingService() {
 
@@ -57,6 +56,8 @@ class MessagingService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "MessagingService"
+        private const val GROUP_KEY = "monarch_notification_group"
+        private const val SUMMARY_ID = 0
         const val CHANNEL_ID = "monarch_notifications"
         const val CHANNEL_NAME = "Notifications"
 
@@ -95,15 +96,12 @@ class MessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun notificationIdForPerson(key: String): Int = key.hashCode()
-
     override fun onMessageReceived(message: RemoteMessage) {
         Log.d(TAG, "Message received: ${message.data}")
 
         val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
         val body = message.notification?.body ?: message.data["body"] ?: return
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
-        val senderKey = message.data["authorDid"] ?: message.data["authorHandle"] ?: title
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -114,32 +112,39 @@ class MessagingService : FirebaseMessagingService() {
         )
 
         val image = imageUrl?.let { downloadBitmap(it) }
-
-        val personBuilder = Person.Builder()
-            .setName(title)
-            .setKey(senderKey)
-        if (image != null) {
-            personBuilder.setIcon(IconCompat.createWithBitmap(toCircularBitmap(image)))
+        val avatarSize = (48 * resources.displayMetrics.density).toInt()
+        val avatar = image?.let {
+            val circular = toCircularBitmap(it)
+            circular.scale(avatarSize, avatarSize)
         }
-        val person = personBuilder.build()
 
-        val notificationId = notificationIdForPerson(senderKey)
-        val notificationManager = getSystemService(NotificationManager::class.java)
+        val boldTitle = android.text.Html.fromHtml("<b>$title</b>", android.text.Html.FROM_HTML_MODE_COMPACT)
 
-        val existingStyle = notificationManager.activeNotifications
-            .find { it.id == notificationId }
-            ?.notification
-            ?.let { NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it) }
-
-        val style = (existingStyle ?: NotificationCompat.MessagingStyle(person))
-            .addMessage(body, System.currentTimeMillis(), person)
+        val style = NotificationCompat.BigTextStyle()
+            .bigText(body)
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(boldTitle)
+            .setContentText(body)
             .setStyle(style)
+            .setGroup(GROUP_KEY)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
 
-        notificationManager.notify(notificationId, builder.build())
+        if (avatar != null) {
+            builder.setLargeIcon(avatar)
+        }
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
+
+        val summaryBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setGroup(GROUP_KEY)
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+        notificationManager.notify(SUMMARY_ID, summaryBuilder.build())
     }
 }
