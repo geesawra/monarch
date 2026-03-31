@@ -726,7 +726,7 @@ private fun InnerTimelineView(
                             TabBarDestinations.TIMELINE -> {
                                 if (isExpandedScreen) {
                                     Row(modifier = Modifier.fillMaxSize()) {
-                                        Box(modifier = Modifier.weight(0.4f).fillMaxHeight()) {
+                                        Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
                                             ShowSkeets(
                                                 viewModel = timelineViewModel,
                                                 settingsState = settingsState,
@@ -742,7 +742,7 @@ private fun InnerTimelineView(
 
                                         VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
 
-                                        Box(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
+                                        Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
                                             when (val content = detailPaneContent) {
                                                 is DetailPaneContent.Thread -> DetailThreadPane(
                                                     timelineViewModel = timelineViewModel,
