@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -930,21 +931,23 @@ private fun DetailProfilePane(
             )
         },
     ) { padding ->
-        PullToRefreshBox(
-            modifier = Modifier.padding(padding),
-            isRefreshing = isLoading,
-            onRefresh = { timelineViewModel.openProfile(did) },
-        ) {
-            if (profile == null) {
-                if (timelineViewModel.uiState.profileNotFound) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Profile not found")
-                    }
+        if (profile == null) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isLoading) {
+                    CircularWavyProgressIndicator()
+                } else if (timelineViewModel.uiState.profileNotFound) {
+                    Text("Profile not found")
                 }
-            } else {
+            }
+        } else {
+            PullToRefreshBox(
+                modifier = Modifier.padding(padding),
+                isRefreshing = false,
+                onRefresh = { timelineViewModel.openProfile(did) },
+            ) {
                 ProfileContent(
                     profile = profile,
                     timelineViewModel = timelineViewModel,
