@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
                         .diskCache {
                             DiskCache.Builder()
                                 .directory(context.cacheDir.resolve("image_cache"))
-                                .maxSizePercent(0.05)
+                                .maxSizePercent(0.15)
                                 .build()
                         }
                         .build()

@@ -81,6 +81,10 @@ fun ShowSkeets(
         }
     }
 
+    val filteredData = remember(data, threadContextCids) {
+        data.filter { !it.replyToNotFollowing && it.cid !in threadContextCids }
+    }
+
     LazyColumn(
         state = state,
         userScrollEnabled = isScrollEnabled,
@@ -96,8 +100,9 @@ fun ShowSkeets(
             return@LazyColumn
         }
         itemsIndexed(
-            items = data.filter { !it.replyToNotFollowing && it.cid !in threadContextCids },
-            key = { _, skeet -> skeet.key() }
+            items = filteredData,
+            key = { _, skeet -> skeet.rkey },
+            contentType = { _, skeet -> if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0 },
         ) { idx, skeet ->
             ElevatedCard(
                 modifier = Modifier.padding(start = (skeet.nestingLevel * 16).dp),

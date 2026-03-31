@@ -104,7 +104,7 @@ data class SkeetData(
     val authorLabels: List<Label> = listOf(),
     val verified: Boolean = false,
     val content: String = "",
-    var embed: PostViewEmbedUnion? = null,
+    val embed: PostViewEmbedUnion? = null,
     val reason: FeedViewPostReasonUnion? = null,
     val reply: ReplyRef? = null,
     val createdAt: Instant? = null,
@@ -115,13 +115,92 @@ data class SkeetData(
     val notFound: Boolean = false,
     val following: Boolean = false,
     val follower: Boolean = false,
-    var replyToNotFollowing: Boolean = false,
+    val replyToNotFollowing: Boolean = false,
+    val cachedParent: Pair<SkeetData?, StrongRef?>? = null,
+    val cachedRoot: SkeetData? = null,
 ) {
     companion object {
         fun fromFeedViewPost(post: FeedViewPost, currentUserDid: Did? = null, replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads): SkeetData {
             val content: Post = (post.post.record.decodeAs())
+            val reason = post.reason
+            val reply = post.reply
+            val did = post.post.author.did
+            val following = post.post.author.viewer?.following != null
 
-            val sd = SkeetData(
+            val computedParent = computeParent(reply)
+            val computedRoot = computeRoot(reply, computedParent)
+
+            val replyToNotFollowing = run {
+                if (replyFilterMode == ReplyFilterMode.None) return@run false
+                if (currentUserDid != null && did == currentUserDid) return@run false
+
+                when (reason) {
+                    is FeedViewPostReasonUnion.ReasonPin,
+                    FeedViewPostReasonUnion.Unknown,
+                    FeedViewPostReasonUnion.ReasonRepost -> false
+
+                    else -> {
+                        val (parent, _) = computedParent
+                        val root = computedRoot
+
+                        fun isFollowedOrSelf(skeet: SkeetData?): Boolean {
+                            if (skeet == null) return false
+                            if (currentUserDid != null && skeet.did == currentUserDid) return true
+                            return skeet.following
+                        }
+
+                        if (parent == null) {
+                            return@run false
+                        }
+
+                        when (replyFilterMode) {
+                            ReplyFilterMode.OnlyFilterDeepThreads -> {
+                                if (root == null) return@run false
+
+                                val parentsParent = computeParentsParentRef(reply)
+                                if (parentsParent != null && parentsParent.uri == root.uri) {
+                                    return@run false
+                                }
+
+                                if (!isFollowedOrSelf(parent)) return@run true
+
+                                val grandfather = reply?.grandparentAuthor
+                                val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
+                                    true
+                                } else {
+                                    grandfather?.viewer?.following?.isNotEmpty() ?: false
+                                }
+                                return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
+                            }
+
+                            ReplyFilterMode.Strict -> {
+                                if (root == null) {
+                                    return@run !isFollowedOrSelf(parent)
+                                }
+
+                                if (!isFollowedOrSelf(parent)) return@run true
+
+                                val parentsParent = computeParentsParentRef(reply)
+                                if (parentsParent != null && parentsParent.uri == root.uri) {
+                                    return@run !isFollowedOrSelf(root)
+                                }
+
+                                val grandfather = reply?.grandparentAuthor
+                                val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
+                                    true
+                                } else {
+                                    grandfather?.viewer?.following?.isNotEmpty() ?: false
+                                }
+                                return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
+                            }
+
+                            else -> return@run false
+                        }
+                    }
+                }
+            }
+
+            return SkeetData(
                 likes = post.post.likeCount,
                 reposts = post.post.repostCount,
                 replies = post.post.replyCount,
@@ -140,90 +219,84 @@ data class SkeetData(
                 verified = post.post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = content.text,
                 embed = post.post.embed,
-                reason = post.reason,
-                reply = post.reply,
+                reason = reason,
+                reply = reply,
                 facets = content.facets,
                 createdAt = content.createdAt.toStdlibInstant(),
-                following = post.post.author.viewer?.following != null,
+                following = following,
                 follower = post.post.author.viewer?.followedBy != null,
-                did = post.post.author.did,
+                did = did,
+                replyToNotFollowing = replyToNotFollowing,
+                cachedParent = computedParent,
+                cachedRoot = computedRoot,
             )
+        }
 
-            sd.replyToNotFollowing = run {
-                if (replyFilterMode == ReplyFilterMode.None) return@run false
-                if (currentUserDid != null && sd.did == currentUserDid) return@run false
+        private fun computeParent(reply: ReplyRef?): Pair<SkeetData?, StrongRef?> {
+            val rawParent = reply?.parent
+            return when (rawParent) {
+                is ReplyRefParentUnion.BlockedPost -> SkeetData(
+                    authorName = "Blocked",
+                    uri = rawParent.value.uri,
+                    blocked = rawParent.value.blocked
+                ) to null
 
-                when (sd.reason) {
-                    is FeedViewPostReasonUnion.ReasonPin,
-                    FeedViewPostReasonUnion.Unknown,
-                    FeedViewPostReasonUnion.ReasonRepost -> false
+                is ReplyRefParentUnion.NotFoundPost -> SkeetData(
+                    authorName = "Post not found",
+                    uri = rawParent.value.uri,
+                    notFound = rawParent.value.notFound
+                ) to null
 
-                    else -> {
-                        val (parent, _) = sd.parent()
-                        val root = sd.root()
-
-                        fun isFollowedOrSelf(skeet: SkeetData?): Boolean {
-                            if (skeet == null) return false
-                            if (currentUserDid != null && skeet.did == currentUserDid) return true
-                            return skeet.following
-                        }
-
-                        if (parent == null) {
-                            return@run false // single post, no parent
-                        }
-
-                        when (replyFilterMode) {
-                            ReplyFilterMode.OnlyFilterDeepThreads -> {
-                                // Show direct replies from followed accounts freely.
-                                // Only filter 4+ deep threads where root/grandfather are unfollowed.
-                                if (root == null) return@run false // direct reply, always show
-
-                                val parentsParent = sd.parentsParentRef()
-                                if (parentsParent != null && parentsParent.uri == root.uri) {
-                                    return@run false // 3-post thread, always show
-                                }
-
-                                // 4+ deep: require root and grandfather to be followed
-                                if (!isFollowedOrSelf(parent)) return@run true
-
-                                val grandfather = sd.grandparentAuthor()
-                                val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
-                                    true
-                                } else {
-                                    grandfather?.viewer?.following?.isNotEmpty() ?: false
-                                }
-                                return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
-                            }
-
-                            ReplyFilterMode.Strict -> {
-                                // Require all thread participants to be followed
-                                if (root == null) {
-                                    return@run !isFollowedOrSelf(parent)
-                                }
-
-                                if (!isFollowedOrSelf(parent)) return@run true
-
-                                val parentsParent = sd.parentsParentRef()
-                                if (parentsParent != null && parentsParent.uri == root.uri) {
-                                    return@run !isFollowedOrSelf(root)
-                                }
-
-                                val grandfather = sd.grandparentAuthor()
-                                val grandfatherFollowed = if (currentUserDid != null && grandfather?.did == currentUserDid) {
-                                    true
-                                } else {
-                                    grandfather?.viewer?.following?.isNotEmpty() ?: false
-                                }
-                                return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
-                            }
-
-                            else -> return@run false
-                        }
-                    }
+                is ReplyRefParentUnion.PostView -> {
+                    val content: Post = (rawParent.value.record.decodeAs())
+                    fromPostView(
+                        rawParent.value, rawParent.value.author
+                    ) to content.reply?.parent
                 }
+
+                else -> null to null
+            }
+        }
+
+        private fun computeRoot(reply: ReplyRef?, parent: Pair<SkeetData?, StrongRef?>): SkeetData? {
+            val (p, _) = parent
+
+            val rawRoot = reply?.root
+            val r = when (rawRoot) {
+                is ReplyRefRootUnion.BlockedPost -> SkeetData(
+                    uri = rawRoot.value.uri,
+                    blocked = rawRoot.value.blocked
+                )
+
+                is ReplyRefRootUnion.NotFoundPost -> SkeetData(
+                    uri = rawRoot.value.uri,
+                    notFound = rawRoot.value.notFound
+                )
+
+                is ReplyRefRootUnion.PostView -> fromPostView(rawRoot.value, rawRoot.value.author)
+
+                else -> null
             }
 
-            return sd
+            if (r?.cid == p?.cid) {
+                return null
+            }
+
+            return r
+        }
+
+        private fun computeParentsParentRef(reply: ReplyRef?): StrongRef? {
+            val rawParent = reply?.parent
+            return when (rawParent) {
+                is ReplyRefParentUnion.PostView -> {
+                    val content: Post = (rawParent.value.record.decodeAs())
+                    when (content.reply) {
+                        is PostReplyRef -> content.reply!!.parent
+                        else -> null
+                    }
+                }
+                else -> null
+            }
         }
 
         fun fromPostView(post: PostView, author: ProfileViewBasic): SkeetData {
@@ -444,9 +517,7 @@ data class SkeetData(
             author: ProfileView,
             embed: PostViewEmbedUnion?
         ): SkeetData {
-            val sd = fromPost(parent, post, author)
-            sd.embed = embed
-            return sd
+            return fromPost(parent, post, author).copy(embed = embed)
         }
 
 
@@ -494,25 +565,19 @@ data class SkeetData(
         }
     }
 
-    private sealed class AnnotatedData {
+    sealed class AnnotatedData {
         data class NoAnnotation(val data: String) : AnnotatedData()
         data class WithAnnotation(val data: Facet, val content: String) : AnnotatedData()
     }
 
-    @Composable
-    fun annotatedContent(onMentionClick: ((Did) -> Unit)? = null): AnnotatedString {
-        if (this.facets.isEmpty()) {
-            return buildAnnotatedString {
-                append(this@SkeetData.content)
-            }
-        }
+    val annotatedSegments: List<AnnotatedData> by lazy {
+        if (this.facets.isEmpty()) return@lazy emptyList()
 
         val c = this.content.toByteArray(Charsets.UTF_8)
-
         var lastIdx: Long = 0
-        val content = mutableListOf<AnnotatedData>()
+        val segments = mutableListOf<AnnotatedData>()
         this.facets.forEachIndexed { idx, f ->
-            content.add(
+            segments.add(
                 AnnotatedData.NoAnnotation(
                     c.slice(
                         lastIdx.toInt()..
@@ -520,7 +585,7 @@ data class SkeetData(
                     ).toByteArray().toString(Charsets.UTF_8)
                 )
             )
-            content.add(
+            segments.add(
                 AnnotatedData.WithAnnotation(
                     data = f, content = c.slice(
                         f.index.byteStart.toInt()..
@@ -532,7 +597,7 @@ data class SkeetData(
             lastIdx = f.index.byteEnd
 
             if (this.facets.lastIndex == idx) {
-                content.add(
+                segments.add(
                     AnnotatedData.NoAnnotation(
                         c.slice(
                             lastIdx.toInt()..c.size - 1
@@ -541,13 +606,23 @@ data class SkeetData(
                 )
             }
         }
+        segments
+    }
+
+    @Composable
+    fun annotatedContent(onMentionClick: ((Did) -> Unit)? = null): AnnotatedString {
+        if (this.facets.isEmpty()) {
+            return buildAnnotatedString {
+                append(this@SkeetData.content)
+            }
+        }
 
         return buildAnnotatedString {
-            content.forEach { content ->
-                when (content) {
-                    is AnnotatedData.NoAnnotation -> append(content.data)
+            annotatedSegments.forEach { segment ->
+                when (segment) {
+                    is AnnotatedData.NoAnnotation -> append(segment.data)
                     is AnnotatedData.WithAnnotation -> {
-                        val f = content.data.features.first()
+                        val f = segment.data.features.first()
                         when (f) {
                             is FacetFeatureUnion.Link -> withLink(
                                 LinkAnnotation.Url(
@@ -555,7 +630,7 @@ data class SkeetData(
                                     TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary))
                                 )
                             ) {
-                                append(content.content)
+                                append(segment.content)
                             }
 
                             is FacetFeatureUnion.Mention -> withLink(
@@ -565,24 +640,18 @@ data class SkeetData(
                                     linkInteractionListener = { onMentionClick?.invoke(f.value.did) },
                                 )
                             ) {
-                                append(
-                                    content.content
-                                )
+                                append(segment.content)
                             }
 
                             is FacetFeatureUnion.Tag -> withStyle(
                                 SpanStyle(
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                            )
-                            {
-                                append(content.content)
+                            ) {
+                                append(segment.content)
                             }
 
-
-                            is FacetFeatureUnion.Unknown -> append(
-                                content.content
-                            )
+                            is FacetFeatureUnion.Unknown -> append(segment.content)
                         }
                     }
                 }
@@ -609,6 +678,7 @@ data class SkeetData(
     }
 
     fun parentsParentRef(): StrongRef? {
+        if (cachedParent != null) return cachedParent.second
         val rawParent = this.reply?.parent
         return when (rawParent) {
             is ReplyRefParentUnion.PostView -> {
@@ -624,29 +694,8 @@ data class SkeetData(
     }
 
     fun parent(): Pair<SkeetData?, StrongRef?> {
-        val rawParent = this.reply?.parent
-        return when (rawParent) {
-            is ReplyRefParentUnion.BlockedPost -> SkeetData(
-                authorName = "Blocked",
-                uri = rawParent.value.uri,
-                blocked = rawParent.value.blocked
-            ) to null
-
-            is ReplyRefParentUnion.NotFoundPost -> SkeetData(
-                authorName = "Post not found",
-                uri = rawParent.value.uri,
-                notFound = rawParent.value.notFound
-            ) to null
-
-            is ReplyRefParentUnion.PostView -> {
-                val content: Post = (rawParent.value.record.decodeAs())
-                fromPostView(
-                    rawParent.value, rawParent.value.author
-                ) to content.reply?.parent
-            }
-
-            else -> null to null
-        }
+        if (cachedParent != null) return cachedParent
+        return computeParent(this.reply)
     }
 
     fun grandparentAuthor(): ProfileViewBasic? {
@@ -654,35 +703,15 @@ data class SkeetData(
     }
 
     fun root(): SkeetData? {
-        val (p, _) = this.parent()
-
-        val rawRoot = this.reply?.root
-        val r = when (rawRoot) {
-            is ReplyRefRootUnion.BlockedPost -> SkeetData(
-                uri = rawRoot.value.uri,
-                blocked = rawRoot.value.blocked
-            )
-
-            is ReplyRefRootUnion.NotFoundPost -> SkeetData(
-                uri = rawRoot.value.uri,
-                notFound = rawRoot.value.notFound
-            )
-
-            is ReplyRefRootUnion.PostView -> fromPostView(rawRoot.value, rawRoot.value.author)
-
-            else -> null
-        }
-
-        if (r?.cid == p?.cid) {
-            return null
-        }
-
-        return r
+        if (cachedRoot != null) return cachedRoot
+        // Check if we explicitly have no root (cachedParent set but cachedRoot not)
+        if (cachedParent != null) return null
+        return computeRoot(this.reply, this.parent())
     }
 
-    fun key(): String {
-        return this.uri.split("/").last()
-    }
+    val rkey: String by lazy { this.uri.atUri.split("/").last() }
+
+    fun key(): String = rkey
 
     fun shareURL(): String {
         val u = "https://bsky.app/profile/${this.authorHandle}/post/${
