@@ -43,6 +43,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Home
@@ -106,6 +107,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
@@ -126,6 +128,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import sh.christian.ozone.api.Did
 import kotlin.time.ExperimentalTime
+
+private sealed class DetailPaneContent {
+    data object Empty : DetailPaneContent()
+    data object Thread : DetailPaneContent()
+    data class Profile(val did: Did) : DetailPaneContent()
+}
 
 enum class TabBarDestinations(
     @param:StringRes val label: Int,
@@ -330,9 +338,14 @@ private fun InnerTimelineView(
     onSeeMoreTap: (SkeetData) -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
-        rememberTopAppBarState()
-    )
+    val adaptiveInfo = currentWindowAdaptiveInfo()
+    val isExpandedScreen = !settingsState.forceCompactLayout &&
+        adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+    val scrollBehavior = if (isExpandedScreen) {
+        TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    } else {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+    }
     val timelineState = rememberLazyListState()
     val notificationsState = rememberLazyListState()
     val searchPostsState = rememberLazyListState()
@@ -431,7 +444,6 @@ private fun InnerTimelineView(
                     timelineViewModel.uiState.unreadNotificationsAmt
             }
 
-            val adaptiveInfo = currentWindowAdaptiveInfo()
             val navLayoutType = if (settingsState.forceCompactLayout) {
                 NavigationSuiteType.NavigationBar
             } else {
@@ -476,7 +488,9 @@ private fun InnerTimelineView(
                                     )
                                 }
                             },
-                            label = { Text(stringResource(dest.label)) },
+                            label = if (navLayoutType == NavigationSuiteType.NavigationBar) {
+                                { Text(stringResource(dest.label)) }
+                            } else null,
                             selected = dest == currentDestination,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -675,10 +689,22 @@ private fun InnerTimelineView(
                     TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = 0
                 }
 
-                val isExpandedScreen = !settingsState.forceCompactLayout &&
-                    adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
-                var detailThreadVisible by remember { mutableStateOf(false) }
-                val detailThreadRefreshing = remember { mutableStateOf(false) }
+                var detailPaneContent by remember { mutableStateOf<DetailPaneContent>(DetailPaneContent.Empty) }
+                val detailRefreshing = remember { mutableStateOf(false) }
+
+                val expandedOnSeeMoreTap: (SkeetData) -> Unit = { skeet ->
+                    detailPaneContent = DetailPaneContent.Thread
+                    detailRefreshing.value = true
+                    timelineViewModel.setThread(skeet)
+                    timelineViewModel.getThread {
+                        detailRefreshing.value = false
+                    }
+                }
+
+                val expandedOnProfileTap: (Did) -> Unit = { did ->
+                    detailPaneContent = DetailPaneContent.Profile(did)
+                    timelineViewModel.openProfile(did)
+                }
 
                 val contentModifier = if (!settingsState.forceCompactLayout && !isExpandedScreen) {
                     Modifier.widthIn(max = 600.dp)
@@ -704,31 +730,33 @@ private fun InnerTimelineView(
                                                 data = timelineViewModel.uiState.skeets,
                                                 isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
                                                 isScrollEnabled = isScrollEnabled,
-                                                onSeeMoreTap = { skeet ->
-                                                    detailThreadVisible = true
-                                                    detailThreadRefreshing.value = true
-                                                    timelineViewModel.setThread(skeet)
-                                                    timelineViewModel.getThread {
-                                                        detailThreadRefreshing.value = false
-                                                    }
-                                                },
-                                                onProfileTap = onProfileTap,
+                                                onSeeMoreTap = expandedOnSeeMoreTap,
+                                                onProfileTap = expandedOnProfileTap,
                                             )
                                         }
 
                                         VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
 
                                         Box(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
-                                            if (detailThreadVisible) {
-                                                DetailThreadPane(
+                                            when (val content = detailPaneContent) {
+                                                is DetailPaneContent.Thread -> DetailThreadPane(
                                                     timelineViewModel = timelineViewModel,
                                                     settingsState = settingsState,
-                                                    isRefreshing = detailThreadRefreshing.value,
-                                                    onProfileTap = onProfileTap,
+                                                    isRefreshing = detailRefreshing.value,
+                                                    onProfileTap = expandedOnProfileTap,
                                                     onReplyTap = onReplyTap,
+                                                    onSeeMoreTap = expandedOnSeeMoreTap,
                                                 )
-                                            } else {
-                                                Box(
+                                                is DetailPaneContent.Profile -> DetailProfilePane(
+                                                    did = content.did,
+                                                    timelineViewModel = timelineViewModel,
+                                                    settingsState = settingsState,
+                                                    onProfileTap = expandedOnProfileTap,
+                                                    onThreadTap = expandedOnSeeMoreTap,
+                                                    onReplyTap = onReplyTap,
+                                                    onBack = { detailPaneContent = DetailPaneContent.Empty },
+                                                )
+                                                is DetailPaneContent.Empty -> Box(
                                                     modifier = Modifier.fillMaxSize(),
                                                     contentAlignment = Alignment.Center,
                                                 ) {
@@ -764,9 +792,10 @@ private fun InnerTimelineView(
                                 isScrollEnabled = isScrollEnabled,
                                 scaffoldPadding = PaddingValues(),
                                 onThreadTap = { skeet ->
-                                    onSeeMoreTap(skeet)
+                                    if (isExpandedScreen) expandedOnSeeMoreTap(skeet)
+                                    else onSeeMoreTap(skeet)
                                 },
-                                onProfileTap = onProfileTap,
+                                onProfileTap = if (isExpandedScreen) expandedOnProfileTap else onProfileTap,
                             )
 
                             TabBarDestinations.NOTIFICATIONS -> NotificationsView(
@@ -776,9 +805,9 @@ private fun InnerTimelineView(
                                 modifier = Modifier,
                                 isScrollEnabled = isScrollEnabled,
                                 onReplyTap = onReplyTap,
-                                onProfileTap = onProfileTap,
+                                onProfileTap = if (isExpandedScreen) expandedOnProfileTap else onProfileTap,
                                 scaffoldPadding = PaddingValues(),
-                                onSeeMoreTap = onSeeMoreTap
+                                onSeeMoreTap = if (isExpandedScreen) expandedOnSeeMoreTap else onSeeMoreTap
                             )
                         }
                     }
@@ -797,6 +826,7 @@ private fun DetailThreadPane(
     isRefreshing: Boolean,
     onProfileTap: (Did) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit,
+    onSeeMoreTap: (SkeetData) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
@@ -830,7 +860,83 @@ private fun DetailThreadPane(
                 settingsState = settingsState,
                 onProfileTap = onProfileTap,
                 onReplyTap = onReplyTap,
+                onSeeMoreTap = onSeeMoreTap,
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DetailProfilePane(
+    did: Did,
+    timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState,
+    onProfileTap: (Did) -> Unit,
+    onThreadTap: (SkeetData) -> Unit,
+    onReplyTap: (SkeetData, Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val profile = timelineViewModel.uiState.profileUser
+    val isLoading = timelineViewModel.uiState.isFetchingProfile && profile == null
+    val listState = rememberLazyListState()
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Go back"
+                        )
+                    }
+                },
+                title = {
+                    Text(
+                        profile?.displayName ?: profile?.handle?.handle ?: "",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { padding ->
+        PullToRefreshBox(
+            modifier = Modifier.padding(padding),
+            isRefreshing = isLoading,
+            onRefresh = { timelineViewModel.openProfile(did) },
+        ) {
+            if (profile == null) {
+                if (timelineViewModel.uiState.profileNotFound) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Profile not found")
+                    }
+                }
+            } else {
+                ProfileContent(
+                    profile = profile,
+                    timelineViewModel = timelineViewModel,
+                    settingsState = settingsState,
+                    listState = listState,
+                    onThreadTap = onThreadTap,
+                    onProfileTap = onProfileTap,
+                    onReplyTap = onReplyTap,
+                )
+            }
         }
     }
 }

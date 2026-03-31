@@ -411,7 +411,7 @@ private fun ProfileOverflowMenu(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ProfileContent(
+internal fun ProfileContent(
     modifier: Modifier = Modifier,
     profile: ProfileViewDetailed,
     timelineViewModel: TimelineViewModel,
@@ -502,7 +502,7 @@ private fun ProfileContent(
 }
 
 @Composable
-private fun ProfileHeader(
+internal fun ProfileHeader(
     profile: ProfileViewDetailed,
     timelineViewModel: TimelineViewModel,
     avatarShape: Shape = CircleShape,
