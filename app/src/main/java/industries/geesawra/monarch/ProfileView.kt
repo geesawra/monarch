@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -351,22 +352,34 @@ fun ProfileView(
                 return@Scaffold
             }
 
-            ProfileContent(
-                modifier = Modifier.padding(padding),
-                profile = profile,
-                timelineViewModel = timelineViewModel,
-                settingsState = settingsState,
-                listState = listState,
-                onThreadTap = onThreadTap,
-                onProfileTap = onProfileTap,
-                onReplyTap = { skeetData, quotePost ->
-                    inReplyTo.value = skeetData
-                    isQuotePost.value = quotePost
-                    coroutineScope.launch {
-                        scaffoldState.bottomSheetState.expand()
-                    }
-                },
-            )
+            val contentModifier = if (!settingsState.forceCompactLayout) {
+                Modifier.widthIn(max = 600.dp)
+            } else {
+                Modifier
+            }
+
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(modifier = contentModifier) {
+                    ProfileContent(
+                        profile = profile,
+                        timelineViewModel = timelineViewModel,
+                        settingsState = settingsState,
+                        listState = listState,
+                        onThreadTap = onThreadTap,
+                        onProfileTap = onProfileTap,
+                        onReplyTap = { skeetData, quotePost ->
+                            inReplyTo.value = skeetData
+                            isQuotePost.value = quotePost
+                            coroutineScope.launch {
+                                scaffoldState.bottomSheetState.expand()
+                            }
+                        },
+                    )
+                }
+            }
         }
     }
     }

@@ -28,8 +28,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -60,6 +65,11 @@ import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.ModalWideNavigationRail
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowSizeClass
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -421,6 +431,86 @@ private fun InnerTimelineView(
                     timelineViewModel.uiState.unreadNotificationsAmt
             }
 
+            val adaptiveInfo = currentWindowAdaptiveInfo()
+            val navLayoutType = if (settingsState.forceCompactLayout) {
+                NavigationSuiteType.NavigationBar
+            } else {
+                NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
+            }
+
+            NavigationSuiteScaffold(
+                layoutType = navLayoutType,
+                navigationSuiteItems = {
+                    TabBarDestinations.entries.forEach { dest ->
+                        item(
+                            icon = {
+                                if (dest.badgeValue != null) {
+                                    val badgeValue = remember { dest.badgeValue }
+                                    BadgedBox(
+                                        badge = {
+                                            if (badgeValue.intValue == 0) {
+                                                return@BadgedBox
+                                            }
+
+                                            Badge {
+                                                Text(
+                                                    badgeValue.intValue.toString(),
+                                                    modifier =
+                                                        Modifier.semantics {
+                                                            contentDescription =
+                                                                dest.badgeDescFmt(dest.badgeValue.intValue)
+                                                        },
+                                                )
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            dest.icon,
+                                            contentDescription = stringResource(dest.contentDescription)
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        dest.icon,
+                                        contentDescription = stringResource(dest.contentDescription)
+                                    )
+                                }
+                            },
+                            label = { Text(stringResource(dest.label)) },
+                            selected = dest == currentDestination,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                if (dest == currentDestination) {
+                                    val state = when (dest) {
+                                        TabBarDestinations.TIMELINE -> timelineState
+                                        TabBarDestinations.SEARCH -> searchPostsState
+                                        TabBarDestinations.NOTIFICATIONS -> notificationsState
+                                    }
+                                    coroutineScope.launch {
+                                        launch {
+                                            if (state.firstVisibleItemIndex > 8) {
+                                                state.scrollToItem(0)
+                                            } else {
+                                                state.animateScrollToItem(0)
+                                            }
+                                        }
+                                        launch {
+                                            animate(
+                                                initialValue = scrollBehavior.state.heightOffset,
+                                                targetValue = 0f
+                                            ) { value, _ ->
+                                                scrollBehavior.state.heightOffset = value
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    currentDestination = dest
+                                }
+                            }
+                        )
+                    }
+                },
+            ) {
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.surface,
                 modifier = Modifier
@@ -580,123 +670,167 @@ private fun InnerTimelineView(
                         TabBarDestinations.NOTIFICATIONS -> {}
                     }
                 },
-                bottomBar = {
-                    NavigationBar {
-                        TabBarDestinations.entries.forEach {
-                            NavigationBarItem(
-                                icon = {
-                                    if (it.badgeValue != null) {
-                                        val badgeValue = remember { it.badgeValue }
-                                        BadgedBox(
-                                            badge = {
-                                                if (badgeValue.intValue == 0) {
-                                                    return@BadgedBox
-                                                }
-
-                                                Badge {
-                                                    Text(
-                                                        badgeValue.intValue.toString(),
-                                                        modifier =
-                                                            Modifier.semantics {
-                                                                contentDescription =
-                                                                    it.badgeDescFmt(it.badgeValue.intValue)
-                                                            },
-                                                    )
-                                                }
-                                            }
-                                        ) {
-                                            Icon(
-                                                it.icon,
-                                                contentDescription = stringResource(it.contentDescription)
-                                            )
-                                        }
-                                    } else {
-                                        Icon(
-                                            it.icon,
-                                            contentDescription = stringResource(it.contentDescription)
-                                        )
-                                    }
-                                },
-                                label = { Text(stringResource(it.label)) },
-                                selected = it == currentDestination,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    if (it == currentDestination) {
-                                        val state = when (it) {
-                                            TabBarDestinations.TIMELINE -> timelineState
-                                            TabBarDestinations.SEARCH -> searchPostsState
-                                            TabBarDestinations.NOTIFICATIONS -> notificationsState
-                                        }
-                                        coroutineScope.launch {
-                                            launch {
-                                                if (state.firstVisibleItemIndex > 8) {
-                                                    state.scrollToItem(0)
-                                                } else {
-                                                    state.animateScrollToItem(0)
-                                                }
-                                            }
-                                            launch {
-                                                animate(
-                                                    initialValue = scrollBehavior.state.heightOffset,
-                                                    targetValue = 0f
-                                                ) { value, _ ->
-                                                    scrollBehavior.state.heightOffset = value
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        currentDestination = it
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
             ) { values ->
                 LaunchedEffect(notificationsState.canScrollBackward) {
                     TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = 0
                 }
 
-                when (currentDestination) {
-                    TabBarDestinations.TIMELINE -> ShowSkeets(
-                        viewModel = timelineViewModel,
-                        settingsState = settingsState,
-                        state = timelineState,
-                        modifier = Modifier.padding(values),
-                        onReplyTap = onReplyTap,
-                        data = timelineViewModel.uiState.skeets,
-                        isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
-                        isScrollEnabled = isScrollEnabled,
-                        onSeeMoreTap = onSeeMoreTap,
-                        onProfileTap = onProfileTap,
-                    )
+                val isExpandedScreen = !settingsState.forceCompactLayout &&
+                    adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+                var detailThreadVisible by remember { mutableStateOf(false) }
+                val detailThreadRefreshing = remember { mutableStateOf(false) }
 
-                    TabBarDestinations.SEARCH -> SearchView(
-                        viewModel = timelineViewModel,
-                        postsListState = searchPostsState,
-                        peopleListState = searchPeopleState,
-                        modifier = Modifier,
-                        isScrollEnabled = isScrollEnabled,
-                        scaffoldPadding = values,
-                        onThreadTap = { skeet ->
-                            onSeeMoreTap(skeet)
-                        },
-                        onProfileTap = onProfileTap,
-                    )
+                val contentModifier = if (!settingsState.forceCompactLayout && !isExpandedScreen) {
+                    Modifier.widthIn(max = 600.dp)
+                } else {
+                    Modifier
+                }
 
-                    TabBarDestinations.NOTIFICATIONS -> NotificationsView(
-                        viewModel = timelineViewModel,
-                        settingsState = settingsState,
-                        state = notificationsState,
-                        modifier = Modifier,
-                        isScrollEnabled = isScrollEnabled,
-                        onReplyTap = onReplyTap,
-                        onProfileTap = onProfileTap,
-                        scaffoldPadding = values,
-                        onSeeMoreTap = onSeeMoreTap
-                    )
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(values),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Box(modifier = contentModifier.fillMaxSize()) {
+                        when (currentDestination) {
+                            TabBarDestinations.TIMELINE -> {
+                                if (isExpandedScreen) {
+                                    Row(modifier = Modifier.fillMaxSize()) {
+                                        Box(modifier = Modifier.weight(0.4f).fillMaxHeight()) {
+                                            ShowSkeets(
+                                                viewModel = timelineViewModel,
+                                                settingsState = settingsState,
+                                                state = timelineState,
+                                                onReplyTap = onReplyTap,
+                                                data = timelineViewModel.uiState.skeets,
+                                                isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
+                                                isScrollEnabled = isScrollEnabled,
+                                                onSeeMoreTap = { skeet ->
+                                                    detailThreadVisible = true
+                                                    detailThreadRefreshing.value = true
+                                                    timelineViewModel.setThread(skeet)
+                                                    timelineViewModel.getThread {
+                                                        detailThreadRefreshing.value = false
+                                                    }
+                                                },
+                                                onProfileTap = onProfileTap,
+                                            )
+                                        }
+
+                                        VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
+
+                                        Box(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
+                                            if (detailThreadVisible) {
+                                                DetailThreadPane(
+                                                    timelineViewModel = timelineViewModel,
+                                                    settingsState = settingsState,
+                                                    isRefreshing = detailThreadRefreshing.value,
+                                                    onProfileTap = onProfileTap,
+                                                    onReplyTap = onReplyTap,
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    Text(
+                                                        "Select a post to view its thread",
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    ShowSkeets(
+                                        viewModel = timelineViewModel,
+                                        settingsState = settingsState,
+                                        state = timelineState,
+                                        onReplyTap = onReplyTap,
+                                        data = timelineViewModel.uiState.skeets,
+                                        isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
+                                        isScrollEnabled = isScrollEnabled,
+                                        onSeeMoreTap = onSeeMoreTap,
+                                        onProfileTap = onProfileTap,
+                                    )
+                                }
+                            }
+
+                            TabBarDestinations.SEARCH -> SearchView(
+                                viewModel = timelineViewModel,
+                                postsListState = searchPostsState,
+                                peopleListState = searchPeopleState,
+                                modifier = Modifier,
+                                isScrollEnabled = isScrollEnabled,
+                                scaffoldPadding = PaddingValues(),
+                                onThreadTap = { skeet ->
+                                    onSeeMoreTap(skeet)
+                                },
+                                onProfileTap = onProfileTap,
+                            )
+
+                            TabBarDestinations.NOTIFICATIONS -> NotificationsView(
+                                viewModel = timelineViewModel,
+                                settingsState = settingsState,
+                                state = notificationsState,
+                                modifier = Modifier,
+                                isScrollEnabled = isScrollEnabled,
+                                onReplyTap = onReplyTap,
+                                onProfileTap = onProfileTap,
+                                scaffoldPadding = PaddingValues(),
+                                onSeeMoreTap = onSeeMoreTap
+                            )
+                        }
+                    }
                 }
             }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DetailThreadPane(
+    timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState,
+    isRefreshing: Boolean,
+    onProfileTap: (Did) -> Unit,
+    onReplyTap: (SkeetData, Boolean) -> Unit,
+) {
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
+                title = { Text("Thread") },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { padding ->
+        PullToRefreshBox(
+            modifier = Modifier.padding(padding),
+            isRefreshing = isRefreshing,
+            onRefresh = {},
+        ) {
+            ShowSkeets(
+                viewModel = timelineViewModel,
+                isScrollEnabled = true,
+                data = timelineViewModel.uiState.currentlyShownThread.flatten(),
+                shouldFetchMoreData = false,
+                isShowingThread = true,
+                settingsState = settingsState,
+                onProfileTap = onProfileTap,
+                onReplyTap = onReplyTap,
+            )
         }
     }
 }

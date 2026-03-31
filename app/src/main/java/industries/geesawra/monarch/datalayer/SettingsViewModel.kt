@@ -48,6 +48,7 @@ data class SettingsState(
     val replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads,
     val showLabels: Boolean = true,
     val defaultFeed: DefaultFeed = DefaultFeed(),
+    val forceCompactLayout: Boolean = false,
     val loaded: Boolean = false,
 )
 
@@ -66,6 +67,7 @@ class SettingsViewModel @Inject constructor(
         private val DEFAULT_FEED_URI = stringPreferencesKey("default_feed_uri")
         private val DEFAULT_FEED_NAME = stringPreferencesKey("default_feed_name")
         private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
+        private val FORCE_COMPACT_LAYOUT = stringPreferencesKey("force_compact_layout")
     }
 
     var settingsState by mutableStateOf(SettingsState())
@@ -86,6 +88,7 @@ class SettingsViewModel @Inject constructor(
                         displayName = prefs[DEFAULT_FEED_NAME] ?: "Following",
                         avatar = prefs[DEFAULT_FEED_AVATAR],
                     ),
+                    forceCompactLayout = prefs[FORCE_COMPACT_LAYOUT]?.toBooleanStrictOrNull() ?: false,
                     loaded = true,
                 )
             }.collect {
@@ -127,6 +130,12 @@ class SettingsViewModel @Inject constructor(
     fun setShowLabels(show: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[SHOW_LABELS] = show.toString() }
+        }
+    }
+
+    fun setForceCompactLayout(force: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[FORCE_COMPACT_LAYOUT] = force.toString() }
         }
     }
 

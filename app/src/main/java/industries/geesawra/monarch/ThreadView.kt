@@ -1,8 +1,10 @@
 package industries.geesawra.monarch
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,8 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.dp
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -84,18 +88,27 @@ fun ThreadView(
                 }
             }
 
-            Column(
-                modifier = Modifier.padding(padding)
+            val contentModifier = if (!settingsState.forceCompactLayout) {
+                Modifier.widthIn(max = 600.dp)
+            } else {
+                Modifier
+            }
+
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.TopCenter,
             ) {
-                ShowSkeets(
-                    viewModel = timelineViewModel,
-                    isScrollEnabled = true,
-                    data = timelineViewModel.uiState.currentlyShownThread.flatten(),
-                    shouldFetchMoreData = false,
-                    isShowingThread = true,
-                    settingsState = settingsState,
-                    onProfileTap = onProfileTap,
-                )
+                Column(modifier = contentModifier) {
+                    ShowSkeets(
+                        viewModel = timelineViewModel,
+                        isScrollEnabled = true,
+                        data = timelineViewModel.uiState.currentlyShownThread.flatten(),
+                        shouldFetchMoreData = false,
+                        isShowingThread = true,
+                        settingsState = settingsState,
+                        onProfileTap = onProfileTap,
+                    )
+                }
             }
         }
     }

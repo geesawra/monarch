@@ -16,8 +16,10 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -90,10 +92,14 @@ fun SettingsView(
             )
         },
     ) { padding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = Alignment.TopCenter,
+        ) {
         Column(
             modifier = Modifier
+                .widthIn(max = 600.dp)
                 .fillMaxSize()
-                .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
@@ -181,6 +187,17 @@ fun SettingsView(
                             }
                         }
                     }
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Force compact layout") },
+                supportingContent = { Text("Use phone layout on large screens") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.forceCompactLayout,
+                        onCheckedChange = { settingsViewModel.setForceCompactLayout(it) }
+                    )
                 },
             )
 
@@ -399,6 +416,7 @@ fun SettingsView(
             ) {
                 Text("Log out")
             }
+        }
         }
     }
 }
