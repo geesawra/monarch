@@ -142,6 +142,8 @@ fun ComposeView(
     scaffoldState: BottomSheetScaffoldState,
     scrollState: ScrollState,
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
+    initialText: String = "",
+    initialMentions: Map<String, Did> = emptyMap(),
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -185,6 +187,13 @@ fun ComposeView(
             }
 
             SheetValue.PartiallyExpanded, SheetValue.Expanded -> {
+                if (initialText.isNotEmpty() && inReplyTo.value == null && !isQuotePost.value && textfieldState.text.isEmpty()) {
+                    textfieldState.edit {
+                        replace(0, length, initialText)
+                        selection = TextRange(initialText.length)
+                    }
+                    mentionDids.putAll(initialMentions)
+                }
                 delay(100)
                 focusRequester.requestFocus()
                 keyboardController?.show()

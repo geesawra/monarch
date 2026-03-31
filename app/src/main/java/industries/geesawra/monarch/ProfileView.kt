@@ -98,8 +98,15 @@ import androidx.compose.ui.unit.dp
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.VerifiedStatus
 import app.bsky.feed.GetAuthorFeedFilter
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import coil3.compose.AsyncImage
@@ -211,6 +218,8 @@ fun ProfileView(
                 inReplyTo = inReplyTo,
                 isQuotePost = isQuotePost,
                 wasEdited = wasEdited,
+                initialText = if (profile != null) "@${profile.handle.handle} " else "",
+                initialMentions = if (profile != null) mapOf(profile.handle.handle to profile.did) else emptyMap(),
             )
         },
     ) { scaffoldPadding ->
@@ -288,6 +297,34 @@ fun ProfileView(
                         }
                     }
                 )
+            },
+            floatingActionButton = {
+                if (profile != null && !timelineViewModel.isOwnProfile()) {
+                    FloatingActionButton(
+                        onClick = {
+                            inReplyTo.value = null
+                            isQuotePost.value = false
+                            coroutineScope.launch {
+                                scaffoldState.bottomSheetState.expand()
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Filled.Create, "Post")
+                    }
+                }
+            },
+            bottomBar = {
+                NavigationBar {
+                    val currentFilter = timelineViewModel.uiState.profileFeedFilter
+                    profileNavTabs.forEach { tab ->
+                        NavigationBarItem(
+                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            label = { Text(tab.label) },
+                            selected = tab.filter == currentFilter,
+                            onClick = { timelineViewModel.setProfileFeedFilter(tab.filter) },
+                        )
+                    }
+                }
             },
         ) { padding ->
             if (profile == null) {
@@ -378,11 +415,6 @@ private fun ProfileContent(
                 timelineViewModel = timelineViewModel,
                 avatarShape = avatarClipShape,
             )
-        }
-
-        // Feed tabs
-        item(key = "feed_tabs") {
-            ProfileFeedTabs(timelineViewModel)
         }
 
         // Posts
@@ -876,26 +908,15 @@ private fun EditProfileSheet(
     }
 }
 
-private val profileTabs = listOf(
-    "Posts" to null,
-    "Replies" to GetAuthorFeedFilter.PostsWithReplies,
-    "Media" to GetAuthorFeedFilter.PostsWithMedia,
-    "Video" to GetAuthorFeedFilter.PostsWithVideo,
+private data class ProfileTab(
+    val label: String,
+    val icon: ImageVector,
+    val filter: GetAuthorFeedFilter?,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProfileFeedTabs(timelineViewModel: TimelineViewModel) {
-    val currentFilter = timelineViewModel.uiState.profileFeedFilter
-    val selectedIndex = profileTabs.indexOfFirst { it.second == currentFilter }.coerceAtLeast(0)
-
-    PrimaryTabRow(selectedTabIndex = selectedIndex) {
-        profileTabs.forEachIndexed { index, (label, filter) ->
-            Tab(
-                selected = selectedIndex == index,
-                onClick = { timelineViewModel.setProfileFeedFilter(filter) },
-                text = { Text(label) },
-            )
-        }
-    }
-}
+private val profileNavTabs = listOf(
+    ProfileTab("Posts", Icons.AutoMirrored.Filled.Article, null),
+    ProfileTab("Replies", Icons.AutoMirrored.Filled.Reply, GetAuthorFeedFilter.PostsWithReplies),
+    ProfileTab("Media", Icons.Default.Image, GetAuthorFeedFilter.PostsWithMedia),
+    ProfileTab("Video", Icons.Default.Videocam, GetAuthorFeedFilter.PostsWithVideo),
+)
