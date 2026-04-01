@@ -8,7 +8,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.text.Html
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
@@ -123,8 +122,6 @@ class MessagingService : FirebaseMessagingService() {
             circular.scale(avatarSize, avatarSize)
         }
 
-        val styledText = Html.fromHtml("<b>$title</b><br>$body", Html.FROM_HTML_MODE_COMPACT)
-
         val style = if (embedImageUrl != null) {
             val embedBitmap = downloadBitmap(embedImageUrl)
             if (embedBitmap != null) {
@@ -133,14 +130,13 @@ class MessagingService : FirebaseMessagingService() {
                 imageFile.outputStream().use { embedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
                 NotificationCompat.BigPictureStyle()
                     .bigPicture(embedBitmap)
-                    .setSummaryText(styledText)
             } else {
                 NotificationCompat.BigTextStyle()
-                    .bigText(styledText)
+                    .bigText(body)
             }
         } else {
             NotificationCompat.BigTextStyle()
-                .bigText(styledText)
+                .bigText(body)
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
