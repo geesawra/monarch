@@ -142,6 +142,50 @@ func TestIPRateLimiterCleanup(t *testing.T) {
 	}
 }
 
+func TestClientIP(t *testing.T) {
+	tests := []struct {
+		name          string
+		xForwardedFor string
+		remoteAddr    string
+		wantIP        string
+	}{
+		{
+			name:       "falls back to RemoteAddr",
+			remoteAddr: "192.168.1.1:1234",
+			wantIP:     "192.168.1.1",
+		},
+		{
+			name:          "single X-Forwarded-For value",
+			xForwardedFor: "1.2.3.4",
+			remoteAddr:    "10.0.0.1:1234",
+			wantIP:        "1.2.3.4",
+		},
+		{
+			name:          "extracts first IP from chain",
+			xForwardedFor: "1.2.3.4, 10.0.0.1, 172.17.0.1",
+			remoteAddr:    "10.0.0.1:1234",
+			wantIP:        "1.2.3.4",
+		},
+		{
+			name:          "trims whitespace from first IP",
+			xForwardedFor: " 5.6.7.8 , 10.0.0.1",
+			remoteAddr:    "10.0.0.1:1234",
+			wantIP:        "5.6.7.8",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.RemoteAddr = tt.remoteAddr
+			if tt.xForwardedFor != "" {
+				req.Header.Set("X-Forwarded-For", tt.xForwardedFor)
+			}
+			tst.Is(tt.wantIP, clientIP(req), t)
+		})
+	}
+}
+
 func TestRateLimitMiddleware(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -59,16 +60,22 @@ func (rl *ipRateLimiter) cleanup() {
 	}
 }
 
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.Index(xff, ","); i != -1 {
+			return strings.TrimSpace(xff[:i])
+		}
+		return xff
+	}
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return ip
+}
+
 func rateLimitMiddleware(next http.Handler) http.Handler {
 	limiter := newIPRateLimiter()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip == "" {
-			ip, _, _ = net.SplitHostPort(r.RemoteAddr)
-		}
-
-		if !limiter.get(ip).Allow() {
+		if !limiter.get(clientIP(r)).Allow() {
 			w.Header().Set("Retry-After", "12")
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
