@@ -107,8 +107,8 @@ class MessagingService : FirebaseMessagingService() {
         val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
         val body = message.notification?.body ?: message.data["body"] ?: return
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
-        val embedImageUrl = message.data["embedImage"]
-        val quotedText = message.data["quotedText"]
+        val embedImageUrl = message.data["embedImage"]?.ifEmpty { null }
+        val quotedText = message.data["quotedText"]?.ifEmpty { null }
         val kind = message.data["kind"]
         val uri = message.data["uri"]
         val authorDid = message.data["authorDid"]
