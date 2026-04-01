@@ -7,10 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Typeface
 import android.net.Uri
-import android.text.SpannableString
-import android.text.style.StyleSpan
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
@@ -125,10 +122,6 @@ class MessagingService : FirebaseMessagingService() {
             circular.scale(avatarSize, avatarSize)
         }
 
-        val boldTitle = SpannableString(title).apply {
-            setSpan(StyleSpan(Typeface.BOLD), 0, length, 0)
-        }
-
         val style = if (embedImageUrl != null) {
             val embedBitmap = downloadBitmap(embedImageUrl)
             if (embedBitmap != null) {
@@ -137,23 +130,21 @@ class MessagingService : FirebaseMessagingService() {
                 imageFile.outputStream().use { embedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
                 NotificationCompat.BigPictureStyle()
                     .bigPicture(embedBitmap)
-                    .setBigContentTitle(boldTitle)
                     .setSummaryText(body)
             } else {
                 NotificationCompat.BigTextStyle()
-                    .setBigContentTitle(boldTitle)
                     .bigText(body)
             }
         } else {
             NotificationCompat.BigTextStyle()
-                .setBigContentTitle(boldTitle)
                 .bigText(body)
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(boldTitle)
+            .setContentTitle(title)
             .setContentText(body)
+            .setSubText(title)
             .setStyle(style)
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
