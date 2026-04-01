@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.text.Html
+import android.graphics.Typeface
+import android.text.SpannableString
+import android.text.style.StyleSpan
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import java.net.URL
@@ -122,7 +124,9 @@ class MessagingService : FirebaseMessagingService() {
 
         val embedImage = embedImageUrl?.let { downloadBitmap(it) }
 
-        val boldTitle = Html.fromHtml("<b>$title</b>", Html.FROM_HTML_MODE_COMPACT)
+        val boldTitle = SpannableString(title).apply {
+            setSpan(StyleSpan(Typeface.BOLD), 0, length, 0)
+        }
 
         val style = if (embedImage != null) {
             NotificationCompat.BigPictureStyle()
@@ -137,6 +141,7 @@ class MessagingService : FirebaseMessagingService() {
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(boldTitle)
             .setStyle(style)
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
