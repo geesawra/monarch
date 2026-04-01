@@ -44,7 +44,7 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-            buildConfigField("String", "PUSH_SERVER_URL", "\"https://push.example.com/subscribe\"")
+            buildConfigField("String", "PUSH_SERVER_URL", "\"https://matrice.wallera.computer/subscribe\"")
         }
     }
     compileOptions {
