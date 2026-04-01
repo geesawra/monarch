@@ -102,6 +102,7 @@ class MessagingService : FirebaseMessagingService() {
         val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
         val body = message.notification?.body ?: message.data["body"] ?: return
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
+        val embedImageUrl = message.data["embedImage"]
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -118,9 +119,18 @@ class MessagingService : FirebaseMessagingService() {
             circular.scale(avatarSize, avatarSize)
         }
 
-        val style = NotificationCompat.BigTextStyle()
-            .setBigContentTitle(title)
-            .bigText(body)
+        val embedImage = embedImageUrl?.let { downloadBitmap(it) }
+
+        val style = if (embedImage != null) {
+            NotificationCompat.BigPictureStyle()
+                .bigPicture(embedImage)
+                .setBigContentTitle(title)
+                .setSummaryText(body)
+        } else {
+            NotificationCompat.BigTextStyle()
+                .setBigContentTitle(title)
+                .bigText(body)
+        }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
