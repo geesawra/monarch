@@ -10,8 +10,8 @@ import (
 	"firebase.google.com/go/v4/messaging"
 	"github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/api/bsky"
-	"github.com/bluesky-social/indigo/atproto/atclient"
 	"github.com/bluesky-social/indigo/atproto/syntax"
+	lexutil "github.com/bluesky-social/indigo/lex/util"
 	"github.com/bluesky-social/jetstream/pkg/client"
 	"github.com/bluesky-social/jetstream/pkg/models"
 	"go.uber.org/zap"
@@ -43,7 +43,11 @@ func jetstreamConfig(lexicons ...string) *client.ClientConfig {
 	}
 }
 
-func handleEvent(l *zap.SugaredLogger, atc *atclient.APIClient, msg *messaging.Client, t *tokens) func(ctx context.Context, e *models.Event) error {
+type messageSender interface {
+	Send(ctx context.Context, message *messaging.Message) (string, error)
+}
+
+func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender, t *tokens) func(ctx context.Context, e *models.Event) error {
 	eh := eventHandler{
 		l:   l,
 		atc: atc,
@@ -114,7 +118,7 @@ func handleEvent(l *zap.SugaredLogger, atc *atclient.APIClient, msg *messaging.C
 
 type eventHandler struct {
 	l   *zap.SugaredLogger
-	atc *atclient.APIClient
+	atc lexutil.LexClient
 	t   *tokens
 }
 
@@ -467,7 +471,7 @@ func mediaForPost(p *bsky.FeedPost, authorDid, size string) string {
 	return fmt.Sprintf("https://cdn.bsky.app/img/%s/plain/%s/%s@webp", size, authorDid, img.Image.Ref.String())
 }
 
-func actorNameAvatar(ctx context.Context, atc *atclient.APIClient, did string) (name, avatar string, err error) {
+func actorNameAvatar(ctx context.Context, atc lexutil.LexClient, did string) (name, avatar string, err error) {
 	profile, err := bsky.ActorGetProfile(ctx, atc, did)
 	if err != nil {
 		return "", "", err

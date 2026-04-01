@@ -50,6 +50,8 @@ github.com/empijei/srpc v0.0.0-20260311074033-f009dbbd7289 h1:sK6MOJekxDkf/GzFUP
 github.com/empijei/srpc v0.0.0-20260311074033-f009dbbd7289/go.mod h1:wszjkvad7KnaLvE+OFLmfIWwLzIZe1AjC+Pt6R/1Mqo=
 github.com/empijei/tst v0.0.0-20260303140155-3196befe4273 h1:TdslLlUxUMYgghq64YgZlzd1M7jC5t/K8+g5ELRc4h4=
 github.com/empijei/tst v0.0.0-20260303140155-3196befe4273/go.mod h1:yhB/XtQiGBa0i7exjbB38IpwbxJm0Jk7y4j7pc+frM8=
+github.com/empijei/tst v0.0.0-20260315134227-bfbe8dbf1d2f h1:MznAcHfbOrZYEfjzVKjsWrFAQxpH/PwGLXfw6TSX4GU=
+github.com/empijei/tst v0.0.0-20260315134227-bfbe8dbf1d2f/go.mod h1:yhB/XtQiGBa0i7exjbB38IpwbxJm0Jk7y4j7pc+frM8=
 github.com/envoyproxy/go-control-plane/envoy v1.32.4 h1:jb83lalDRZSpPWW2Z7Mck/8kXZ5CQAFYVjQcdVIr83A=
 github.com/envoyproxy/go-control-plane/envoy v1.32.4/go.mod h1:Gzjc5k8JcJswLjAx1Zm+wSYE20UrLtt7JZMWiWQXQEw=
 github.com/envoyproxy/protoc-gen-validate v1.2.1 h1:DEo3O99U8j4hBFwbJfrz9VtgcDfUKS7KJ7spH3d86P8=

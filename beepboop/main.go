@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"os"
 	"runtime"
 	"time"
 
@@ -87,6 +88,6 @@ func main() {
 		}
 	}()
 
-	shutdown(l, 15*time.Second, epShutdown, sch.Shutdown)
+	shutdown(l, 15*time.Second, os.Exit, epShutdown, sch.Shutdown)
 
 }

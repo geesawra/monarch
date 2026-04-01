@@ -34,9 +34,8 @@ func runEndpoints(ctx context.Context, bind string, t *tokens) func() {
 	ep := srpc.NewEndpoint(http.MethodPost, "/subscribe", srpc.NewCodecJSON[struct{}](), srpc.NewCodecJSON[subscriptionRequest]())
 
 	ep.Register(mux, func(ctx context.Context, req subscriptionRequest) (struct{}, error) {
-		// TODO: HARDENING!
 		t.storeDID(req.DID, req.FCMToken)
-		return struct{}{}, nil // TODO: fill
+		return struct{}{}, nil
 	})
 
 	srv := &http.Server{
