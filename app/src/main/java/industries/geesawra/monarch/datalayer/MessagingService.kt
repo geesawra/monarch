@@ -177,7 +177,12 @@ class MessagingService : FirebaseMessagingService() {
         }
 
         val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
+        val channel = notificationManager.getNotificationChannel(CHANNEL_ID)
+        Log.d(TAG, "Channel importance: ${channel?.importance}, enabled: ${notificationManager.areNotificationsEnabled()}")
+        val notifId = System.currentTimeMillis().toInt()
+        Log.d(TAG, "Posting notification id=$notifId title=$title")
+        notificationManager.notify(notifId, builder.build())
+        Log.d(TAG, "Notification posted successfully")
 
         val summaryBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
