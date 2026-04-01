@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +77,7 @@ fun PostImageGallery(
             }
 
             DeletableImageView(
+                modifier = Modifier.heightIn(max = 360.dp),
                 image = img,
                 originalIndex = 0,
                 onCrossClick = onCrossClick,
@@ -88,6 +90,7 @@ fun PostImageGallery(
             Row(
                 modifier = modifier
                     .fillMaxWidth()
+                    .heightIn(max = 360.dp)
                     .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -111,6 +114,7 @@ fun PostImageGallery(
             Column(
                 modifier = modifier
                     .fillMaxWidth()
+                    .heightIn(max = 360.dp)
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -146,6 +150,7 @@ fun PostImageGallery(
             Column(
                 modifier = modifier
                     .fillMaxWidth()
+                    .heightIn(max = 360.dp)
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
