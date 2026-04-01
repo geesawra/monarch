@@ -118,15 +118,12 @@ class MessagingService : FirebaseMessagingService() {
             circular.scale(avatarSize, avatarSize)
         }
 
-        val boldTitle = android.text.Html.fromHtml("<b>$title</b>", android.text.Html.FROM_HTML_MODE_COMPACT)
-
         val style = NotificationCompat.BigTextStyle()
+            .setBigContentTitle(title)
             .bigText(body)
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(boldTitle)
-            .setContentText(body)
             .setStyle(style)
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
