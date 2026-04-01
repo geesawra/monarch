@@ -41,7 +41,7 @@ func runEndpoints(ctx context.Context, bind string, t *tokens) func() {
 
 	srv := &http.Server{
 		Addr:    bind,
-		Handler: mux,
+		Handler: rateLimitMiddleware(mux),
 	}
 
 	go func() {
