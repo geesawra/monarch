@@ -1,0 +1,15 @@
+services:
+  beepboop:
+    image: ghcr.io/geesawra/monarch/beepboop:latest
+    ports:
+      - "9999:9999"
+    env_file: ./stack.env
+    volumes:
+      - ./keys/firebase-key.json:/keys/firebase-key.json:ro
+      - ./tokens:/app/tokens
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1024M

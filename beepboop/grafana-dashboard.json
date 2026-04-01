@@ -1,0 +1,189 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "Events Received (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "opm" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_events_received_total[5m])) by (collection) * 60",
+          "legendFormat": "{{collection}}"
+        }
+      ]
+    },
+    {
+      "title": "Events Skipped (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "opm" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_events_skipped_total[5m])) by (reason) * 60",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    },
+    {
+      "title": "Notifications Sent vs Failed (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "opm" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_notifications_sent_total[5m])) by (kind) * 60",
+          "legendFormat": "sent: {{kind}}"
+        },
+        {
+          "expr": "sum(rate(beepboop_notifications_failed_total[5m])) by (kind) * 60",
+          "legendFormat": "failed: {{kind}}"
+        }
+      ]
+    },
+    {
+      "title": "Notification Failure Rate (%)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_notifications_failed_total[5m])) / (sum(rate(beepboop_notifications_sent_total[5m])) + sum(rate(beepboop_notifications_failed_total[5m])))"
+        }
+      ]
+    },
+    {
+      "title": "Registered Tokens",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "beepboop_tokens_registered"
+        }
+      ]
+    },
+    {
+      "title": "Event Processing Duration (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(beepboop_event_duration_ms_bucket[5m])) by (le, collection))",
+          "legendFormat": "p50 {{collection}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(beepboop_event_duration_ms_bucket[5m])) by (le, collection))",
+          "legendFormat": "p95 {{collection}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(beepboop_event_duration_ms_bucket[5m])) by (le, collection))",
+          "legendFormat": "p99 {{collection}}"
+        }
+      ]
+    },
+    {
+      "title": "Cache Hit Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_cache_hits_total[5m])) by (cache) / (sum(rate(beepboop_cache_hits_total[5m])) by (cache) + sum(rate(beepboop_cache_misses_total[5m])) by (cache))",
+          "legendFormat": "{{cache}}"
+        }
+      ]
+    },
+    {
+      "title": "Cache Hits vs Misses (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": {
+        "defaults": { "unit": "opm" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_cache_hits_total[5m])) by (cache) * 60",
+          "legendFormat": "hits: {{cache}}"
+        },
+        {
+          "expr": "sum(rate(beepboop_cache_misses_total[5m])) by (cache) * 60",
+          "legendFormat": "misses: {{cache}}"
+        }
+      ]
+    },
+    {
+      "title": "Events Processed vs Useful (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": {
+        "defaults": { "unit": "opm" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_events_received_total[5m])) * 60",
+          "legendFormat": "received"
+        },
+        {
+          "expr": "sum(rate(beepboop_notifications_sent_total[5m])) * 60",
+          "legendFormat": "sent notifications"
+        },
+        {
+          "expr": "sum(rate(beepboop_events_skipped_total[5m])) * 60",
+          "legendFormat": "skipped"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["beepboop"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "beepboop",
+  "uid": "beepboop-overview"
+}

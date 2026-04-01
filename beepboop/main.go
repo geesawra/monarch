@@ -57,12 +57,17 @@ func main() {
 		log.Fatal("initialize firebase messaging:", err)
 	}
 
+	m, err := newMetrics()
+	if err != nil {
+		log.Fatal("initialize metrics:", err)
+	}
+
 	_ = msg
 	sch := parallel.NewScheduler(
 		runtime.NumCPU()*8,
 		"processor",
 		slog.Default(),
-		handleEvent(l, atc, msg, &t),
+		handleEvent(l, atc, msg, &t, m),
 	)
 
 	jc, err := client.NewClient(

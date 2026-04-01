@@ -58,6 +58,26 @@ func (m *mockLexClient) LexDo(_ context.Context, method, inputEncoding, endpoint
 	return nil
 }
 
+func testMetrics(t *testing.T) *metrics {
+	t.Helper()
+	m, err := newMetrics()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+func testEventHandler(t *testing.T, mock *mockLexClient, tk *tokens) *eventHandler {
+	t.Helper()
+	return &eventHandler{
+		atc:          mock,
+		t:            tk,
+		m:            testMetrics(t),
+		profileCache: newProfileCache(mock),
+		recordCache:  newRecordCache(mock),
+	}
+}
+
 func makeEvent(did, collection, rkey string, record any) *models.Event {
 	data, _ := json.Marshal(record)
 	return &models.Event{
@@ -331,7 +351,7 @@ func TestHandleLike(t *testing.T) {
 				},
 			}
 
-			eh := &eventHandler{atc: mock, t: tk}
+			eh := testEventHandler(t, mock, tk)
 
 			subj, uri, err := subject(tt.event)
 			tst.No(err, t)
@@ -421,7 +441,7 @@ func TestHandleFollow(t *testing.T) {
 				},
 			}
 
-			eh := &eventHandler{atc: mock, t: tk}
+			eh := testEventHandler(t, mock, tk)
 
 			follow := &bsky.GraphFollow{
 				Subject:   tt.followed,
@@ -489,7 +509,7 @@ func TestHandleRepost(t *testing.T) {
 				},
 			}
 
-			eh := &eventHandler{atc: mock, t: tk}
+			eh := testEventHandler(t, mock, tk)
 
 			repost := &bsky.FeedRepost{
 				Subject: &atproto.RepoStrongRef{
@@ -658,7 +678,7 @@ func TestHandleReply(t *testing.T) {
 				},
 			}
 
-			eh := &eventHandler{atc: mock, t: tk}
+			eh := testEventHandler(t, mock, tk)
 
 			event := makeEvent(tt.poster, "app.bsky.feed.post", "rkey1", tt.post)
 			_, uri, err := subject(event)
@@ -798,7 +818,7 @@ func TestHandleEvent(t *testing.T) {
 			sender := &mockSender{}
 			tk := testTokens(t, tt.tokens)
 
-			handler := handleEvent(l.Sugar(), mock, sender, tk)
+			handler := handleEvent(l.Sugar(), mock, sender, tk, testMetrics(t))
 			err := handler(context.Background(), tt.event)
 
 			if tt.wantErr != "" {

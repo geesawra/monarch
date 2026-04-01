@@ -9,6 +9,7 @@ import (
 
 	"github.com/bluesky-social/indigo/atproto/syntax"
 	"github.com/empijei/srpc"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type subscriptionRequest struct {
@@ -37,6 +38,8 @@ func runEndpoints(ctx context.Context, bind string, t *tokens) func() {
 		t.storeDID(req.DID, req.FCMToken)
 		return struct{}{}, nil
 	})
+
+	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := &http.Server{
 		Addr:    bind,
