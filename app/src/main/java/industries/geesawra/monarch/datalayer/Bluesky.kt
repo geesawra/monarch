@@ -558,6 +558,8 @@ class BlueskyConn(val context: Context) {
                 }
             }
 
+            Log.d("BlueskyAuth", "getSession status: ${gs.status.value}")
+
             when (gs.status) {
                 HttpStatusCode.OK -> {
                     this.session = token
@@ -583,6 +585,8 @@ class BlueskyConn(val context: Context) {
                 }
             }
 
+            Log.d("BlueskyAuth", "Access token expired, attempting refresh")
+
             val rs = httpClient.post {
                 headers["Authorization"] = "Bearer " + token.refreshJwt
                 url {
@@ -590,6 +594,8 @@ class BlueskyConn(val context: Context) {
                     path("/xrpc/com.atproto.server.refreshSession")
                 }
             }
+
+            Log.d("BlueskyAuth", "refreshSession status: ${rs.status.value}")
 
             when (rs.status) {
                 HttpStatusCode.OK -> {
@@ -631,6 +637,7 @@ class BlueskyConn(val context: Context) {
         createMutex.lock()
         try {
             if (session != null && client != null && pdsClient != null && pdsURL != null) {
+                Log.d("BlueskyAuth", "create: session already active, skipping initialization")
                 return Result.success(Unit)
             }
 
@@ -649,6 +656,8 @@ class BlueskyConn(val context: Context) {
             val sessionDataString = sessionDataStringFlow.first()
             val appviewProxy = appviewProxyFlow.first()
 
+            Log.d("BlueskyAuth", "DataStore keys present: PDSHOST=${pdsURL.isNotEmpty()}, SESSION=${sessionDataString.isNotEmpty()}, APPVIEW_PROXY=${appviewProxy.isNotEmpty()}")
+
             if (pdsURL.isEmpty() || sessionDataString.isEmpty() || appviewProxy.isEmpty()) {
                 return Result.failure(Exception("No session data found"))
             }
@@ -658,14 +667,19 @@ class BlueskyConn(val context: Context) {
             refreshIfNeeded(pdsURL, appviewProxy, sessionData).onFailure {
                 return Result.failure(it)
             }
+
+            val activeSession = this.session!!
+            val sessionWasRefreshed = activeSession != sessionData
+            Log.d("BlueskyAuth", "refreshIfNeeded complete: sessionRefreshed=$sessionWasRefreshed")
+
             this.pdsURL = pdsURL
             this.appviewProxy = appviewProxy
 
-            this.pdsClient = mkPdsClient(pdsURL, sessionData)
+            this.pdsClient = mkPdsClient(pdsURL, activeSession)
             this.client = mkClient(
                 pdsURL,
                 appviewProxy,
-                sessionData,
+                activeSession,
             )
 
             val labelerMap = this.subscribedLabelers().getOrDefault(emptyMap())
@@ -675,12 +689,14 @@ class BlueskyConn(val context: Context) {
             this.client = mkClient(
                 pdsURL,
                 appviewProxy,
-                sessionData,
+                activeSession,
                 labelers
             )
 
+            Log.d("BlueskyAuth", "Clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}")
             return Result.success(Unit)
         } catch (e: Exception) {
+            Log.d("BlueskyAuth", "create() failed: ${e::class.simpleName}: ${e.message}")
             return Result.failure(e)
         } finally {
             createMutex.unlock()
