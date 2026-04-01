@@ -13,9 +13,8 @@ import android.text.SpannableString
 import android.text.style.StyleSpan
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.app.Person
 import androidx.core.content.FileProvider
-import androidx.core.graphics.drawable.IconCompat
+import androidx.core.graphics.scale
 import java.io.File
 import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -103,8 +102,6 @@ class MessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun notificationIdForPerson(key: String): Int = key.hashCode()
-
     override fun onMessageReceived(message: RemoteMessage) {
         Log.d(TAG, "Message received: ${message.data}")
 
@@ -112,7 +109,6 @@ class MessagingService : FirebaseMessagingService() {
         val body = message.notification?.body ?: message.data["body"] ?: return
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
         val embedImageUrl = message.data["embedImage"]
-        val senderKey = message.data["authorDid"] ?: message.data["authorHandle"] ?: title
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -123,50 +119,52 @@ class MessagingService : FirebaseMessagingService() {
         )
 
         val image = imageUrl?.let { downloadBitmap(it) }
+        val avatarSize = (48 * resources.displayMetrics.density).toInt()
+        val avatar = image?.let {
+            val circular = toCircularBitmap(it)
+            circular.scale(avatarSize, avatarSize)
+        }
 
         val boldTitle = SpannableString(title).apply {
             setSpan(StyleSpan(Typeface.BOLD), 0, length, 0)
         }
 
-        val personBuilder = Person.Builder()
-            .setName(boldTitle)
-            .setKey(senderKey)
-        if (image != null) {
-            personBuilder.setIcon(IconCompat.createWithBitmap(toCircularBitmap(image)))
-        }
-        val person = personBuilder.build()
-
-        val notificationId = notificationIdForPerson(senderKey)
-        val notificationManager = getSystemService(NotificationManager::class.java)
-
-        val existingStyle = notificationManager.activeNotifications
-            .find { it.id == notificationId }
-            ?.notification
-            ?.let { NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it) }
-
-        val msg = NotificationCompat.MessagingStyle.Message(body, System.currentTimeMillis(), person)
-        if (embedImageUrl != null) {
+        val style = if (embedImageUrl != null) {
             val embedBitmap = downloadBitmap(embedImageUrl)
             if (embedBitmap != null) {
                 val imageDir = File(cacheDir, "notification_images").apply { mkdirs() }
                 val imageFile = File(imageDir, "${System.currentTimeMillis()}.jpg")
                 imageFile.outputStream().use { embedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                val contentUri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", imageFile)
-                msg.setData("image/jpeg", contentUri)
+                NotificationCompat.BigPictureStyle()
+                    .bigPicture(embedBitmap)
+                    .setBigContentTitle(boldTitle)
+                    .setSummaryText(body)
+            } else {
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle(boldTitle)
+                    .bigText(body)
             }
+        } else {
+            NotificationCompat.BigTextStyle()
+                .setBigContentTitle(boldTitle)
+                .bigText(body)
         }
-
-        val style = (existingStyle ?: NotificationCompat.MessagingStyle(person))
-            .addMessage(msg)
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(boldTitle)
+            .setContentText(body)
             .setStyle(style)
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
 
-        notificationManager.notify(notificationId, builder.build())
+        if (avatar != null) {
+            builder.setLargeIcon(avatar)
+        }
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
 
         val summaryBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
