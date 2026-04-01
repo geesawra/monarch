@@ -100,7 +100,7 @@ func handleEvent(l *zap.SugaredLogger, atc *atclient.APIClient, msg *messaging.C
 
 func handleLike(
 	ctx context.Context,
-	l *zap.SugaredLogger,
+	_ *zap.SugaredLogger,
 	token string,
 	e *models.Event,
 	atc *atclient.APIClient,
@@ -139,10 +139,11 @@ func handleLike(
 
 	m := &messaging.Message{
 		Data: map[string]string{
-			"authorDid": e.Did,
-			"title":     authorName + " liked your post",
-			"body":      post.Text,
-			"image":     authorAvatar,
+			"authorDid":  e.Did,
+			"title":      authorName + " liked your post",
+			"body":       post.Text,
+			"image":      authorAvatar,
+			"embedImage": mediaForPost(post, likeAuthor.Did, mediaSizeThumb),
 		},
 		Android: &messaging.AndroidConfig{
 			Priority: "high",
@@ -177,6 +178,25 @@ func subject(e *models.Event) (any, syntax.ATURI, error) {
 	}
 }
 
-// func mediaForPost(p *bsky.FeedPost) string {
-// 	p.Embed.EmbedImages.Images[0].Image.
-// }
+const (
+	mediaSizeThumb = "feed_thumbnail"
+	mediaSizeFull  = "feed_fullsize"
+)
+
+func mediaForPost(p *bsky.FeedPost, authorDid, size string) string {
+	if p.Embed == nil {
+		return ""
+	}
+
+	if p.Embed.EmbedImages == nil {
+		return ""
+	}
+
+	if len(p.Embed.EmbedImages.Images) == 0 {
+		return ""
+	}
+
+	img := p.Embed.EmbedImages.Images[0]
+
+	return fmt.Sprintf("https://cdn.bsky.app/img/%s/plain/%s/%s@webp", size, authorDid, img.Image.Ref.String())
+}
