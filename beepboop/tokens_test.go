@@ -66,6 +66,6 @@ func TestTokens(t *testing.T) {
 }
 
 func TestNewTokensInvalidPath(t *testing.T) {
-	_, err := newTokens("/dev/null/impossible")
+	_, err := newTokens("/dev/null/impossible", nil)
 	tst.Err("", err, t)
 }

@@ -207,17 +207,31 @@ type eventHandler struct {
 }
 
 func (eh *eventHandler) getProfile(ctx context.Context, did string) (*bsky.ActorDefs_ProfileViewDetailed, error) {
+	cached := eh.profileCache.Has(did)
 	item := eh.profileCache.Get(did)
 	if item == nil {
+		eh.m.cacheMisses.Add(ctx, 1, attrCache("profile"))
 		return nil, fmt.Errorf("profile not found: %s", did)
+	}
+	if cached {
+		eh.m.cacheHits.Add(ctx, 1, attrCache("profile"))
+	} else {
+		eh.m.cacheMisses.Add(ctx, 1, attrCache("profile"))
 	}
 	return item.Value(), nil
 }
 
 func (eh *eventHandler) getRecord(ctx context.Context, uri string) (*bsky.FeedPost, error) {
+	cached := eh.recordCache.Has(uri)
 	item := eh.recordCache.Get(uri)
 	if item == nil {
+		eh.m.cacheMisses.Add(ctx, 1, attrCache("record"))
 		return nil, fmt.Errorf("record not found: %s", uri)
+	}
+	if cached {
+		eh.m.cacheHits.Add(ctx, 1, attrCache("record"))
+	} else {
+		eh.m.cacheMisses.Add(ctx, 1, attrCache("record"))
 	}
 	return item.Value(), nil
 }

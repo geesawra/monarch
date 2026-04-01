@@ -69,16 +69,21 @@ func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
 		log.Fatal("LOKI_URL is required when LOG_OUTPUT is loki or both")
 	}
 
-	lp := zaploki.New(ctx, zaploki.Config{
+	lokiCfg := zaploki.Config{
 		Url:          c.LokiURL,
 		BatchMaxSize: 1000,
 		BatchMaxWait: 5 * time.Second,
 		Labels:       map[string]string{"app": "beepboop"},
-		Auth: &zaploki.BasicAuthenticator{
+	}
+
+	if c.LokiUsername != "" {
+		lokiCfg.Auth = &zaploki.BasicAuthenticator{
 			Username: c.LokiUsername,
 			Password: c.LokiPassword,
-		},
-	})
+		}
+	}
+
+	lp := zaploki.New(ctx, lokiCfg)
 
 	l, err := lp.WithCreateLogger(cfg)
 	if err != nil {
@@ -103,7 +108,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	t, err := newTokens(c.TokensDir)
+	m, err := newMetrics()
+	if err != nil {
+		log.Fatal("initialize metrics:", err)
+	}
+
+	t, err := newTokens(c.TokensDir, m.tokensRegistered)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,11 +127,6 @@ func main() {
 	msg, err := app.Messaging(ctx)
 	if err != nil {
 		log.Fatal("initialize firebase messaging:", err)
-	}
-
-	m, err := newMetrics()
-	if err != nil {
-		log.Fatal("initialize metrics:", err)
 	}
 
 	_ = msg

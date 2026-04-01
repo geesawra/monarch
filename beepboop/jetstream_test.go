@@ -95,7 +95,7 @@ func makeEvent(did, collection, rkey string, record any) *models.Event {
 func testTokens(t *testing.T, entries map[string]string) *tokens {
 	t.Helper()
 	dir := t.TempDir()
-	tk := tst.Do(newTokens(dir))(t)
+	tk := tst.Do(newTokens(dir, nil))(t)
 	for did, token := range entries {
 		tk.storeDID(did, token)
 	}
