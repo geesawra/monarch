@@ -114,6 +114,7 @@ class MessagingService : FirebaseMessagingService() {
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
         val embedImageUrl = message.data["embedImage"]?.ifEmpty { null }
         val quotedText = message.data["quotedText"]?.ifEmpty { null }
+        val quotedEmbedImage = message.data["quotedEmbedImage"]?.ifEmpty { null }
         val kind = message.data["kind"]
         val uri = message.data["uri"]
         val authorDid = message.data["authorDid"]
@@ -141,9 +142,18 @@ class MessagingService : FirebaseMessagingService() {
             }
         }
 
-        if (quotedText != null) {
-            expandedView.setTextViewText(R.id.notification_quoted_text, "\u201C$quotedText\u201D")
-            expandedView.setViewVisibility(R.id.notification_quoted_text, View.VISIBLE)
+        if (quotedText != null || quotedEmbedImage != null) {
+            expandedView.setViewVisibility(R.id.notification_quote_container, View.VISIBLE)
+            if (quotedText != null) {
+                expandedView.setTextViewText(R.id.notification_quoted_text, quotedText)
+            }
+            if (quotedEmbedImage != null) {
+                val quotedBitmap = downloadBitmap(quotedEmbedImage)
+                if (quotedBitmap != null) {
+                    expandedView.setImageViewBitmap(R.id.notification_quoted_image, quotedBitmap)
+                    expandedView.setViewVisibility(R.id.notification_quoted_image, View.VISIBLE)
+                }
+            }
         }
 
         if (embedImageUrl != null) {
