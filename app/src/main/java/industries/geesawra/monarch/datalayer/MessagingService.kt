@@ -13,7 +13,6 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
-import androidx.core.graphics.scale
 import java.io.File
 import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -130,13 +129,6 @@ class MessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val image = imageUrl?.let { downloadBitmap(it) }
-        val avatarSize = (48 * resources.displayMetrics.density).toInt()
-        val avatar = image?.let {
-            val circular = toCircularBitmap(it)
-            circular.scale(avatarSize, avatarSize)
-        }
-
         val expandedView = RemoteViews(packageName, R.layout.notification_expanded).apply {
             setTextViewText(R.id.notification_title, title)
             when (kind) {
@@ -150,7 +142,7 @@ class MessagingService : FirebaseMessagingService() {
         }
 
         if (quotedText != null) {
-            expandedView.setTextViewText(R.id.notification_quoted_text, quotedText)
+            expandedView.setTextViewText(R.id.notification_quoted_text, "\u201C$quotedText\u201D")
             expandedView.setViewVisibility(R.id.notification_quoted_text, View.VISIBLE)
         }
 
@@ -172,17 +164,8 @@ class MessagingService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
 
-        if (avatar != null) {
-            builder.setLargeIcon(avatar)
-        }
-
         val notificationManager = getSystemService(NotificationManager::class.java)
-        val channel = notificationManager.getNotificationChannel(CHANNEL_ID)
-        Log.d(TAG, "Channel importance: ${channel?.importance}, enabled: ${notificationManager.areNotificationsEnabled()}")
-        val notifId = System.currentTimeMillis().toInt()
-        Log.d(TAG, "Posting notification id=$notifId title=$title")
-        notificationManager.notify(notifId, builder.build())
-        Log.d(TAG, "Notification posted successfully")
+        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
 
         val summaryBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
