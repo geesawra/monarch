@@ -130,15 +130,15 @@ class MessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val image = imageUrl?.let { downloadBitmap(it) }
+        val avatar = image?.let { toCircularBitmap(it) }
+
         val expandedView = RemoteViews(packageName, R.layout.notification_expanded).apply {
             setTextViewText(R.id.notification_title, title)
-            when (kind) {
-                "app.bsky.graph.follow" -> {
-                    setViewVisibility(R.id.notification_body, View.GONE)
-                }
-                else -> {
-                    setTextViewText(R.id.notification_body, body)
-                }
+            if (body.isNotEmpty()) {
+                setTextViewText(R.id.notification_body, body)
+            } else {
+                setViewVisibility(R.id.notification_body, View.GONE)
             }
         }
 
@@ -173,6 +173,10 @@ class MessagingService : FirebaseMessagingService() {
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+
+        if (avatar != null) {
+            builder.setLargeIcon(avatar)
+        }
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
