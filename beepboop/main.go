@@ -29,6 +29,7 @@ type Config struct {
 	LokiURL         string `env:"LOKI_URL"`
 	LokiUsername    string `env:"LOKI_USERNAME"`
 	LokiPassword    string `env:"LOKI_PASSWORD"`
+	TokensDir       string `env:"TOKENS_DIR,required"`
 }
 
 func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
@@ -102,7 +103,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	t, err := newTokens("./tokens")
+	t, err := newTokens(c.TokensDir)
 	if err != nil {
 		log.Fatal(err)
 	}
