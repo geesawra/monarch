@@ -7,11 +7,16 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Typeface
 import android.net.Uri
+import android.text.SpannableString
+import android.text.style.StyleSpan
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
+import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.IconCompat
+import java.io.File
 import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -119,8 +124,12 @@ class MessagingService : FirebaseMessagingService() {
 
         val image = imageUrl?.let { downloadBitmap(it) }
 
+        val boldTitle = SpannableString(title).apply {
+            setSpan(StyleSpan(Typeface.BOLD), 0, length, 0)
+        }
+
         val personBuilder = Person.Builder()
-            .setName(title)
+            .setName(boldTitle)
             .setKey(senderKey)
         if (image != null) {
             personBuilder.setIcon(IconCompat.createWithBitmap(toCircularBitmap(image)))
@@ -137,7 +146,14 @@ class MessagingService : FirebaseMessagingService() {
 
         val msg = NotificationCompat.MessagingStyle.Message(body, System.currentTimeMillis(), person)
         if (embedImageUrl != null) {
-            msg.setData("image/*", Uri.parse(embedImageUrl))
+            val embedBitmap = downloadBitmap(embedImageUrl)
+            if (embedBitmap != null) {
+                val imageDir = File(cacheDir, "notification_images").apply { mkdirs() }
+                val imageFile = File(imageDir, "${System.currentTimeMillis()}.jpg")
+                imageFile.outputStream().use { embedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                val contentUri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", imageFile)
+                msg.setData("image/jpeg", contentUri)
+            }
         }
 
         val style = (existingStyle ?: NotificationCompat.MessagingStyle(person))
