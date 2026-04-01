@@ -869,7 +869,7 @@ private fun labelDefinition(rawValue: String): LabelDefinition {
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }, labelDescription: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
-    val authorName = skeet.authorName ?: (skeet.authorHandle?.handle ?: "")
+    val authorName = skeet.authorName?.ifEmpty { null } ?: (skeet.authorHandle?.handle ?: "")
 
     val isBot = skeet.authorLabels.any { it.`val` == "bot" }
 
