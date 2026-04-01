@@ -110,7 +110,7 @@ class MessagingService : FirebaseMessagingService() {
     private fun onMessageReceivedInner(message: RemoteMessage) {
 
         val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
-        val body = message.notification?.body ?: message.data["body"] ?: return
+        val body = message.notification?.body ?: message.data["body"] ?: ""
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
         val embedImageUrl = message.data["embedImage"]?.ifEmpty { null }
         val quotedText = message.data["quotedText"]?.ifEmpty { null }
