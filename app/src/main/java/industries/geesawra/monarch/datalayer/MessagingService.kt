@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.text.Html
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import java.net.URL
@@ -121,14 +122,16 @@ class MessagingService : FirebaseMessagingService() {
 
         val embedImage = embedImageUrl?.let { downloadBitmap(it) }
 
+        val boldTitle = Html.fromHtml("<b>$title</b>", Html.FROM_HTML_MODE_COMPACT)
+
         val style = if (embedImage != null) {
             NotificationCompat.BigPictureStyle()
                 .bigPicture(embedImage)
-                .setBigContentTitle(title)
+                .setBigContentTitle(boldTitle)
                 .setSummaryText(body)
         } else {
             NotificationCompat.BigTextStyle()
-                .setBigContentTitle(title)
+                .setBigContentTitle(boldTitle)
                 .bigText(body)
         }
 
