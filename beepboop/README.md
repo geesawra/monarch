@@ -16,6 +16,10 @@ Push notification service for Monarch. Connects to the Bluesky Jetstream firehos
 | `FIREBASE_KEY_JSON` | Yes | Path to the Firebase service account JSON key file |
 | `HANDLE` | Yes | Bluesky handle (e.g. `user.bsky.social`) |
 | `PASSWORD` | Yes | Bluesky app password |
+| `LOG_OUTPUT` | No | `stdout` (default), `loki`, or `both` |
+| `LOKI_URL` | No | Loki push URL (required when LOG_OUTPUT is `loki` or `both`) |
+| `LOKI_USERNAME` | No | Loki basic auth username (Grafana Cloud user ID) |
+| `LOKI_PASSWORD` | No | Loki basic auth password (Grafana Cloud API key) |
 
 ## Running
 
