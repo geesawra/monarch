@@ -108,6 +108,7 @@ class MessagingService : FirebaseMessagingService() {
         val body = message.notification?.body ?: message.data["body"] ?: return
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
         val embedImageUrl = message.data["embedImage"]
+        val quotedText = message.data["quotedText"]
         val kind = message.data["kind"]
         val uri = message.data["uri"]
         val authorDid = message.data["authorDid"]
@@ -140,6 +141,11 @@ class MessagingService : FirebaseMessagingService() {
                     setTextViewText(R.id.notification_body, body)
                 }
             }
+        }
+
+        if (quotedText != null) {
+            expandedView.setTextViewText(R.id.notification_quoted_text, quotedText)
+            expandedView.setViewVisibility(R.id.notification_quote_container, View.VISIBLE)
         }
 
         if (embedImageUrl != null) {

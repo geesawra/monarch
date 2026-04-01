@@ -919,11 +919,13 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             }
         }
 
-        Text(
-            text = "@" + skeet.authorHandle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium,
-        )
+        skeet.authorHandle?.let {
+            Text(
+                text = "@$it",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
 
 
         if (showLabels) {

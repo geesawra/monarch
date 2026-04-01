@@ -301,7 +301,7 @@ class MainActivity : ComponentActivity() {
                                 timelineViewModel.openProfile(Did(did))
                                 navController.navigate(ViewList.Profile.name)
                             }
-                            "app.bsky.feed.like", "app.bsky.feed.repost", "app.bsky.feed.post", "app.bsky.feed.reply", "app.bsky.feed.mention" -> {
+                            "app.bsky.feed.like", "app.bsky.feed.repost", "app.bsky.feed.post", "app.bsky.feed.reply", "app.bsky.feed.mention", "app.bsky.feed.quote" -> {
                                 val uri = notifUri ?: return@LaunchedEffect
                                 timelineViewModel.setThread(SkeetData(uri = AtUri(uri)))
                                 navController.navigate(ViewList.ShowThread.name)
