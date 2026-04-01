@@ -108,12 +108,18 @@ class MessagingService : FirebaseMessagingService() {
         val body = message.notification?.body ?: message.data["body"] ?: return
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
         val embedImageUrl = message.data["embedImage"]
+        val kind = message.data["kind"]
+        val uri = message.data["uri"]
+        val authorDid = message.data["authorDid"]
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            kind?.let { putExtra("notification_kind", it) }
+            uri?.let { putExtra("notification_uri", it) }
+            authorDid?.let { putExtra("notification_author_did", it) }
         }
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+            this, System.currentTimeMillis().toInt(), intent,
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -126,7 +132,14 @@ class MessagingService : FirebaseMessagingService() {
 
         val expandedView = RemoteViews(packageName, R.layout.notification_expanded).apply {
             setTextViewText(R.id.notification_title, title)
-            setTextViewText(R.id.notification_body, body)
+            when (kind) {
+                "app.bsky.graph.follow" -> {
+                    setViewVisibility(R.id.notification_body, View.GONE)
+                }
+                else -> {
+                    setTextViewText(R.id.notification_body, body)
+                }
+            }
         }
 
         if (embedImageUrl != null) {
@@ -141,6 +154,7 @@ class MessagingService : FirebaseMessagingService() {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomBigContentView(expandedView)
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)

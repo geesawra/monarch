@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,6 +47,9 @@ import jakarta.inject.Inject
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.ui.theme.MonarchTheme
+import industries.geesawra.monarch.datalayer.SkeetData
+import kotlin.time.ExperimentalTime
+import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
 
 
@@ -271,6 +275,29 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
+
+                    @OptIn(ExperimentalTime::class)
+                    LaunchedEffect(intent) {
+                        if (!timelineViewModel.uiState.authenticated) return@LaunchedEffect
+                        val kind = intent?.getStringExtra("notification_kind") ?: return@LaunchedEffect
+                        val notifUri = intent.getStringExtra("notification_uri")
+                        val notifAuthorDid = intent.getStringExtra("notification_author_did")
+
+                        when (kind) {
+                            "app.bsky.graph.follow" -> {
+                                val did = notifAuthorDid ?: return@LaunchedEffect
+                                timelineViewModel.openProfile(Did(did))
+                                navController.navigate(ViewList.Profile.name)
+                            }
+                            "app.bsky.feed.like", "app.bsky.feed.repost", "app.bsky.feed.post" -> {
+                                val uri = notifUri ?: return@LaunchedEffect
+                                timelineViewModel.setThread(SkeetData(uri = AtUri(uri)))
+                                navController.navigate(ViewList.ShowThread.name)
+                            }
+                        }
+
+                        intent?.removeExtra("notification_kind")
                     }
                 }
             }
