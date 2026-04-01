@@ -1,6 +1,7 @@
 package industries.geesawra.monarch
 
 import android.app.Application
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -73,12 +74,19 @@ enum class ViewList() {
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     @Inject lateinit var pushNotificationManager: PushNotificationManager
+    private val currentIntent = mutableStateOf<Intent?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        currentIntent.value = intent
+    }
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        currentIntent.value = intent
 
         setContent {
             val firstLoadDone = remember { mutableStateOf(false) }
@@ -277,12 +285,15 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    val notificationIntent = currentIntent.value
+                    val isAuthenticated = timelineViewModel.uiState.authenticated
                     @OptIn(ExperimentalTime::class)
-                    LaunchedEffect(intent) {
-                        if (!timelineViewModel.uiState.authenticated) return@LaunchedEffect
-                        val kind = intent?.getStringExtra("notification_kind") ?: return@LaunchedEffect
-                        val notifUri = intent.getStringExtra("notification_uri")
-                        val notifAuthorDid = intent.getStringExtra("notification_author_did")
+                    LaunchedEffect(notificationIntent, isAuthenticated) {
+                        if (!isAuthenticated) return@LaunchedEffect
+                        val ni = notificationIntent ?: return@LaunchedEffect
+                        val kind = ni.getStringExtra("notification_kind") ?: return@LaunchedEffect
+                        val notifUri = ni.getStringExtra("notification_uri")
+                        val notifAuthorDid = ni.getStringExtra("notification_author_did")
 
                         when (kind) {
                             "app.bsky.graph.follow" -> {
@@ -290,14 +301,14 @@ class MainActivity : ComponentActivity() {
                                 timelineViewModel.openProfile(Did(did))
                                 navController.navigate(ViewList.Profile.name)
                             }
-                            "app.bsky.feed.like", "app.bsky.feed.repost", "app.bsky.feed.post" -> {
+                            "app.bsky.feed.like", "app.bsky.feed.repost", "app.bsky.feed.post", "app.bsky.feed.reply", "app.bsky.feed.mention" -> {
                                 val uri = notifUri ?: return@LaunchedEffect
                                 timelineViewModel.setThread(SkeetData(uri = AtUri(uri)))
                                 navController.navigate(ViewList.ShowThread.name)
                             }
                         }
 
-                        intent?.removeExtra("notification_kind")
+                        ni.removeExtra("notification_kind")
                     }
                 }
             }
