@@ -34,6 +34,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
@@ -41,6 +44,7 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField("String", "PUSH_SERVER_URL", "\"https://push.example.com/subscribe\"")
         }
     }
     compileOptions {
@@ -53,6 +57,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

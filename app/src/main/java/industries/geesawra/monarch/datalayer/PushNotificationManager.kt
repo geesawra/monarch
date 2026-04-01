@@ -40,7 +40,7 @@ class PushNotificationManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "PushNotificationManager"
-        const val REGISTER_URL = "http://10.0.2.2:9999/subscribe"
+        val REGISTER_URL = industries.geesawra.monarch.BuildConfig.PUSH_SERVER_URL
         private val FCM_TOKEN = stringPreferencesKey("fcm_token")
     }
 
