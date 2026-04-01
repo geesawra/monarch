@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	// "log"
 	"math/rand/v2"
 
 	"firebase.google.com/go/v4/messaging"
@@ -45,6 +44,12 @@ func jetstreamConfig(lexicons ...string) *client.ClientConfig {
 }
 
 func handleEvent(l *zap.SugaredLogger, atc *atclient.APIClient, msg *messaging.Client, t *tokens) func(ctx context.Context, e *models.Event) error {
+	eh := eventHandler{
+		l:   l,
+		atc: atc,
+		t:   t,
+	}
+
 	return func(ctx context.Context, e *models.Event) error {
 		if e.Kind != models.EventKindCommit {
 			return nil
@@ -59,14 +64,7 @@ func handleEvent(l *zap.SugaredLogger, atc *atclient.APIClient, msg *messaging.C
 			return fmt.Errorf("read event subject: %w", err)
 		}
 
-		token := t.tokenFor(uri.Authority().String())
-		if token == "" {
-			return nil
-		}
-
-		l.Debugln("token for", uri.Authority().String(), "found")
-
-		message, err := func() (*messaging.Message, error) {
+		messages, err := func() ([]*messaging.Message, error) {
 			switch e.Commit.Collection {
 			case "app.bsky.feed.like":
 				lk, ok := subj.(bsky.FeedLike)
@@ -74,13 +72,17 @@ func handleEvent(l *zap.SugaredLogger, atc *atclient.APIClient, msg *messaging.C
 					return nil, fmt.Errorf("subject should be like, but is %T", l)
 				}
 
-				return handleLike(ctx, l, token, e, atc, uri, &lk)
+				return eh.handleLike(ctx, e, uri, &lk)
 			case "app.bsky.feed.repost":
 				return nil, nil
 			case "app.bsky.graph.follow":
 				return nil, nil
 			case "app.bsky.feed.post":
-				return nil, nil
+				pp, ok := subj.(bsky.FeedPost)
+				if !ok {
+					return nil, fmt.Errorf("subject should be post, but is %T", l)
+				}
+				return eh.handleReply(ctx, e, uri, &pp)
 			default:
 				return nil, fmt.Errorf("unknown collection %s", e.Commit.Collection)
 			}
@@ -89,47 +91,37 @@ func handleEvent(l *zap.SugaredLogger, atc *atclient.APIClient, msg *messaging.C
 			return fmt.Errorf("create message from event: %w", err)
 		}
 
-		_, err = msg.Send(ctx, message)
-		if err != nil {
-			return fmt.Errorf("send notification: %w", err)
+		for _, message := range messages {
+			_, err = msg.Send(ctx, message)
+			if err != nil {
+				l.Errorw("send notification", "error", err)
+			}
 		}
 
 		return nil
 	}
 }
 
-func handleLike(
+type eventHandler struct {
+	l   *zap.SugaredLogger
+	atc *atclient.APIClient
+	t   *tokens
+}
+
+func (eh *eventHandler) handleLike(
 	ctx context.Context,
-	_ *zap.SugaredLogger,
-	token string,
 	e *models.Event,
-	atc *atclient.APIClient,
 	subject syntax.ATURI,
 	like *bsky.FeedLike,
-) (*messaging.Message, error) {
-	record, err := atproto.RepoGetRecord(ctx, atc, like.Subject.Cid, subject.Collection().String(), subject.Authority().String(), subject.RecordKey().String())
+) ([]*messaging.Message, error) {
+	token := eh.t.tokenFor(subject.Authority().String())
+	if token == "" {
+		return nil, nil
+	}
+
+	record, err := atproto.RepoGetRecord(ctx, eh.atc, like.Subject.Cid, subject.Collection().String(), subject.Authority().String(), subject.RecordKey().String())
 	if err != nil {
 		return nil, fmt.Errorf("get like subject: %w", err)
-	}
-
-	likeAuthor, err := bsky.ActorGetProfile(ctx, atc, e.Did)
-	if err != nil {
-		return nil, fmt.Errorf("fetch like author: %w", err)
-	}
-
-	var (
-		authorName   string
-		authorAvatar string
-	)
-
-	if likeAuthor.DisplayName == nil {
-		authorName = likeAuthor.Handle
-	} else {
-		authorName = *likeAuthor.DisplayName
-	}
-
-	if likeAuthor.Avatar != nil {
-		authorAvatar = *likeAuthor.Avatar
 	}
 
 	post, ok := record.Value.Val.(*bsky.FeedPost)
@@ -137,20 +129,105 @@ func handleLike(
 		return nil, fmt.Errorf("fetch liked post not of type FeedPost but %T", record.Value.Val)
 	}
 
+	authorName, authorAvatar, err := actorNameAvatar(ctx, eh.atc, e.Did)
+	if err != nil {
+		return nil, fmt.Errorf("fetch like author: %w", err)
+	}
+
 	m := &messaging.Message{
 		Data: map[string]string{
 			"authorDid":  e.Did,
+			"uri":        string(subject),
 			"title":      authorName + " liked your post",
 			"body":       post.Text,
 			"image":      authorAvatar,
-			"embedImage": mediaForPost(post, likeAuthor.Did, mediaSizeThumb),
+			"embedImage": mediaForPost(post, e.Did, mediaSizeThumb),
+			"kind":       e.Commit.Collection,
 		},
 		Android: &messaging.AndroidConfig{
 			Priority: "high",
 		},
 		Token: token,
 	}
-	return m, nil
+	return []*messaging.Message{m}, nil
+}
+
+func (eh *eventHandler) handleReply(
+	ctx context.Context,
+	e *models.Event,
+	subject syntax.ATURI,
+	post *bsky.FeedPost,
+) ([]*messaging.Message, error) {
+	var (
+		mentionedDIDs = map[string]string{}
+	)
+	for _, f := range post.Facets { // This handles mentions
+		if f == nil {
+			continue
+		}
+
+		for _, ff := range f.Features {
+			if ff.RichtextFacet_Mention == nil {
+				continue
+			}
+
+			mention := ff.RichtextFacet_Mention
+
+			if t := eh.t.tokenFor(mention.Did); t != "" {
+				mentionedDIDs[t] = "app.bsky.feed.mention"
+			}
+		}
+	}
+
+	if post.Reply != nil {
+		p := post.Reply.Parent
+		puri, err := syntax.ParseATURI(p.Uri)
+		if err != nil {
+			return nil, fmt.Errorf("parse parent uri %q: %w", p.Uri, err)
+		}
+
+		if t := eh.t.tokenFor(puri.Authority().String()); t != "" {
+			mentionedDIDs[t] = "app.bsky.feed.reply"
+		}
+	}
+
+	if len(mentionedDIDs) == 0 {
+		return nil, nil // nothing we're interested in
+	}
+
+	authorName, authorAvatar, err := actorNameAvatar(ctx, eh.atc, e.Did)
+	if err != nil {
+		return nil, fmt.Errorf("fetch like author: %w", err)
+	}
+
+	var ret []*messaging.Message
+
+	for t, kind := range mentionedDIDs {
+		titleSuffix := "mentioned you"
+		if kind == "app.bsky.feed.reply" {
+			titleSuffix = "replied to your post"
+		}
+
+		m := &messaging.Message{
+			Data: map[string]string{
+				"authorDid":  e.Did,
+				"uri":        string(subject),
+				"title":      authorName + " " + titleSuffix,
+				"body":       post.Text,
+				"image":      authorAvatar,
+				"embedImage": mediaForPost(post, e.Did, mediaSizeThumb),
+				"kind":       kind,
+			},
+			Android: &messaging.AndroidConfig{
+				Priority: "high",
+			},
+			Token: t,
+		}
+
+		ret = append(ret, m)
+	}
+
+	return ret, nil
 }
 
 func subject(e *models.Event) (any, syntax.ATURI, error) {
@@ -172,7 +249,18 @@ func subject(e *models.Event) (any, syntax.ATURI, error) {
 	case "app.bsky.graph.follow":
 		return "", "", nil
 	case "app.bsky.feed.post":
-		return "", "", nil
+		var feedPost bsky.FeedPost
+		if err := json.Unmarshal(e.Commit.Record, &feedPost); err != nil {
+			return "", "", fmt.Errorf("unmarshal post %q: %w", string(e.Commit.Record), err)
+		}
+
+		rawURI := fmt.Sprintf("at://%s/%s/%s", e.Did, e.Commit.Collection, e.Commit.RKey)
+		uri, err := syntax.ParseATURI(rawURI)
+		if err != nil {
+			return "", "", fmt.Errorf("parse post subject %q: %w", rawURI, err)
+		}
+
+		return feedPost, uri, nil
 	default:
 		return "", "", nil
 	}
@@ -199,4 +287,30 @@ func mediaForPost(p *bsky.FeedPost, authorDid, size string) string {
 	img := p.Embed.EmbedImages.Images[0]
 
 	return fmt.Sprintf("https://cdn.bsky.app/img/%s/plain/%s/%s@webp", size, authorDid, img.Image.Ref.String())
+}
+
+func actorNameAvatar(ctx context.Context, atc *atclient.APIClient, did string) (name, avatar string, err error) {
+	profile, err := bsky.ActorGetProfile(ctx, atc, did)
+	if err != nil {
+		return "", "", err
+	}
+
+	var (
+		authorName   string
+		authorAvatar string
+	)
+
+	if profile.DisplayName == nil {
+		authorName = profile.Handle
+	} else if *profile.DisplayName == "" {
+		authorName = profile.Handle
+	} else {
+		authorName = *profile.DisplayName
+	}
+
+	if profile.Avatar != nil {
+		authorAvatar = *profile.Avatar
+	}
+
+	return authorName, authorAvatar, nil
 }

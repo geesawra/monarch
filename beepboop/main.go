@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"runtime"
+	"time"
 
 	firebase "firebase.google.com/go/v4"
 	"github.com/bluesky-social/indigo/atproto/atclient"
@@ -86,6 +87,6 @@ func main() {
 		}
 	}()
 
-	shutdown(epShutdown, sch.Shutdown)
+	shutdown(l, 15*time.Second, epShutdown, sch.Shutdown)
 
 }
