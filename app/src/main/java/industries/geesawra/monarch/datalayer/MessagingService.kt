@@ -151,7 +151,7 @@ class MessagingService : FirebaseMessagingService() {
 
         if (quotedText != null) {
             expandedView.setTextViewText(R.id.notification_quoted_text, quotedText)
-            expandedView.setViewVisibility(R.id.notification_quote_container, View.VISIBLE)
+            expandedView.setViewVisibility(R.id.notification_quoted_text, View.VISIBLE)
         }
 
         if (embedImageUrl != null) {
