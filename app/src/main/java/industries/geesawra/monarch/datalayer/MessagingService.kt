@@ -9,6 +9,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
+import android.view.View
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import androidx.core.graphics.scale
@@ -122,28 +124,24 @@ class MessagingService : FirebaseMessagingService() {
             circular.scale(avatarSize, avatarSize)
         }
 
-        val style = if (embedImageUrl != null) {
+        val expandedView = RemoteViews(packageName, R.layout.notification_expanded).apply {
+            setTextViewText(R.id.notification_title, title)
+            setTextViewText(R.id.notification_body, body)
+        }
+
+        if (embedImageUrl != null) {
             val embedBitmap = downloadBitmap(embedImageUrl)
             if (embedBitmap != null) {
-                val imageDir = File(cacheDir, "notification_images").apply { mkdirs() }
-                val imageFile = File(imageDir, "${System.currentTimeMillis()}.jpg")
-                imageFile.outputStream().use { embedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                NotificationCompat.BigPictureStyle()
-                    .bigPicture(embedBitmap)
-            } else {
-                NotificationCompat.BigTextStyle()
-                    .bigText(body)
+                expandedView.setImageViewBitmap(R.id.notification_image, embedBitmap)
+                expandedView.setViewVisibility(R.id.notification_image, View.VISIBLE)
             }
-        } else {
-            NotificationCompat.BigTextStyle()
-                .bigText(body)
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(style)
+            .setCustomBigContentView(expandedView)
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
