@@ -103,6 +103,12 @@ class MessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         Log.d(TAG, "Message received: ${message.data}")
+        try { onMessageReceivedInner(message) } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle notification", e)
+        }
+    }
+
+    private fun onMessageReceivedInner(message: RemoteMessage) {
 
         val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
         val body = message.notification?.body ?: message.data["body"] ?: return
