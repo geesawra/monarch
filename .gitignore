@@ -15,3 +15,4 @@
 local.properties
 secrets
 beepboop/tokens
+app/google-services.json
