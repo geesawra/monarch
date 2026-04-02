@@ -7,9 +7,28 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:574397106287:android:9ac3541a32aea9a023659a",
+        "mobilesdk_app_id": "1:574397106287:android:abaf4d14ced07d5523659a",
         "android_client_info": {
           "package_name": "industries.geesawra.monarch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuysJFQR9P6IUqLV4bbRjJ2zCHfiOIQ_w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:574397106287:android:08d0c918a781cfe823659a",
+        "android_client_info": {
+          "package_name": "industries.geesawra.monarch.debug"
         }
       },
       "oauth_client": [],

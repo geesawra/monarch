@@ -32,3 +32,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Monarch"
 include(":app")
+include(":baselineprofile")

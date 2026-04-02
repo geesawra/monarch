@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization")
     id("com.google.gms.google-services")
+    alias(libs.plugins.baselineprofile)
 }
 
 android {
@@ -45,7 +46,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (providers.environmentVariable("KEYSTORE_PASSWORD").isPresent)
+                signingConfigs.getByName("release") else signingConfigs.getByName("debug")
             buildConfigField("String", "PUSH_SERVER_URL", "\"https://matrice.wallera.computer/subscribe\"")
             resValue("string", "app_name", "Monarch")
         }
@@ -72,56 +74,59 @@ android {
     }
 }
 
+//noinspection UseTomlInstead
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-messaging")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("io.ktor:ktor-client-cio:3.3.1") // Or another engine like OkHttp
+    implementation("androidx.core:core-splashscreen:1.2.0")
+    implementation("io.ktor:ktor-client-cio:3.4.1") // Or another engine like OkHttp
     implementation("io.ktor:ktor-client-plugins:3.1.1") // Or more specifically:
-    implementation("io.ktor:ktor-client-core:3.3.1") // Or the version aligned with the library
-    implementation("io.ktor:ktor-client-okhttp:3.3.1") // Or your preferred engine
-    implementation("io.ktor:ktor-client-content-negotiation:3.3.1")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
+    implementation("io.ktor:ktor-client-core:3.4.1") // Or the version aligned with the library
+    implementation("io.ktor:ktor-client-okhttp:3.4.1") // Or your preferred engine
+    implementation("io.ktor:ktor-client-content-negotiation:3.4.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.1")
     implementation("sh.christian.ozone:bluesky:0.3.3")
-    implementation("androidx.navigation:navigation-compose:2.9.5")
-    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
-    implementation("io.coil-kt.coil3:coil-gif:3.3.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
+    implementation("androidx.navigation:navigation-compose:2.9.7")
+    implementation("io.coil-kt.coil3:coil-compose:3.4.0")
+    implementation("io.coil-kt.coil3:coil-gif:3.4.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
     implementation("io.github.fornewid:placeholder-material3:2.0.0")
-    implementation("androidx.media3:media3-exoplayer:1.8.0") // [Required] androidx.media3 ExoPlayer dependency
-    implementation("androidx.media3:media3-session:1.8.0") // [Required] MediaSession Extension dependency
-    implementation("androidx.media3:media3-ui:1.8.0") // [Required] Base Player UI
-    implementation("androidx.media3:media3-exoplayer-hls:1.8.0")
-    implementation("androidx.media3:media3-exoplayer-dash:1.8.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4")
-    implementation("com.google.dagger:hilt-android:2.57.2")
+    implementation("androidx.media3:media3-exoplayer:1.10.0") // [Required] androidx.media3 ExoPlayer dependency
+    implementation("androidx.media3:media3-session:1.10.0") // [Required] MediaSession Extension dependency
+    implementation("androidx.media3:media3-ui:1.10.0") // [Required] Base Player UI
+    implementation("androidx.media3:media3-exoplayer-hls:1.10.0")
+    implementation("androidx.media3:media3-exoplayer-dash:1.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
+    implementation("com.google.dagger:hilt-android:2.59.2")
     implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
     implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
     implementation("androidx.compose.material3.adaptive:adaptive")
     implementation("androidx.compose.material3.adaptive:adaptive-layout")
     implementation("androidx.compose.material3.adaptive:adaptive-navigation")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.datastore:datastore-preferences:1.1.7")
-    implementation("androidx.datastore:datastore:1.1.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-    implementation(platform("androidx.compose:compose-bom:2025.10.01"))
-    implementation("androidx.paging:paging-compose:3.3.6")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
+    implementation("androidx.datastore:datastore:1.2.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+    implementation(platform("androidx.compose:compose-bom:2026.03.01"))
+    implementation("androidx.paging:paging-compose:3.4.2")
     implementation("me.saket.telephoto:zoomable:0.18.0")
     implementation("me.saket.telephoto:zoomable-image-coil3:0.18.0")
-    implementation("androidx.browser:browser:1.9.0")
-    implementation("androidx.media3:media3-transformer:1.8.0")
-    implementation("androidx.media3:media3-effect:1.8.0")
-    implementation("androidx.media3:media3-common:1.8.0")
+    implementation("androidx.browser:browser:1.10.0")
+    implementation("androidx.media3:media3-transformer:1.10.0")
+    implementation("androidx.media3:media3-effect:1.10.0")
+    implementation("androidx.media3:media3-common:1.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
-    implementation("nl.jacobras:Human-Readable:1.12.0")
+    implementation("nl.jacobras:Human-Readable:1.12.3")
+    implementation(libs.androidx.profileinstaller)
+    "baselineProfile"(project(":baselineprofile"))
+    ksp("com.google.dagger:hilt-compiler:2.59.2")
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.firebase.messaging)
-    ksp("com.google.dagger:hilt-compiler:2.57.2")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
