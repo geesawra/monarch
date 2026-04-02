@@ -8,61 +8,78 @@ import (
 
 func TestTokens(t *testing.T) {
 	tests := []struct {
-		name      string
-		store     map[string]string
-		overwrite map[string]string
-		lookup    string
-		wantToken string
+		name       string
+		store      []didToken
+		wantTokens []string
+		lookup     string
 	}{
 		{
-			name:      "returns empty for unknown DID",
-			store:     map[string]string{},
-			lookup:    "did:plc:unknown",
-			wantToken: "",
+			name:       "returns nil for unknown DID",
+			store:      nil,
+			lookup:     "did:plc:unknown",
+			wantTokens: nil,
 		},
 		{
-			name:      "returns stored token",
-			store:     map[string]string{"did:plc:alice": "fcm-token-alice"},
-			lookup:    "did:plc:alice",
-			wantToken: "fcm-token-alice",
+			name:       "returns stored token",
+			store:      []didToken{{"did:plc:alice", "fcm-token-alice"}},
+			lookup:     "did:plc:alice",
+			wantTokens: []string{"fcm-token-alice"},
 		},
 		{
-			name:      "overwrites existing token",
-			store:     map[string]string{"did:plc:bob": "old-token"},
-			overwrite: map[string]string{"did:plc:bob": "new-token"},
-			lookup:    "did:plc:bob",
-			wantToken: "new-token",
+			name: "stores multiple tokens for same DID",
+			store: []didToken{
+				{"did:plc:bob", "token-1"},
+				{"did:plc:bob", "token-2"},
+			},
+			lookup:     "did:plc:bob",
+			wantTokens: []string{"token-1", "token-2"},
+		},
+		{
+			name: "deduplicates same token",
+			store: []didToken{
+				{"did:plc:carol", "token-1"},
+				{"did:plc:carol", "token-1"},
+			},
+			lookup:     "did:plc:carol",
+			wantTokens: []string{"token-1"},
 		},
 		{
 			name: "isolates different DIDs",
-			store: map[string]string{
-				"did:plc:carol": "carol-token",
-				"did:plc:dave":  "dave-token",
+			store: []didToken{
+				{"did:plc:carol", "carol-token"},
+				{"did:plc:dave", "dave-token"},
 			},
-			lookup:    "did:plc:carol",
-			wantToken: "carol-token",
+			lookup:     "did:plc:carol",
+			wantTokens: []string{"carol-token"},
 		},
 		{
-			name: "returns correct token among many",
-			store: map[string]string{
-				"did:plc:a": "token-a",
-				"did:plc:b": "token-b",
-				"did:plc:c": "token-c",
+			name: "returns correct tokens among many",
+			store: []didToken{
+				{"did:plc:a", "token-a"},
+				{"did:plc:b", "token-b1"},
+				{"did:plc:b", "token-b2"},
+				{"did:plc:c", "token-c"},
 			},
-			lookup:    "did:plc:b",
-			wantToken: "token-b",
+			lookup:     "did:plc:b",
+			wantTokens: []string{"token-b1", "token-b2"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tk := testTokens(t, tt.store)
-			for did, token := range tt.overwrite {
-				tk.storeDID(did, token)
+			dir := t.TempDir()
+			tk := tst.Do(newTokens(dir, nil))(t)
+			for _, dt := range tt.store {
+				tk.storeDID(dt.did, dt.token)
 			}
-			tst.Is(tt.wantToken, tk.tokenFor(tt.lookup), t)
+			tst.Is(tt.wantTokens, tk.tokensFor(tt.lookup), t)
 		})
 	}
+}
+
+type didToken struct {
+	did   string
+	token string
 }
 
 func TestNewTokensInvalidPath(t *testing.T) {
