@@ -166,7 +166,7 @@ func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender,
 		m.eventDuration.Record(ctx, time.Since(start).Milliseconds(), attrCollection(e.Commit.Collection))
 
 		for _, message := range messages {
-			l.Infow("sending notification", "kind", message.Data["kind"], "destination", message.Data["authorDid"])
+			l.Debugw("sending notification", "kind", message.Data["kind"], "destination", message.Data["authorDid"])
 
 			_, err = msg.Send(ctx, message)
 			if err != nil {
@@ -591,4 +591,3 @@ func mediaForPost(p *bsky.FeedPost, authorDid, size string) string {
 
 	return fmt.Sprintf("https://cdn.bsky.app/img/%s/plain/%s/%s@webp", size, authorDid, img.Image.Ref.String())
 }
-
