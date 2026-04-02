@@ -17,3 +17,4 @@ secrets
 beepboop/tokens
 app/google-services.json
 .vscode
+.idea/deploymentTargetSelector.xml
