@@ -46,6 +46,7 @@ func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
 			StacktraceKey:  "stacktrace",
 			LineEnding:     zapcore.DefaultLineEnding,
 			EncodeLevel:    zapcore.LowercaseLevelEncoder,
+			EncodeTime:     zapcore.EpochTimeEncoder,
 			EncodeDuration: zapcore.SecondsDurationEncoder,
 			EncodeCaller:   zapcore.ShortCallerEncoder,
 		},
@@ -86,7 +87,7 @@ func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
 
 	l, err := lp.WithCreateLogger(cfg)
 	if err != nil {
-		log.Fatal("create logger:", err)
+		log.Fatalln("create logger:", err)
 	}
 
 	return l.Sugar(), lp.Stop
