@@ -7,13 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.util.Log
-import android.view.View
-import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
-import androidx.core.content.FileProvider
-import java.io.File
 import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -133,43 +128,13 @@ class MessagingService : FirebaseMessagingService() {
         val image = imageUrl?.let { downloadBitmap(it) }
         val avatar = image?.let { toCircularBitmap(it) }
 
-        val expandedView = RemoteViews(packageName, R.layout.notification_expanded).apply {
-            setTextViewText(R.id.notification_title, title)
-            if (body.isNotEmpty()) {
-                setTextViewText(R.id.notification_body, body)
-            } else {
-                setViewVisibility(R.id.notification_body, View.GONE)
-            }
-        }
-
-        if (quotedText != null || quotedEmbedImage != null) {
-            expandedView.setViewVisibility(R.id.notification_quote_container, View.VISIBLE)
-            if (quotedText != null) {
-                expandedView.setTextViewText(R.id.notification_quoted_text, quotedText)
-            }
-            if (quotedEmbedImage != null) {
-                val quotedBitmap = downloadBitmap(quotedEmbedImage)
-                if (quotedBitmap != null) {
-                    expandedView.setImageViewBitmap(R.id.notification_quoted_image, quotedBitmap)
-                    expandedView.setViewVisibility(R.id.notification_quoted_image, View.VISIBLE)
-                }
-            }
-        }
-
-        if (embedImageUrl != null) {
-            val embedBitmap = downloadBitmap(embedImageUrl)
-            if (embedBitmap != null) {
-                expandedView.setImageViewBitmap(R.id.notification_image, embedBitmap)
-                expandedView.setViewVisibility(R.id.notification_image, View.VISIBLE)
-            }
-        }
+        val embedBitmap = embedImageUrl?.let { downloadBitmap(it) }
+        val quotedImageBitmap = quotedEmbedImage?.let { downloadBitmap(it) }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setCustomBigContentView(expandedView)
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
@@ -178,11 +143,34 @@ class MessagingService : FirebaseMessagingService() {
             builder.setLargeIcon(avatar)
         }
 
+        when {
+            embedBitmap != null -> {
+                val style = NotificationCompat.BigPictureStyle()
+                    .bigPicture(embedBitmap)
+                if (quotedText != null) {
+                    style.setSummaryText(quotedText)
+                }
+                builder.setStyle(style)
+            }
+            quotedImageBitmap != null -> {
+                val style = NotificationCompat.BigPictureStyle()
+                    .bigPicture(quotedImageBitmap)
+                if (quotedText != null) {
+                    style.setSummaryText(quotedText)
+                }
+                builder.setStyle(style)
+            }
+            quotedText != null -> {
+                val fullText = if (body.isNotEmpty()) "$body\n\n$quotedText" else quotedText
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(fullText))
+            }
+        }
+
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
 
         val summaryBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setGroup(GROUP_KEY)
             .setGroupSummary(true)
             .setAutoCancel(true)
