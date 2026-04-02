@@ -28,10 +28,14 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +52,8 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.Did
+
+val LocalActiveVideoKey = compositionLocalOf<MutableState<String?>?> { null }
 
 @Composable
 fun ShowSkeets(
@@ -85,6 +91,15 @@ fun ShowSkeets(
         data.filter { !it.replyToNotFollowing && it.cid !in threadContextCids }
     }
 
+    val visibleKeys by remember {
+        derivedStateOf {
+            state.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
+        }
+    }
+
+    val activeVideoKey = remember { mutableStateOf<String?>(null) }
+
+    CompositionLocalProvider(LocalActiveVideoKey provides activeVideoKey) {
     LazyColumn(
         state = state,
         userScrollEnabled = isScrollEnabled,
@@ -104,6 +119,7 @@ fun ShowSkeets(
             key = { _, skeet -> skeet.rkey },
             contentType = { _, skeet -> if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0 },
         ) { idx, skeet ->
+            val isVisible = visibleKeys.contains(skeet.rkey)
             ElevatedCard(
                 modifier = Modifier.padding(start = (skeet.nestingLevel * 16).dp),
                 colors = CardDefaults.elevatedCardColors(
@@ -135,7 +151,8 @@ fun ShowSkeets(
                                         viewModel.setThread(skeet)
                                         onSeeMoreTap(skeet)
                                     }
-                                }
+                                },
+                                isVisible = isVisible,
                             )
                         }
 
@@ -189,7 +206,8 @@ fun ShowSkeets(
                                         viewModel.setThread(skeet)
                                         onSeeMoreTap(skeet)
                                     }
-                                }
+                                },
+                                isVisible = isVisible,
                             )
                         }
                     }
@@ -209,7 +227,8 @@ fun ShowSkeets(
                             viewModel.setThread(skeet)
                             onSeeMoreTap(skeet)
                         }
-                    }
+                    },
+                    isVisible = isVisible,
                 )
             }
 
@@ -227,6 +246,7 @@ fun ShowSkeets(
                 }
             }
         }
+    }
     }
 
     val endOfListReached by remember {

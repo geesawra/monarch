@@ -49,6 +49,14 @@ android {
             buildConfigField("String", "PUSH_SERVER_URL", "\"https://matrice.wallera.computer/subscribe\"")
             resValue("string", "app_name", "Monarch")
         }
+        create("profile") {
+            initWith(getByName("release"))
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
+            resValue("string", "app_name", "Monarch Profile")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21

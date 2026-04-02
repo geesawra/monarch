@@ -124,6 +124,7 @@ fun VideoPlayer(
     defaultFullScreeen: Boolean = false,
     enablePipWhenBackPressed: Boolean = false,
     handleAudioFocus: Boolean = true,
+    isVisible: Boolean = true,
     playerBuilder: ExoPlayer.Builder.() -> ExoPlayer.Builder = { this },
     playerInstance: ExoPlayer.() -> Unit = {},
 ) {
@@ -222,10 +223,24 @@ fun VideoPlayer(
         }
 
         player.setMediaItems(exoPlayerMediaItems)
-        player.prepare()
 
-        if (autoPlay) {
-            player.play()
+        if (isVisible) {
+            player.prepare()
+
+            if (autoPlay) {
+                player.play()
+            }
+        }
+    }
+
+    LaunchedEffect(isVisible) {
+        if (!isVisible) {
+            player.stop()
+        } else {
+            player.prepare()
+            if (autoPlay) {
+                player.play()
+            }
         }
     }
 

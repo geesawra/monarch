@@ -56,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -114,6 +115,7 @@ fun SkeetView(
     renderingMention: Boolean = false,
     onShowThread: (SkeetData) -> Unit = {},
     onAvatarTap: ((Did) -> Unit)? = null,
+    isVisible: Boolean = true,
 ) {
     if (skeet.blocked) {
         ConditionalCard(text = "Blocked :(", wrapWithCard = !nested)
@@ -195,7 +197,7 @@ fun SkeetView(
                 )
             }
             if (contentRevealed) {
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible)
             }
         }
     } else {
@@ -279,7 +281,7 @@ fun SkeetView(
                     )
                 }
                 if (contentRevealed) {
-                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape)
+                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible)
 
                     if (!disableEmbeds) {
                         TimelinePostActionsView(
@@ -308,6 +310,7 @@ private fun SkeetContent(
     onMentionClick: ((Did) -> Unit)? = null,
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
+    isVisible: Boolean = true,
 ) {
     val context = LocalContext.current
 
@@ -328,7 +331,7 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape)
+    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible)
 }
 
 @Composable
@@ -340,6 +343,7 @@ fun Embeds(
     viewModel: TimelineViewModel? = null,
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
+    isVisible: Boolean = true,
 ) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
@@ -350,12 +354,13 @@ fun Embeds(
             val ar = embed.value.aspectRatio
             VideoView(
                 embed.value.playlist.uri.toUri(),
-                aspectRatio = if (ar != null && ar.height > 0) ar.width.toFloat() / ar.height.toFloat() else null
+                aspectRatio = if (ar != null && ar.height > 0) ar.width.toFloat() / ar.height.toFloat() else null,
+                isVisible = isVisible,
             )
         }
 
         is PostViewEmbedUnion.ExternalView -> {
-            ExternalView(context, embed.value.external)
+            ExternalView(context, embed.value.external, isVisible = isVisible)
         }
 
         is PostViewEmbedUnion.RecordView -> run {
@@ -389,7 +394,7 @@ fun Embeds(
                 is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
             }
 
-            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape)
+            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible)
 
             OutlinedCard(
                 modifier = Modifier.padding(top = 4.dp)
@@ -432,7 +437,14 @@ private fun ImageView(img: List<ImagesViewImage>) {
 }
 
 @Composable
-fun VideoView(uri: Uri, aspectRatio: Float? = null) {
+fun VideoView(uri: Uri, aspectRatio: Float? = null, isVisible: Boolean = true) {
+    val activeVideoKey = LocalActiveVideoKey.current
+    val id = remember { java.util.UUID.randomUUID().toString() }
+    LaunchedEffect(isVisible) {
+        if (isVisible) activeVideoKey?.value = id
+    }
+    val isActive = if (activeVideoKey != null) isVisible && activeVideoKey.value == id else isVisible
+
     OutlinedCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -466,6 +478,7 @@ fun VideoView(uri: Uri, aspectRatio: Float? = null) {
             ),
             volume = 0.5f,
             repeatMode = RepeatMode.NONE,
+            isVisible = isActive,
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
@@ -492,7 +505,14 @@ private fun tenorGifToWebm(gifUrl: String): String? {
 }
 
 @Composable
-private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
+private fun TenorGifView(context: Context, ev: ExternalViewExternal, isVisible: Boolean = true) {
+    val activeVideoKey = LocalActiveVideoKey.current
+    val id = remember { java.util.UUID.randomUUID().toString() }
+    LaunchedEffect(isVisible) {
+        if (isVisible) activeVideoKey?.value = id
+    }
+    val isActive = if (activeVideoKey != null) isVisible && activeVideoKey.value == id else isVisible
+
     val uri = ev.uri.uri
     val parsedUri = uri.toUri()
     val webmUrl = tenorGifToWebm(uri)
@@ -539,6 +559,7 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
                     showFullScreenButton = false,
                 ),
                 repeatMode = RepeatMode.ALL,
+                isVisible = isActive,
                 modifier = Modifier.matchParentSize(),
             )
         }
@@ -564,9 +585,9 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal) {
 }
 
 @Composable
-private fun ExternalView(context: Context, ev: ExternalViewExternal) {
+private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: Boolean = true) {
     if (isTenorUrl(ev.uri.uri)) {
-        TenorGifView(context, ev)
+        TenorGifView(context, ev, isVisible = isVisible)
         return
     }
 
