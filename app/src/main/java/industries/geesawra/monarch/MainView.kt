@@ -3,6 +3,8 @@
 package industries.geesawra.monarch
 
 import android.widget.Toast
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.activity.compose.BackHandler
@@ -42,6 +44,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -63,6 +66,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -472,77 +476,104 @@ private fun InnerTimelineView(
                 timelineViewModel.openProfile(did)
             }
 
+            val narrowScreen = isNarrowScreen()
+
+            val navItemIcon: @Composable (TabBarDestinations) -> Unit = { dest ->
+                if (dest.badgeValue != null) {
+                    val badgeValue = remember { dest.badgeValue }
+                    BadgedBox(
+                        badge = {
+                            if (badgeValue.intValue == 0) {
+                                return@BadgedBox
+                            }
+
+                            Badge {
+                                Text(
+                                    badgeValue.intValue.toString(),
+                                    modifier =
+                                        Modifier.semantics {
+                                            contentDescription =
+                                                dest.badgeDescFmt(dest.badgeValue.intValue)
+                                        },
+                                )
+                            }
+                        }
+                    ) {
+                        Icon(
+                            dest.icon,
+                            contentDescription = stringResource(dest.contentDescription)
+                        )
+                    }
+                } else {
+                    Icon(
+                        dest.icon,
+                        contentDescription = stringResource(dest.contentDescription)
+                    )
+                }
+            }
+
+            val navItemOnClick: (TabBarDestinations) -> Unit = { dest ->
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (dest == currentDestination) {
+                    val state = when (dest) {
+                        TabBarDestinations.TIMELINE -> timelineState
+                        TabBarDestinations.SEARCH -> searchPostsState
+                        TabBarDestinations.NOTIFICATIONS -> notificationsState
+                    }
+                    coroutineScope.launch {
+                        launch {
+                            if (state.firstVisibleItemIndex > 8) {
+                                state.scrollToItem(0)
+                            } else {
+                                state.animateScrollToItem(0)
+                            }
+                        }
+                        launch {
+                            animate(
+                                initialValue = scrollBehavior.state.heightOffset,
+                                targetValue = 0f
+                            ) { value, _ ->
+                                scrollBehavior.state.heightOffset = value
+                            }
+                        }
+                    }
+                } else {
+                    currentDestination = dest
+                }
+            }
+
+            val compactBottomBar: @Composable () -> Unit = {
+                val barHeight = 64.dp
+                val density = LocalDensity.current
+                val collapseFraction = with(scrollBehavior.state) {
+                    if (heightOffsetLimit != 0f) (heightOffset / heightOffsetLimit).coerceIn(0f, 1f) else 0f
+                }
+                val visibleHeight = barHeight * (1f - collapseFraction)
+                Box(modifier = Modifier.height(visibleHeight).clipToBounds()) {
+                    NavigationBar(modifier = Modifier.height(barHeight)) {
+                        TabBarDestinations.entries.forEach { dest ->
+                            NavigationBarItem(
+                                icon = { navItemIcon(dest) },
+                                label = null,
+                                selected = dest == currentDestination,
+                                onClick = { navItemOnClick(dest) },
+                            )
+                        }
+                    }
+                }
+            }
+
             NavigationSuiteScaffold(
-                layoutType = navLayoutType,
+                layoutType = if (narrowScreen) NavigationSuiteType.None else navLayoutType,
                 navigationSuiteItems = {
                     TabBarDestinations.entries.forEach { dest ->
                         item(
-                            icon = {
-                                if (dest.badgeValue != null) {
-                                    val badgeValue = remember { dest.badgeValue }
-                                    BadgedBox(
-                                        badge = {
-                                            if (badgeValue.intValue == 0) {
-                                                return@BadgedBox
-                                            }
-
-                                            Badge {
-                                                Text(
-                                                    badgeValue.intValue.toString(),
-                                                    modifier =
-                                                        Modifier.semantics {
-                                                            contentDescription =
-                                                                dest.badgeDescFmt(dest.badgeValue.intValue)
-                                                        },
-                                                )
-                                            }
-                                        }
-                                    ) {
-                                        Icon(
-                                            dest.icon,
-                                            contentDescription = stringResource(dest.contentDescription)
-                                        )
-                                    }
-                                } else {
-                                    Icon(
-                                        dest.icon,
-                                        contentDescription = stringResource(dest.contentDescription)
-                                    )
-                                }
-                            },
+                            icon = { navItemIcon(dest) },
                             label = if (navLayoutType == NavigationSuiteType.NavigationBar) {
                                 { Text(stringResource(dest.label)) }
                             } else null,
                             selected = dest == currentDestination,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                if (dest == currentDestination) {
-                                    val state = when (dest) {
-                                        TabBarDestinations.TIMELINE -> timelineState
-                                        TabBarDestinations.SEARCH -> searchPostsState
-                                        TabBarDestinations.NOTIFICATIONS -> notificationsState
-                                    }
-                                    coroutineScope.launch {
-                                        launch {
-                                            if (state.firstVisibleItemIndex > 8) {
-                                                state.scrollToItem(0)
-                                            } else {
-                                                state.animateScrollToItem(0)
-                                            }
-                                        }
-                                        launch {
-                                            animate(
-                                                initialValue = scrollBehavior.state.heightOffset,
-                                                targetValue = 0f
-                                            ) { value, _ ->
-                                                scrollBehavior.state.heightOffset = value
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    currentDestination = dest
-                                }
-                            }
+                            onClick = { navItemOnClick(dest) },
                         )
                     }
                 },
@@ -552,8 +583,10 @@ private fun InnerTimelineView(
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
+                bottomBar = if (narrowScreen) compactBottomBar else { {} },
                 topBar = {
                     TopAppBar(
+                        expandedHeight = if (isNarrowScreen()) 48.dp else TopAppBarDefaults.TopAppBarExpandedHeight,
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.surface,
                             scrolledContainerColor = MaterialTheme.colorScheme.surface,
@@ -573,7 +606,7 @@ private fun InnerTimelineView(
                                             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                             modifier = Modifier
-                                                .size(40.dp)
+                                                .size(topBarAvatarSize())
                                                 .clip(CircleShape),
                                             contentDescription = "Feed avatar",
                                         )
@@ -692,13 +725,24 @@ private fun InnerTimelineView(
                 floatingActionButton = {
                     when (currentDestination) {
                         TabBarDestinations.TIMELINE -> {
-                            FloatingActionButton(
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    fobOnClick()
+                            if (narrowScreen) {
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        fobOnClick()
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.Create, "Post")
                                 }
-                            ) {
-                                Icon(Icons.Filled.Create, "Post")
+                            } else {
+                                FloatingActionButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        fobOnClick()
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.Create, "Post")
+                                }
                             }
                         }
 
@@ -977,6 +1021,7 @@ fun FeedsDrawer(
     selectFeed: (uri: String, displayName: String, avatar: String?) -> Unit,
     timelineViewModel: TimelineViewModel,
 ) {
+    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
     WideNavigationRailItem(
         label = {
             Text(text = "Following")
@@ -1041,6 +1086,7 @@ fun FeedsDrawer(
             },
             railExpanded = state == WideNavigationRailValue.Expanded,
         )
+    }
     }
 }
 

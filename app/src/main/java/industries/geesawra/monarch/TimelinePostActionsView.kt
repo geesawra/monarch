@@ -87,6 +87,7 @@ private fun IconWithNumber(
     tint: Color,
     scale: Float = 1f,
 ) {
+    val iconSize = actionIconSize()
     Row(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -95,7 +96,7 @@ private fun IconWithNumber(
             imageVector,
             contentDescription = contentDescription,
             modifier = Modifier
-                .size(18.dp)
+                .size(iconSize)
                 .scale(scale),
             tint = tint
         )
@@ -186,7 +187,7 @@ fun TimelinePostActionsView(
             }
         ) {
             Icon(
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(actionIconSize()),
                 imageVector = Icons.Default.Share,
                 contentDescription = "Share",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -201,7 +202,7 @@ fun TimelinePostActionsView(
                 }
             ) {
                 Icon(
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(actionIconSize()),
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -345,7 +346,7 @@ fun TimelinePostActionsView(
         Box {
             IconButton(onClick = { showMenu = true }) {
                 Icon(
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(actionIconSize()),
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "More",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,

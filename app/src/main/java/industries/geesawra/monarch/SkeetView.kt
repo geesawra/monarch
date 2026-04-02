@@ -130,7 +130,7 @@ fun SkeetView(
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
     var contentRevealed by remember { mutableStateOf(warningLabel == null) }
 
-    val minSize = 40.dp
+    val minSize = avatarSize()
 
     if (nested) {
         // Embedded posts: simple stacked layout
@@ -179,7 +179,7 @@ fun SkeetView(
                 )
 
                 SkeetHeader(
-                    modifier = Modifier.padding(start = 12.dp),
+                    modifier = Modifier.padding(start = avatarTextGap()),
                     skeet = skeet,
                     showLabels = showLabels,
                     labelDisplayName = { viewModel?.labelDisplayName(it) },
@@ -197,7 +197,7 @@ fun SkeetView(
                 )
             }
             if (contentRevealed) {
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible)
+                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels)
             }
         }
     } else {
@@ -209,7 +209,7 @@ fun SkeetView(
                     Log.d("SkeetView", skeet.content)
                     onShowThread(skeet)
                 }
-                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = if (inThread) 0.dp else 8.dp)
+                .padding(top = 8.dp, start = postHorizontalPadding(), end = postHorizontalPadding(), bottom = if (inThread) 0.dp else 8.dp)
                 .height(IntrinsicSize.Min)
         ) {
             // Left column: avatar + thread line (spans full post height)
@@ -252,7 +252,7 @@ fun SkeetView(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 12.dp)
+                    .padding(start = avatarTextGap())
                     .sizeIn(minHeight = minSize),
             ) {
                 SkeetReason(
@@ -281,7 +281,7 @@ fun SkeetView(
                     )
                 }
                 if (contentRevealed) {
-                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible)
+                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels)
 
                     if (!disableEmbeds) {
                         TimelinePostActionsView(
@@ -311,6 +311,7 @@ private fun SkeetContent(
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
     isVisible: Boolean = true,
+    showLabels: Boolean = true,
 ) {
     val context = LocalContext.current
 
@@ -331,7 +332,7 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible)
+    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels)
 }
 
 @Composable
@@ -344,6 +345,7 @@ fun Embeds(
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
     isVisible: Boolean = true,
+    showLabels: Boolean = true,
 ) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
@@ -378,6 +380,7 @@ fun Embeds(
                     viewModel = viewModel,
                     postTextSize = postTextSize,
                     avatarShape = avatarShape,
+                    showLabels = showLabels,
                 )
             }
         }
@@ -394,7 +397,7 @@ fun Embeds(
                 is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
             }
 
-            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible)
+            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels)
 
             OutlinedCard(
                 modifier = Modifier.padding(top = 4.dp)
@@ -406,6 +409,7 @@ fun Embeds(
                     viewModel = viewModel,
                     postTextSize = postTextSize,
                     avatarShape = avatarShape,
+                    showLabels = showLabels,
                 )
             }
         }
@@ -684,6 +688,7 @@ fun RecordView(
     viewModel: TimelineViewModel? = null,
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
+    showLabels: Boolean = true,
 ) {
     val rv = rv.record
     when (rv) {
@@ -697,6 +702,7 @@ fun RecordView(
                 nested = true,
                 postTextSize = postTextSize,
                 avatarShape = avatarShape,
+                showLabels = showLabels,
                 onShowThread = onShowThread
             )
         }
@@ -713,6 +719,7 @@ private fun RecordWithMediaView(
     viewModel: TimelineViewModel? = null,
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
+    showLabels: Boolean = true,
 ) {
     val rv = rv.record.record
     val record = when (rv) {
@@ -734,6 +741,7 @@ private fun RecordWithMediaView(
             nested = true,
             postTextSize = postTextSize,
             avatarShape = avatarShape,
+            showLabels = showLabels,
             onShowThread = onShowThread
         )
     }

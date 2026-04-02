@@ -81,13 +81,14 @@ class SettingsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             context.settingsDataStore.data.map { prefs ->
+                val narrowScreen = context.resources.configuration.screenWidthDp <= 360
                 SettingsState(
                     themeMode = prefs[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
                     dynamicColor = prefs[DYNAMIC_COLOR]?.toBooleanStrictOrNull() ?: true,
-                    postTextSize = prefs[POST_TEXT_SIZE]?.let { runCatching { PostTextSize.valueOf(it) }.getOrNull() } ?: PostTextSize.Medium,
+                    postTextSize = prefs[POST_TEXT_SIZE]?.let { runCatching { PostTextSize.valueOf(it) }.getOrNull() } ?: if (narrowScreen) PostTextSize.Small else PostTextSize.Medium,
                     avatarShape = prefs[AVATAR_SHAPE]?.let { runCatching { AvatarShape.valueOf(it) }.getOrNull() } ?: AvatarShape.Circle,
                     replyFilterMode = prefs[REPLY_FILTER_MODE]?.let { runCatching { ReplyFilterMode.valueOf(it) }.getOrNull() } ?: ReplyFilterMode.OnlyFilterDeepThreads,
-                    showLabels = prefs[SHOW_LABELS]?.toBooleanStrictOrNull() ?: true,
+                    showLabels = prefs[SHOW_LABELS]?.toBooleanStrictOrNull() ?: !narrowScreen,
                     defaultFeed = DefaultFeed(
                         uri = prefs[DEFAULT_FEED_URI] ?: "following",
                         displayName = prefs[DEFAULT_FEED_NAME] ?: "Following",

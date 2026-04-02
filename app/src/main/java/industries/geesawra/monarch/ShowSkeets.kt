@@ -105,8 +105,8 @@ fun ShowSkeets(
         userScrollEnabled = isScrollEnabled,
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = feedHorizontalPadding()),
+        verticalArrangement = Arrangement.spacedBy(feedItemSpacing()),
     ) {
         if (isLoading && data.isEmpty()) {
             items(8, key = { "skeleton_$it" }) {
@@ -121,7 +121,7 @@ fun ShowSkeets(
         ) { idx, skeet ->
             val isVisible = visibleKeys.contains(skeet.rkey)
             ElevatedCard(
-                modifier = Modifier.padding(start = (skeet.nestingLevel * 16).dp),
+                modifier = Modifier.padding(start = (skeet.nestingLevel * nestingIndent()).dp),
                 colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
@@ -278,11 +278,11 @@ private fun SkeletonPost() {
     ) {
         Row(
             modifier = Modifier
-                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
+                .padding(top = 8.dp, start = postHorizontalPadding(), end = postHorizontalPadding(), bottom = 8.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(avatarSize())
                     .clip(CircleShape)
                     .placeholder(
                         visible = true,
