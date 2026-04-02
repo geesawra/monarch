@@ -19,10 +19,14 @@ import (
 
 type mockSender struct {
 	sent []*messaging.Message
+	err  error
 }
 
 func (m *mockSender) Send(_ context.Context, msg *messaging.Message) (string, error) {
 	m.sent = append(m.sent, msg)
+	if m.err != nil {
+		return "", m.err
+	}
 	return "mock-id", nil
 }
 
@@ -727,12 +731,15 @@ func TestHandleEvent(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		event     *models.Event
-		tokens    map[string]string
-		wantSent  int
-		wantTitle string
-		wantErr   string
+		name            string
+		event           *models.Event
+		tokens          map[string]string
+		wantSent        int
+		wantTitle       string
+		wantErr         string
+		wantSendErr     error
+		wantTokenGone   bool
+		wantTokenLookup string
 	}{
 		{
 			name: "skips non-commit events",
@@ -810,12 +817,25 @@ func TestHandleEvent(t *testing.T) {
 			tokens:  map[string]string{},
 			wantErr: "unknown collection",
 		},
+		{
+			name: "removes token on entity not found error",
+			event: makeEvent("did:plc:liker", "app.bsky.feed.like", "rk7", bsky.FeedLike{
+				Subject:   &atproto.RepoStrongRef{Uri: "at://did:plc:me/app.bsky.feed.post/postkey", Cid: "cid1"},
+				CreatedAt: "2026-01-01T00:00:00Z",
+			}),
+			tokens:          map[string]string{"did:plc:me": "stale-tok"},
+			wantSent:        1,
+			wantTitle:       "Liker liked your post",
+			wantSendErr:     fmt.Errorf("Requested entity was not found."),
+			wantTokenGone:   true,
+			wantTokenLookup: "did:plc:me",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l, _ := zap.NewDevelopment()
-			sender := &mockSender{}
+			sender := &mockSender{err: tt.wantSendErr}
 			tk := testTokens(t, tt.tokens)
 
 			handler := handleEvent(l.Sugar(), mock, sender, tk, testMetrics(t))
@@ -830,6 +850,10 @@ func TestHandleEvent(t *testing.T) {
 			tst.Is(tt.wantSent, len(sender.sent), t)
 			if tt.wantSent > 0 {
 				tst.Is(tt.wantTitle, sender.sent[0].Data["title"], t)
+			}
+
+			if tt.wantTokenGone {
+				tst.Is([]string(nil), tk.tokensFor(tt.wantTokenLookup), t)
 			}
 		})
 	}

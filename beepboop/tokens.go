@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/peterbourgon/diskv/v3"
 	"go.opentelemetry.io/otel/metric"
 )
 
 type tokens struct {
+	mu               sync.RWMutex
 	d                *diskv.Diskv
 	tokensRegistered metric.Int64UpDownCounter
 }
@@ -47,6 +49,9 @@ func newTokens(path string, tokensRegistered metric.Int64UpDownCounter) (tokens,
 }
 
 func (t *tokens) storeDID(did, fcmToken string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	isNew := !t.d.Has(did)
 
 	existing := t.d.ReadString(did)
@@ -67,9 +72,51 @@ func (t *tokens) storeDID(did, fcmToken string) {
 }
 
 func (t *tokens) tokensFor(did string) []string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	v := t.d.ReadString(did)
 	if v == "" {
 		return nil
 	}
 	return strings.Split(v, "\n")
+}
+
+func (t *tokens) removeToken(fcmToken string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	cancel := make(chan struct{})
+	defer close(cancel)
+
+	for did := range t.d.Keys(cancel) {
+		existing := t.d.ReadString(did)
+		if existing == "" {
+			continue
+		}
+
+		var remaining []string
+		found := false
+		for tok := range strings.SplitSeq(existing, "\n") {
+			if tok == fcmToken {
+				found = true
+				continue
+			}
+			remaining = append(remaining, tok)
+		}
+
+		if !found {
+			continue
+		}
+
+		if len(remaining) == 0 {
+			t.d.Erase(did)
+			if t.tokensRegistered != nil {
+				t.tokensRegistered.Add(context.Background(), -1)
+			}
+		} else {
+			t.d.WriteString(did, strings.Join(remaining, "\n"))
+		}
+		return
+	}
 }

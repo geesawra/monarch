@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"math/rand/v2"
+	"strings"
 
 	"firebase.google.com/go/v4/messaging"
 	"github.com/bluesky-social/indigo/api/atproto"
@@ -170,6 +171,12 @@ func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender,
 
 			_, err = msg.Send(ctx, message)
 			if err != nil {
+				if strings.Contains(err.Error(), "Requested entity was not found") {
+					l.Debugw("removing invalid token", "token", message.Token)
+					t.removeToken(message.Token)
+					continue
+				}
+
 				l.Errorw("send notification", "error", err)
 				m.notificationsFailed.Add(ctx, 1, attrKind(message.Data["kind"]))
 			} else {

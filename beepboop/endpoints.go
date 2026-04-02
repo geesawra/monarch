@@ -39,6 +39,12 @@ func runEndpoints(ctx context.Context, bind string, t *tokens) func() {
 		return struct{}{}, nil
 	})
 
+	del := srpc.NewEndpoint(http.MethodDelete, "/subscribe", srpc.NewCodecJSON[struct{}](), srpc.NewCodecJSON[subscriptionRequest]())
+	del.Register(mux, func(ctx context.Context, req subscriptionRequest) (struct{}, error) {
+		t.removeToken(req.FCMToken)
+		return struct{}{}, nil
+	})
+
 	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := &http.Server{
