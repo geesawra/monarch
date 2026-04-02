@@ -254,8 +254,8 @@ func (eh *eventHandler) handleLike(
 	subject syntax.ATURI,
 	like *bsky.FeedLike,
 ) ([]*messaging.Message, error) {
-	token := eh.t.tokenFor(subject.Authority().String())
-	if token == "" {
+	tokens := eh.t.tokensFor(subject.Authority().String())
+	if len(tokens) == 0 {
 		eh.m.eventsSkipped.Add(ctx, 1, attrReason("no_token"))
 		return nil, nil
 	}
@@ -272,22 +272,25 @@ func (eh *eventHandler) handleLike(
 
 	authorName, authorAvatar := profileNameAvatar(profile)
 
-	m := &messaging.Message{
-		Data: map[string]string{
-			"authorDid":  e.Did,
-			"uri":        string(subject),
-			"title":      authorName + " liked your post",
-			"body":       post.Text,
-			"image":      authorAvatar,
-			"embedImage": mediaForPost(post, subject.Authority().String(), mediaSizeThumb),
-			"kind":       e.Commit.Collection,
-		},
-		Android: &messaging.AndroidConfig{
-			Priority: "high",
-		},
-		Token: token,
+	var ret []*messaging.Message
+	for _, token := range tokens {
+		ret = append(ret, &messaging.Message{
+			Data: map[string]string{
+				"authorDid":  e.Did,
+				"uri":        string(subject),
+				"title":      authorName + " liked your post",
+				"body":       post.Text,
+				"image":      authorAvatar,
+				"embedImage": mediaForPost(post, subject.Authority().String(), mediaSizeThumb),
+				"kind":       e.Commit.Collection,
+			},
+			Android: &messaging.AndroidConfig{
+				Priority: "high",
+			},
+			Token: token,
+		})
 	}
-	return []*messaging.Message{m}, nil
+	return ret, nil
 }
 
 func (eh *eventHandler) handleReply(
@@ -301,7 +304,7 @@ func (eh *eventHandler) handleReply(
 		quotedPostContent string
 		quotedPostImage   string
 	}
-	var mentionedDIDs = map[string]replyData{}
+	var notifyDIDs = map[string]replyData{}
 
 	for _, f := range post.Facets {
 		if f == nil {
@@ -315,8 +318,8 @@ func (eh *eventHandler) handleReply(
 
 			mention := ff.RichtextFacet_Mention
 
-			if t := eh.t.tokenFor(mention.Did); t != "" {
-				mentionedDIDs[t] = replyData{kind: "app.bsky.feed.mention"}
+			if tokens := eh.t.tokensFor(mention.Did); len(tokens) > 0 {
+				notifyDIDs[mention.Did] = replyData{kind: "app.bsky.feed.mention"}
 			}
 		}
 	}
@@ -328,8 +331,9 @@ func (eh *eventHandler) handleReply(
 			return nil, fmt.Errorf("parse parent uri %q: %w", p.Uri, err)
 		}
 
-		if t := eh.t.tokenFor(puri.Authority().String()); t != "" {
-			mentionedDIDs[t] = replyData{kind: "app.bsky.feed.reply"}
+		did := puri.Authority().String()
+		if tokens := eh.t.tokensFor(did); len(tokens) > 0 {
+			notifyDIDs[did] = replyData{kind: "app.bsky.feed.reply"}
 		}
 	}
 
@@ -354,17 +358,18 @@ func (eh *eventHandler) handleReply(
 				return nil, fmt.Errorf("get quoted post: %w", err)
 			}
 
-			if t := eh.t.tokenFor(ruri.Authority().String()); t != "" {
-				mentionedDIDs[t] = replyData{
+			did := ruri.Authority().String()
+			if tokens := eh.t.tokensFor(did); len(tokens) > 0 {
+				notifyDIDs[did] = replyData{
 					kind:              "app.bsky.feed.quote",
 					quotedPostContent: qpost.Text,
-					quotedPostImage:   mediaForPost(qpost, ruri.Authority().String(), mediaSizeThumb),
+					quotedPostImage:   mediaForPost(qpost, did, mediaSizeThumb),
 				}
 			}
 		}
 	}
 
-	if len(mentionedDIDs) == 0 {
+	if len(notifyDIDs) == 0 {
 		eh.m.eventsSkipped.Add(ctx, 1, attrReason("no_token"))
 		return nil, nil
 	}
@@ -378,7 +383,7 @@ func (eh *eventHandler) handleReply(
 
 	var ret []*messaging.Message
 
-	for t, rd := range mentionedDIDs {
+	for did, rd := range notifyDIDs {
 		var titleSuffix string
 
 		switch rd.kind {
@@ -390,25 +395,25 @@ func (eh *eventHandler) handleReply(
 			titleSuffix = "quoted your post"
 		}
 
-		m := &messaging.Message{
-			Data: map[string]string{
-				"authorDid":        e.Did,
-				"uri":              string(subject),
-				"title":            authorName + " " + titleSuffix,
-				"body":             post.Text,
-				"image":            authorAvatar,
-				"embedImage":       mediaForPost(post, e.Did, mediaSizeThumb),
-				"kind":             rd.kind,
-				"quotedText":       rd.quotedPostContent,
-				"quotedEmbedImage": rd.quotedPostImage,
-			},
-			Android: &messaging.AndroidConfig{
-				Priority: "high",
-			},
-			Token: t,
+		for _, token := range eh.t.tokensFor(did) {
+			ret = append(ret, &messaging.Message{
+				Data: map[string]string{
+					"authorDid":        e.Did,
+					"uri":              string(subject),
+					"title":            authorName + " " + titleSuffix,
+					"body":             post.Text,
+					"image":            authorAvatar,
+					"embedImage":       mediaForPost(post, e.Did, mediaSizeThumb),
+					"kind":             rd.kind,
+					"quotedText":       rd.quotedPostContent,
+					"quotedEmbedImage": rd.quotedPostImage,
+				},
+				Android: &messaging.AndroidConfig{
+					Priority: "high",
+				},
+				Token: token,
+			})
 		}
-
-		ret = append(ret, m)
 	}
 
 	return ret, nil
@@ -419,8 +424,8 @@ func (eh *eventHandler) handleFollow(
 	e *models.Event,
 	follow *bsky.GraphFollow,
 ) ([]*messaging.Message, error) {
-	token := eh.t.tokenFor(follow.Subject)
-	if token == "" {
+	tokens := eh.t.tokensFor(follow.Subject)
+	if len(tokens) == 0 {
 		eh.m.eventsSkipped.Add(ctx, 1, attrReason("no_token"))
 		return nil, nil
 	}
@@ -437,21 +442,24 @@ func (eh *eventHandler) handleFollow(
 		bio = *profile.Description
 	}
 
-	m := &messaging.Message{
-		Data: map[string]string{
-			"authorDid": e.Did,
-			"title":     authorName + " has followed you!",
-			"body":      bio,
-			"image":     authorAvatar,
-			"kind":      e.Commit.Collection,
-		},
-		Android: &messaging.AndroidConfig{
-			Priority: "high",
-		},
-		Token: token,
+	var ret []*messaging.Message
+	for _, token := range tokens {
+		ret = append(ret, &messaging.Message{
+			Data: map[string]string{
+				"authorDid": e.Did,
+				"title":     authorName + " has followed you!",
+				"body":      bio,
+				"image":     authorAvatar,
+				"kind":      e.Commit.Collection,
+			},
+			Android: &messaging.AndroidConfig{
+				Priority: "high",
+			},
+			Token: token,
+		})
 	}
 
-	return []*messaging.Message{m}, nil
+	return ret, nil
 }
 
 func (eh *eventHandler) handleRepost(
@@ -465,8 +473,8 @@ func (eh *eventHandler) handleRepost(
 		return nil, fmt.Errorf("parse reposted post uri %q: %w", repost.Subject.Uri, err)
 	}
 
-	t := eh.t.tokenFor(ruri.Authority().String())
-	if t == "" {
+	tokens := eh.t.tokensFor(ruri.Authority().String())
+	if len(tokens) == 0 {
 		eh.m.eventsSkipped.Add(ctx, 1, attrReason("no_token"))
 		return nil, nil
 	}
@@ -483,8 +491,9 @@ func (eh *eventHandler) handleRepost(
 
 	authorName, authorAvatar := profileNameAvatar(profile)
 
-	return []*messaging.Message{
-		{
+	var ret []*messaging.Message
+	for _, token := range tokens {
+		ret = append(ret, &messaging.Message{
 			Data: map[string]string{
 				"authorDid":  e.Did,
 				"uri":        string(subject),
@@ -497,9 +506,10 @@ func (eh *eventHandler) handleRepost(
 			Android: &messaging.AndroidConfig{
 				Priority: "high",
 			},
-			Token: t,
-		},
-	}, nil
+			Token: token,
+		})
+	}
+	return ret, nil
 }
 
 func subject(e *models.Event) (any, syntax.ATURI, error) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/peterbourgon/diskv/v3"
 	"go.opentelemetry.io/otel/metric"
@@ -47,12 +48,28 @@ func newTokens(path string, tokensRegistered metric.Int64UpDownCounter) (tokens,
 
 func (t *tokens) storeDID(did, fcmToken string) {
 	isNew := !t.d.Has(did)
-	t.d.WriteString(did, fcmToken)
+
+	existing := t.d.ReadString(did)
+	if existing != "" {
+		for tok := range strings.SplitSeq(existing, "\n") {
+			if tok == fcmToken {
+				return
+			}
+		}
+		t.d.WriteString(did, existing+"\n"+fcmToken)
+	} else {
+		t.d.WriteString(did, fcmToken)
+	}
+
 	if isNew && t.tokensRegistered != nil {
 		t.tokensRegistered.Add(context.Background(), 1)
 	}
 }
 
-func (t *tokens) tokenFor(did string) string {
-	return t.d.ReadString(did)
+func (t *tokens) tokensFor(did string) []string {
+	v := t.d.ReadString(did)
+	if v == "" {
+		return nil
+	}
+	return strings.Split(v, "\n")
 }
