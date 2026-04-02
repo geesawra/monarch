@@ -40,8 +40,13 @@ class PushNotificationManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "PushNotificationManager"
-        val REGISTER_URL = industries.geesawra.monarch.BuildConfig.PUSH_SERVER_URL
         private val FCM_TOKEN = stringPreferencesKey("fcm_token")
+    }
+
+    private suspend fun getRegisterUrl(): String {
+        return context.settingsDataStore.data.map {
+            it[SettingsViewModel.NOTIFICATION_SERVER_URL]
+        }.first() ?: industries.geesawra.monarch.BuildConfig.PUSH_SERVER_URL
     }
 
     private val httpClient = HttpClient(OkHttp) {
@@ -52,7 +57,8 @@ class PushNotificationManager @Inject constructor(
 
     suspend fun registerToken(token: String, did: String): Result<Unit> {
         return runCatching {
-            val response = httpClient.post(REGISTER_URL) {
+            val registerUrl = getRegisterUrl()
+            val response = httpClient.post(registerUrl) {
                 contentType(ContentType.Application.Json)
                 setBody(PushRegistrationRequest(token = token, did = did))
             }

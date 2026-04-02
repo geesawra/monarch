@@ -62,6 +62,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.ContextCompat
+import industries.geesawra.monarch.BuildConfig
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.PushNotificationManager
@@ -470,6 +471,53 @@ fun SettingsView(
                         },
                         dismissButton = {
                             TextButton(onClick = { showCustomDialog = false }) { Text("Cancel") }
+                        },
+                    )
+                }
+            }
+
+            if (BuildConfig.DEBUG) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                Text(
+                    text = "Debug \uD83D\uDD25",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
+                )
+
+                var showServerUrlDialog by remember { mutableStateOf(false) }
+
+                ListItem(
+                    headlineContent = { Text("Notification server URL") },
+                    supportingContent = { Text(settings.notificationServerUrl) },
+                    modifier = Modifier.clickable { showServerUrlDialog = true },
+                )
+
+                if (showServerUrlDialog) {
+                    var urlValue by remember { mutableStateOf(settings.notificationServerUrl) }
+                    AlertDialog(
+                        onDismissRequest = { showServerUrlDialog = false },
+                        title = { Text("Notification Server URL") },
+                        text = {
+                            OutlinedTextField(
+                                value = urlValue,
+                                onValueChange = { urlValue = it },
+                                label = { Text("URL") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    settingsViewModel.setNotificationServerUrl(urlValue.trim())
+                                    showServerUrlDialog = false
+                                }
+                            ) { Text("Save") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showServerUrlDialog = false }) { Text("Cancel") }
                         },
                     )
                 }

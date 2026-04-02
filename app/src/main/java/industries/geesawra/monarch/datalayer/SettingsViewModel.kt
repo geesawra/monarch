@@ -11,11 +11,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import industries.geesawra.monarch.BuildConfig
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-private val Context.settingsDataStore by preferencesDataStore("settings")
+internal val Context.settingsDataStore by preferencesDataStore("settings")
 
 enum class ThemeMode {
     System,
@@ -50,6 +51,7 @@ data class SettingsState(
     val defaultFeed: DefaultFeed = DefaultFeed(),
     val forceCompactLayout: Boolean = false,
     val pushNotificationsEnabled: Boolean = false,
+    val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
     val loaded: Boolean = false,
 )
 
@@ -70,6 +72,7 @@ class SettingsViewModel @Inject constructor(
         private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
         private val FORCE_COMPACT_LAYOUT = stringPreferencesKey("force_compact_layout")
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
+        internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
     }
 
     var settingsState by mutableStateOf(SettingsState())
@@ -92,6 +95,7 @@ class SettingsViewModel @Inject constructor(
                     ),
                     forceCompactLayout = prefs[FORCE_COMPACT_LAYOUT]?.toBooleanStrictOrNull() ?: false,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
+                    notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
                     loaded = true,
                 )
             }.collect {
@@ -145,6 +149,12 @@ class SettingsViewModel @Inject constructor(
     fun setPushNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[PUSH_NOTIFICATIONS_ENABLED] = enabled.toString() }
+        }
+    }
+
+    fun setNotificationServerUrl(url: String) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[NOTIFICATION_SERVER_URL] = url }
         }
     }
 
