@@ -35,7 +35,9 @@ android {
 
     buildTypes {
         debug {
+            applicationIdSuffix = ".debug"
             buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
+            resValue("string", "app_name", "Monarch Debug")
         }
         release {
             isMinifyEnabled = true
@@ -45,6 +47,7 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "PUSH_SERVER_URL", "\"https://matrice.wallera.computer/subscribe\"")
+            resValue("string", "app_name", "Monarch")
         }
     }
     compileOptions {
