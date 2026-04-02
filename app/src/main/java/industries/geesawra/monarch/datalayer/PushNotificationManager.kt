@@ -10,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.delete
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -69,6 +70,24 @@ class PushNotificationManager @Inject constructor(
             Unit
         }.onFailure {
             Log.e(TAG, "Failed to register push token: ${it.message}")
+        }
+    }
+
+    suspend fun unregisterToken(): Result<Unit> {
+        return runCatching {
+            val token = getLocalTokenOnce() ?: return Result.success(Unit)
+            val registerUrl = getRegisterUrl()
+            val response = httpClient.delete(registerUrl) {
+                contentType(ContentType.Application.Json)
+                setBody(PushRegistrationRequest(token = token, did = ""))
+            }
+            if (!response.status.isSuccess()) {
+                throw Exception("Server returned ${response.status.value}: ${response.bodyAsText()}")
+            }
+            Log.d(TAG, "Push token unregistered")
+            Unit
+        }.onFailure {
+            Log.e(TAG, "Failed to unregister push token: ${it.message}")
         }
     }
 

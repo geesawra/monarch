@@ -103,6 +103,7 @@ data class TimelineUiState(
 class TimelineViewModel @AssistedInject constructor(
     @Assisted private val bskyConn: BlueskyConn,
     private val accountManager: AccountManager,
+    private val pushNotificationManager: PushNotificationManager,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -195,6 +196,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun logout(then: () -> Unit = {}) {
         viewModelScope.launch {
+            pushNotificationManager.unregisterToken()
             val currentDid = bskyConn.session?.did?.did
             if (currentDid != null) {
                 accountManager.removeAccount(currentDid)
