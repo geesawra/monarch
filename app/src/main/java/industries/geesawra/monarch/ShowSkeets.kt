@@ -89,10 +89,17 @@ fun ShowSkeets(
     }
 
     val filteredData = remember(data, threadContextCids) {
+        val seenRootCids = mutableSetOf<Cid>()
         data.filter {
             !it.replyToNotFollowing && it.cid !in threadContextCids &&
             (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.BlockedPost) &&
             (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.NotFoundPost)
+        }.filter {
+            if (isShowingThread) return@filter true
+            val isRepost = it.reason is FeedViewPostReasonUnion.ReasonRepost
+            if (isRepost) return@filter true
+            val rootCid = it.root()?.cid ?: return@filter true
+            seenRootCids.add(rootCid)
         }
     }
 

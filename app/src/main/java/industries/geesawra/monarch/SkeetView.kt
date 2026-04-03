@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.media3.common.MimeTypes
 import app.bsky.embed.ExternalViewExternal
@@ -1008,7 +1009,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
 
                     val chipContent = @Composable {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val avatarUrl = labelerAvatar(it)
@@ -1019,24 +1020,25 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                                         .crossfade(true)
                                         .build(),
                                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     contentDescription = definition.plaintext,
                                     modifier = Modifier
-                                        .size(14.dp)
+                                        .size(12.dp)
                                         .clip(CircleShape)
                                 )
                             } else {
                                 Icon(
                                     imageVector = definition.icon,
                                     contentDescription = definition.plaintext,
-                                    modifier = Modifier.size(14.dp),
+                                    modifier = Modifier.size(12.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = definition.plaintext,
                                 style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
                             )
                         }
                     }
