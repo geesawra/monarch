@@ -978,7 +978,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                 text = "@$it",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
-                modifier = if (!showLabels) Modifier.padding(bottom = 8.dp) else Modifier,
+                modifier = Modifier.padding(bottom = if (!showLabels) 8.dp else 4.dp),
             )
         }
 
