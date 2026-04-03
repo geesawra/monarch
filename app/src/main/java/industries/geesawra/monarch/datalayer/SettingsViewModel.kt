@@ -97,7 +97,7 @@ class SettingsViewModel @Inject constructor(
                         avatar = prefs[DEFAULT_FEED_AVATAR],
                     ),
                     forceCompactLayout = prefs[FORCE_COMPACT_LAYOUT]?.toBooleanStrictOrNull() ?: false,
-                    swipeableFeeds = prefs[SWIPEABLE_FEEDS]?.toBooleanStrictOrNull() ?: true,
+                    swipeableFeeds = prefs[SWIPEABLE_FEEDS]?.toBooleanStrictOrNull() ?: !narrowScreen,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
                     loaded = true,

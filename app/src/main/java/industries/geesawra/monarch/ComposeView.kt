@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.webkit.URLUtil
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -11,6 +13,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
 import androidx.compose.foundation.content.consume
@@ -41,6 +48,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CameraRoll
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Shield
@@ -259,15 +267,36 @@ fun ComposeView(
             mediaSelected.value = urisMap.filterValues { it != null }.keys.toList()
         }
 
+    val cameraImageUri = remember { mutableStateOf<Uri?>(null) }
+    val takePicture =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success) {
+                cameraImageUri.value?.let { uri ->
+                    mediaSelectedIsVideo.value = false
+                    mediaSelected.value = mediaSelected.value + uri
+                }
+            }
+        }
+
     val uploadingPost = remember { mutableStateOf(false) }
+
+    val sheetScrollConnection = remember(scrollState) {
+        object : NestedScrollConnection {
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (scrollState.value > 0) return available
+                return Velocity.Zero
+            }
+        }
+    }
 
     // Outer Box: Handles IME padding and general content padding for the whole sheet content
     Box(
         modifier = Modifier
-            .fillMaxWidth() // Takes full width of the bottom sheet
+            .fillMaxWidth()
+            .nestedScroll(sheetScrollConnection)
             .windowInsetsPadding(WindowInsets.ime.add(WindowInsets.navigationBars))
             .verticalScroll(scrollState)
-            .padding(16.dp) // General padding around all content inside the sheet
+            .padding(16.dp)
     ) {
         // Inner Box: Fills the space provided by Outer Box, used for layering scrollable content and fixed buttons
         Box(modifier = Modifier.fillMaxSize()) {
@@ -281,6 +310,8 @@ fun ComposeView(
                     context,
                     uploadingPost,
                     pickMedia,
+                    takePicture,
+                    cameraImageUri,
                     textfieldState.text.toString(),
                     mediaSelected,
                     mediaSelectedIsVideo,
@@ -295,25 +326,6 @@ fun ComposeView(
                     threadgateRules = threadgateRules,
                     wasEdited = wasEdited,
                 )
-
-                inReplyTo.value?.let {
-                    OutlinedCard(
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        SkeetView(
-                            modifier = Modifier
-                                .padding(8.dp)
-                                .background(Color.Transparent),
-                            skeet = it,
-                            nested = true,
-                            disableEmbeds = false,
-                            showLabels = false,
-                            showInReplyTo = false,
-                            avatarShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape,
-                            postTextSize = settingsState.postTextSize,
-                        )
-                    }
-                }
 
                 LaunchedEffect(Unit) {
                     snapshotFlow { textfieldState.text.toString() to mediaSelected.value }
@@ -482,6 +494,25 @@ fun ComposeView(
                     state = textfieldState,
                     outputTransformation = facetHighlighter,
                 )
+
+                inReplyTo.value?.let {
+                    OutlinedCard(
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        SkeetView(
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .background(Color.Transparent),
+                            skeet = it,
+                            nested = true,
+                            disableEmbeds = false,
+                            showLabels = false,
+                            showInReplyTo = false,
+                            avatarShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape,
+                            postTextSize = settingsState.postTextSize,
+                        )
+                    }
+                }
 
                 if (showMentionDropdown.value) {
                     OutlinedCard(
@@ -707,6 +738,8 @@ fun ActionRow(
     context: Context,
     uploadingPost: MutableState<Boolean>,
     pickMedia: ManagedActivityResultLauncher<PickVisualMediaRequest, List<@JvmSuppressWildcards Uri>>,
+    takePicture: ManagedActivityResultLauncher<Uri, Boolean>,
+    cameraImageUri: MutableState<Uri?>,
     postText: String,
     mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
@@ -750,6 +783,17 @@ fun ActionRow(
                 }
             ) {
                 Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
+            }
+            TextButton(
+                onClick = {
+                    val cacheDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
+                    val file = File.createTempFile("capture_", ".jpg", cacheDir)
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    cameraImageUri.value = uri
+                    takePicture.launch(uri)
+                }
+            ) {
+                Icon(Icons.Default.CameraAlt, contentDescription = "Take photo")
             }
             TextButton(onClick = { showThreadgateSheet = true }) {
                 Icon(
