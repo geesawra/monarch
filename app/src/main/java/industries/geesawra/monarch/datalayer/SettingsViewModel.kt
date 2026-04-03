@@ -50,6 +50,7 @@ data class SettingsState(
     val showLabels: Boolean = true,
     val defaultFeed: DefaultFeed = DefaultFeed(),
     val forceCompactLayout: Boolean = false,
+    val swipeableFeeds: Boolean = true,
     val pushNotificationsEnabled: Boolean = false,
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
     val loaded: Boolean = false,
@@ -71,6 +72,7 @@ class SettingsViewModel @Inject constructor(
         private val DEFAULT_FEED_NAME = stringPreferencesKey("default_feed_name")
         private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
         private val FORCE_COMPACT_LAYOUT = stringPreferencesKey("force_compact_layout")
+        private val SWIPEABLE_FEEDS = stringPreferencesKey("swipeable_feeds")
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
         internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
     }
@@ -95,6 +97,7 @@ class SettingsViewModel @Inject constructor(
                         avatar = prefs[DEFAULT_FEED_AVATAR],
                     ),
                     forceCompactLayout = prefs[FORCE_COMPACT_LAYOUT]?.toBooleanStrictOrNull() ?: false,
+                    swipeableFeeds = prefs[SWIPEABLE_FEEDS]?.toBooleanStrictOrNull() ?: true,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
                     loaded = true,
@@ -144,6 +147,12 @@ class SettingsViewModel @Inject constructor(
     fun setForceCompactLayout(force: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[FORCE_COMPACT_LAYOUT] = force.toString() }
+        }
+    }
+
+    fun setSwipeableFeeds(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[SWIPEABLE_FEEDS] = enabled.toString() }
         }
     }
 

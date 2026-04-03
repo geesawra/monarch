@@ -43,6 +43,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -81,14 +83,16 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.WideNavigationRailItem
+import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.WideNavigationRailItem
-import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -143,6 +147,8 @@ private sealed class DetailPaneContent {
     data object Thread : DetailPaneContent()
     data class Profile(val did: Did) : DetailPaneContent()
 }
+
+private data class FeedItem(val uri: String, val displayName: String, val avatar: String?)
 
 enum class TabBarDestinations(
     @param:StringRes val label: Int,
@@ -362,6 +368,21 @@ private fun InnerTimelineView(
     val drawerState = rememberWideNavigationRailState(
         initialValue = WideNavigationRailValue.Collapsed
     )
+    val feedItems = remember(timelineViewModel.uiState.feeds, timelineViewModel.uiState.user?.avatar) {
+        listOf(FeedItem("following", "Following", timelineViewModel.uiState.user?.avatar?.uri)) +
+        timelineViewModel.uiState.feeds.map { FeedItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
+    }
+    val pagerState = rememberPagerState(pageCount = { feedItems.size })
+
+    if (settingsState.swipeableFeeds) {
+        LaunchedEffect(pagerState.settledPage) {
+            val feed = feedItems.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
+            if (feed.uri != timelineViewModel.uiState.selectedFeed) {
+                timelineViewModel.selectFeed(feed.uri, feed.displayName, feed.avatar)
+            }
+        }
+    }
+
     val isRefreshing =
         timelineViewModel.uiState.isFetchingMoreTimeline || timelineViewModel.uiState.isFetchingMoreNotifications
     val isScrollEnabled = true
@@ -408,43 +429,45 @@ private fun InnerTimelineView(
             }
         },
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            ModalWideNavigationRail(
-                header = {
-                    Column(modifier = Modifier.padding(start = 16.dp)) {
-                        Text(
-                            text = "Feeds",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                    }
-                },
-                hideOnCollapse = true,
-                state = drawerState,
-                modifier = modifier,
-                content = {
-                    FeedsDrawer(
-                        state = drawerState.targetValue,
-                        selectFeed = { uri: String, displayName: String, avatar: String? ->
-                            coroutineScope.launch {
-                                drawerState.collapse()
-                            }
-                            timelineViewModel.selectFeed(
-                                uri,
-                                displayName,
-                                avatar
-                            ) {
+        if (!settingsState.swipeableFeeds) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                ModalWideNavigationRail(
+                    header = {
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            Text(
+                                text = "Feeds",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                    },
+                    hideOnCollapse = true,
+                    state = drawerState,
+                    modifier = modifier,
+                    content = {
+                        FeedsDrawer(
+                            state = drawerState.targetValue,
+                            selectFeed = { uri: String, displayName: String, avatar: String? ->
                                 coroutineScope.launch {
-                                    launch {
-                                        timelineState.scrollToItem(0)
+                                    drawerState.collapse()
+                                }
+                                timelineViewModel.selectFeed(
+                                    uri,
+                                    displayName,
+                                    avatar
+                                ) {
+                                    coroutineScope.launch {
+                                        launch {
+                                            timelineState.scrollToItem(0)
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        timelineViewModel = timelineViewModel,
-                    )
-                }
-            )
+                            },
+                            timelineViewModel = timelineViewModel,
+                        )
+                    }
+                )
+            }
         }
 
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -596,23 +619,29 @@ private fun InnerTimelineView(
                         ),
                         title = {
                             when (currentDestination) {
-                                TabBarDestinations.TIMELINE -> Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (timelineViewModel.uiState.feedAvatar != null) {
-                                        AsyncImage(
-                                            model = timelineViewModel.uiState.feedAvatar,
-                                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                            modifier = Modifier
-                                                .size(topBarAvatarSize())
-                                                .clip(CircleShape),
-                                            contentDescription = "Feed avatar",
-                                        )
-                                    }
+                                TabBarDestinations.TIMELINE -> if (settingsState.swipeableFeeds) {
+                                    Text(text = timelineViewModel.uiState.user?.displayName
+                                        ?: timelineViewModel.uiState.user?.handle?.handle
+                                        ?: "")
+                                } else {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (timelineViewModel.uiState.feedAvatar != null && timelineViewModel.uiState.selectedFeed != "following") {
+                                            AsyncImage(
+                                                model = timelineViewModel.uiState.feedAvatar,
+                                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier
+                                                    .size(topBarAvatarSize())
+                                                    .clip(CircleShape),
+                                                contentDescription = "Feed avatar",
+                                            )
+                                        }
 
-                                    Text(text = timelineViewModel.uiState.feedName)
+                                        Text(text = timelineViewModel.uiState.feedName)
+                                    }
                                 }
 
                                 TabBarDestinations.SEARCH -> {
@@ -635,14 +664,17 @@ private fun InnerTimelineView(
                         scrollBehavior = scrollBehavior,
                         navigationIcon = {
                             when (currentDestination) {
-                                TabBarDestinations.TIMELINE -> IconButton(onClick = {
-                                    coroutineScope.launch {
-                                        drawerState.expand()
+                                TabBarDestinations.TIMELINE -> {
+                                    if (!settingsState.swipeableFeeds) {
+                                        IconButton(onClick = {
+                                            coroutineScope.launch {
+                                                drawerState.expand()
+                                            }
+                                        }) {
+                                            Icon(Icons.Default.Tag, "Feeds")
+                                        }
                                     }
-                                }) {
-                                    Icon(Icons.Default.Tag, "Feeds")
                                 }
-
                                 TabBarDestinations.SEARCH -> {}
                                 TabBarDestinations.NOTIFICATIONS -> {}
                             }
@@ -768,7 +800,144 @@ private fun InnerTimelineView(
                     Box(modifier = contentModifier.fillMaxSize()) {
                         when (currentDestination) {
                             TabBarDestinations.TIMELINE -> {
-                                if (isExpandedScreen) {
+                                if (settingsState.swipeableFeeds) {
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        SecondaryScrollableTabRow(
+                                            selectedTabIndex = pagerState.currentPage,
+                                            edgePadding = 8.dp,
+                                            divider = {},
+                                        ) {
+                                            feedItems.forEachIndexed { index, feed ->
+                                                Tab(
+                                                    selected = pagerState.currentPage == index,
+                                                    onClick = {
+                                                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                                    },
+                                                    text = {
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            if (feed.avatar != null) {
+                                                                AsyncImage(
+                                                                    model = feed.avatar,
+                                                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                                    modifier = Modifier
+                                                                        .size(18.dp)
+                                                                        .clip(CircleShape),
+                                                                    contentDescription = null,
+                                                                )
+                                                            }
+                                                            Text(feed.displayName)
+                                                        }
+                                                    },
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        if (isExpandedScreen) {
+                                            Row(modifier = Modifier.fillMaxSize()) {
+                                                Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
+                                                    HorizontalPager(
+                                                        state = pagerState,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        beyondViewportPageCount = 0,
+                                                    ) { page ->
+                                                        val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
+                                                        val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
+                                                        val notYetLoaded = feedUri !in timelineViewModel.uiState.feedSkeets
+                                                        val pageListState = rememberLazyListState()
+                                                        ShowSkeets(
+                                                            viewModel = timelineViewModel,
+                                                            settingsState = settingsState,
+                                                            state = pageListState,
+                                                            onReplyTap = onReplyTap,
+                                                            data = pageData,
+                                                            isLoading = notYetLoaded || (timelineViewModel.uiState.isFetchingMoreTimeline && page == pagerState.settledPage),
+                                                            isScrollEnabled = isScrollEnabled,
+                                                            onSeeMoreTap = expandedOnSeeMoreTap,
+                                                            onProfileTap = expandedOnProfileTap,
+                                                            shouldFetchMoreData = page == pagerState.settledPage,
+                                                        )
+                                                    }
+                                                }
+
+                                                VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
+
+                                                Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
+                                                    when (val content = detailPaneContent) {
+                                                        is DetailPaneContent.Thread -> DetailThreadPane(
+                                                            timelineViewModel = timelineViewModel,
+                                                            settingsState = settingsState,
+                                                            isRefreshing = detailRefreshing.value,
+                                                            onProfileTap = expandedOnProfileTap,
+                                                            onReplyTap = onReplyTap,
+                                                            onSeeMoreTap = expandedOnSeeMoreTap,
+                                                            onClose = { detailPaneContent = DetailPaneContent.Empty },
+                                                        )
+                                                        is DetailPaneContent.Profile -> DetailProfilePane(
+                                                            did = content.did,
+                                                            timelineViewModel = timelineViewModel,
+                                                            settingsState = settingsState,
+                                                            onProfileTap = expandedOnProfileTap,
+                                                            onThreadTap = expandedOnSeeMoreTap,
+                                                            onReplyTap = onReplyTap,
+                                                            onSettingsTap = onSettingsTap,
+                                                            onClose = { detailPaneContent = DetailPaneContent.Empty },
+                                                        )
+                                                        is DetailPaneContent.Empty -> Box(
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentAlignment = Alignment.Center,
+                                                        ) {
+                                                            Column(
+                                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                            ) {
+                                                                Icon(
+                                                                    Icons.Default.Forum,
+                                                                    contentDescription = null,
+                                                                    modifier = Modifier.size(48.dp),
+                                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                )
+                                                                Spacer(modifier = Modifier.height(16.dp))
+                                                                Text(
+                                                                    "Tap a post to view the thread",
+                                                                    style = MaterialTheme.typography.bodyLarge,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            HorizontalPager(
+                                                state = pagerState,
+                                                modifier = Modifier.fillMaxSize(),
+                                                beyondViewportPageCount = 0,
+                                            ) { page ->
+                                                val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
+                                                val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
+                                                val notYetLoaded = feedUri !in timelineViewModel.uiState.feedSkeets
+                                                val pageListState = rememberLazyListState()
+                                                ShowSkeets(
+                                                    viewModel = timelineViewModel,
+                                                    settingsState = settingsState,
+                                                    state = pageListState,
+                                                    onReplyTap = onReplyTap,
+                                                    data = pageData,
+                                                    isLoading = notYetLoaded || (timelineViewModel.uiState.isFetchingMoreTimeline && page == pagerState.settledPage),
+                                                    isScrollEnabled = isScrollEnabled,
+                                                    onSeeMoreTap = onSeeMoreTap,
+                                                    onProfileTap = onProfileTap,
+                                                    shouldFetchMoreData = page == pagerState.settledPage,
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else if (isExpandedScreen) {
                                     Row(modifier = Modifier.fillMaxSize()) {
                                         Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
                                             ShowSkeets(
@@ -1015,6 +1184,7 @@ private fun DetailProfilePane(
 }
 
 
+
 @Composable
 fun FeedsDrawer(
     state: WideNavigationRailValue,
@@ -1022,55 +1192,20 @@ fun FeedsDrawer(
     timelineViewModel: TimelineViewModel,
 ) {
     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-    WideNavigationRailItem(
-        label = {
-            Text(text = "Following")
-        },
-        selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
-        onClick = {
-            selectFeed("following", "Following", null)
-        },
-        icon = {
-            val userAvatar = timelineViewModel.uiState.user?.avatar?.uri
-            if (userAvatar != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(userAvatar)
-                        .crossfade(true)
-                        .build(),
-                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape),
-                    contentDescription = "Following feed",
-                )
-            } else {
-                Spacer(modifier = Modifier.size(20.dp))
-            }
-        },
-        railExpanded = state == WideNavigationRailValue.Expanded,
-    )
-
-    timelineViewModel.uiState.feeds.forEach { feed ->
         WideNavigationRailItem(
             label = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = feed.displayName)
-                }
+                Text(text = "Following")
             },
-            selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
+            selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
             onClick = {
-                selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
+                selectFeed("following", "Following", null)
             },
             icon = {
-                if (feed.avatar != null) {
+                val userAvatar = timelineViewModel.uiState.user?.avatar?.uri
+                if (userAvatar != null) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(feed.avatar?.uri)
+                            .data(userAvatar)
                             .crossfade(true)
                             .build(),
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
@@ -1078,7 +1213,7 @@ fun FeedsDrawer(
                         modifier = Modifier
                             .size(20.dp)
                             .clip(CircleShape),
-                        contentDescription = "Feed avatar",
+                        contentDescription = "Following feed",
                     )
                 } else {
                     Spacer(modifier = Modifier.size(20.dp))
@@ -1086,7 +1221,42 @@ fun FeedsDrawer(
             },
             railExpanded = state == WideNavigationRailValue.Expanded,
         )
-    }
+
+        timelineViewModel.uiState.feeds.forEach { feed ->
+            WideNavigationRailItem(
+                label = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = feed.displayName)
+                    }
+                },
+                selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
+                onClick = {
+                    selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
+                },
+                icon = {
+                    if (feed.avatar != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(feed.avatar?.uri)
+                                .crossfade(true)
+                                .build(),
+                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape),
+                            contentDescription = "Feed avatar",
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.size(20.dp))
+                    }
+                },
+                railExpanded = state == WideNavigationRailValue.Expanded,
+            )
+        }
     }
 }
 

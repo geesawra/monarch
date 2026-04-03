@@ -211,6 +211,17 @@ fun SettingsView(
                 },
             )
 
+            ListItem(
+                headlineContent = { Text("Swipeable feeds") },
+                supportingContent = { Text("Swipe left/right on the timeline to switch feeds") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.swipeableFeeds,
+                        onCheckedChange = { settingsViewModel.setSwipeableFeeds(it) }
+                    )
+                },
+            )
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(

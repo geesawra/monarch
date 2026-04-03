@@ -62,6 +62,8 @@ data class TimelineUiState(
     val feedAvatar: String? = null,
     val feeds: List<GeneratorView> = listOf(),
     val skeets: List<SkeetData> = listOf(),
+    val feedSkeets: Map<String, List<SkeetData>> = mapOf(),
+    val feedCursors: Map<String, String?> = mapOf(),
     val notifications: List<Notification> = listOf(),
     val isFetchingMoreTimeline: Boolean = false,
     val isFetchingMoreNotifications: Boolean = false,
@@ -308,14 +310,23 @@ class TimelineViewModel @AssistedInject constructor(
                     }
                 )
             }.onSuccess { response ->
+                val feedKey = uiState.selectedFeed
+                val existingFeedSkeets = uiState.feedSkeets[feedKey] ?: listOf()
                 val newSkeets = if (fresh) {
                     response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { it.cid }
                 } else {
                     (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { it.cid }
                 }
+                val newFeedSkeets = if (fresh) {
+                    newSkeets
+                } else {
+                    (existingFeedSkeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { it.cid }
+                }
 
                 uiState = uiState.copy(
                     skeets = newSkeets,
+                    feedSkeets = uiState.feedSkeets + (feedKey to newFeedSkeets),
+                    feedCursors = uiState.feedCursors + (feedKey to response.cursor),
                     timelineCursor = response.cursor,
                     isFetchingMoreTimeline = false
                 )
@@ -729,6 +740,8 @@ class TimelineViewModel @AssistedInject constructor(
             selectedFeed = uri,
             feedName = displayName,
             feedAvatar = avatar,
+            skeets = uiState.feedSkeets[uri] ?: listOf(),
+            timelineCursor = uiState.feedCursors[uri],
         )
     }
 
