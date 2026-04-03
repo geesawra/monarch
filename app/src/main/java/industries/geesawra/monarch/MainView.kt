@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -373,6 +374,7 @@ private fun InnerTimelineView(
         timelineViewModel.uiState.feeds.map { FeedItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
     }
     val pagerState = rememberPagerState(pageCount = { feedItems.size })
+    val pagerListStates = remember { mutableMapOf<Int, LazyListState>() }
 
     if (settingsState.swipeableFeeds) {
         LaunchedEffect(pagerState.settledPage) {
@@ -539,7 +541,9 @@ private fun InnerTimelineView(
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 if (dest == currentDestination) {
                     val state = when (dest) {
-                        TabBarDestinations.TIMELINE -> timelineState
+                        TabBarDestinations.TIMELINE -> if (settingsState.swipeableFeeds) {
+                            pagerListStates[pagerState.settledPage] ?: timelineState
+                        } else timelineState
                         TabBarDestinations.SEARCH -> searchPostsState
                         TabBarDestinations.NOTIFICATIONS -> notificationsState
                     }
@@ -850,6 +854,7 @@ private fun InnerTimelineView(
                                                         val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
                                                         val notYetLoaded = feedUri !in timelineViewModel.uiState.feedSkeets
                                                         val pageListState = rememberLazyListState()
+                                                        pagerListStates[page] = pageListState
                                                         ShowSkeets(
                                                             viewModel = timelineViewModel,
                                                             settingsState = settingsState,
@@ -922,6 +927,7 @@ private fun InnerTimelineView(
                                                 val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
                                                 val notYetLoaded = feedUri !in timelineViewModel.uiState.feedSkeets
                                                 val pageListState = rememberLazyListState()
+                                                pagerListStates[page] = pageListState
                                                 ShowSkeets(
                                                     viewModel = timelineViewModel,
                                                     settingsState = settingsState,
