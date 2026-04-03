@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Verified
@@ -853,7 +854,27 @@ private fun SkeetReason(
                         )
                     }
 
-                    else -> {}
+                    else -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Reply,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Replying to a thread",
+                                color = MaterialTheme.colorScheme.outline,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
                 }
             }
         }

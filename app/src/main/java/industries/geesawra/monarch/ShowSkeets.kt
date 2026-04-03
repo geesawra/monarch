@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
+import app.bsky.feed.ReplyRefParentUnion
 import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
 import io.github.fornewid.placeholder.material3.fade
 import io.github.fornewid.placeholder.material3.placeholder
@@ -88,7 +89,11 @@ fun ShowSkeets(
     }
 
     val filteredData = remember(data, threadContextCids) {
-        data.filter { !it.replyToNotFollowing && it.cid !in threadContextCids }
+        data.filter {
+            !it.replyToNotFollowing && it.cid !in threadContextCids &&
+            (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.BlockedPost) &&
+            (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.NotFoundPost)
+        }
     }
 
     val visibleKeys by remember {

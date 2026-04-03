@@ -210,7 +210,7 @@ fun TimelinePostActionsView(
             }
         }
 
-        val replyDisabled = skeet.threadgate != null && !isOwnPost
+        val replyDisabled = skeet.replyDisabled && !isOwnPost
 
         IconButton(
             enabled = !replyDisabled,
