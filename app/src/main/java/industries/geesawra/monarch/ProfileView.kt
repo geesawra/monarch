@@ -50,7 +50,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -445,8 +445,8 @@ internal fun ProfileContent(
             items = posts,
             key = { _, skeet -> "post_${skeet.key()}" }
         ) { _, skeet ->
-            ElevatedCard(
-                colors = CardDefaults.elevatedCardColors(
+            Card(
+                colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
             ) {

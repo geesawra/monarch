@@ -73,6 +73,7 @@ data class TimelineUiState(
     val timelineCursor: String? = null,
     val notificationsCursor: String? = null,
     val unreadNotificationsAmt: Int = 0,
+    val seenNotificationsAt: Instant? = null,
 
     val cidInteractedWith: Map<Cid, RKey> = mapOf(),
 
@@ -124,7 +125,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
-    private var seenNotificationsAt: Instant? = null
+    private val seenNotificationsAt: Instant? get() = uiState.seenNotificationsAt
 
     fun appviewName(): String = bskyConn.appviewName()
     fun appviewProxy(): String? = bskyConn.appviewProxy
@@ -675,7 +676,7 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun updateSeenNotifications() {
-        seenNotificationsAt = Clock.System.now()
+        uiState = uiState.copy(seenNotificationsAt = Clock.System.now())
         viewModelScope.launch {
             bskyConn.updateSeenNotifications().onFailure {
                 uiState = when (it) {

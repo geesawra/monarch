@@ -1,13 +1,19 @@
 package industries.geesawra.monarch
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -16,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -77,31 +82,38 @@ fun NotificationsView(
             key = { it.uniqueKey() }
         ) { notif ->
             val isUnread = viewModel.isNotificationNew(notif)
-            ElevatedCard(
-                elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = if (isUnread) 4.dp else 1.dp,
-                ),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = if (isUnread)
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    else
-                        MaterialTheme.colorScheme.surfaceContainerLow
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
                 modifier = Modifier
             ) {
-                RenderNotification(
-                    viewModel = viewModel,
-                    notification = notif,
-                    settingsState = settingsState,
-                    onReplyTap = onReplyTap,
-                    onProfileTap = onProfileTap,
-                    onShowThread = { skeet ->
-                        if (onSeeMoreTap != null) {
-                            viewModel.setThread(skeet)
-                            onSeeMoreTap(skeet)
-                        }
+                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .fillMaxHeight()
+                            .background(
+                                if (isUnread) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceContainerLow
+                            )
+                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        RenderNotification(
+                            viewModel = viewModel,
+                            notification = notif,
+                            settingsState = settingsState,
+                            onReplyTap = onReplyTap,
+                            onProfileTap = onProfileTap,
+                            onShowThread = { skeet ->
+                                if (onSeeMoreTap != null) {
+                                    viewModel.setThread(skeet)
+                                    onSeeMoreTap(skeet)
+                                }
+                            }
+                        )
                     }
-                )
+                }
             }
         }
     }

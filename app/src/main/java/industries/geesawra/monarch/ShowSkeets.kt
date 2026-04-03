@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
@@ -120,9 +120,9 @@ fun ShowSkeets(
             contentType = { _, skeet -> if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0 },
         ) { idx, skeet ->
             val isVisible = visibleKeys.contains(skeet.rkey)
-            ElevatedCard(
+            Card(
                 modifier = Modifier.padding(start = (skeet.nestingLevel * nestingIndent()).dp),
-                colors = CardDefaults.elevatedCardColors(
+                colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
             ) {
@@ -271,8 +271,8 @@ fun ShowSkeets(
 
 @Composable
 private fun SkeletonPost() {
-    ElevatedCard(
-        colors = CardDefaults.elevatedCardColors(
+    Card(
+        colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
     ) {
