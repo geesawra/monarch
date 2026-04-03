@@ -102,6 +102,13 @@ data class TimelineUiState(
     val isSearching: Boolean = false,
 )
 
+object NotificationBadge {
+    val count = kotlinx.coroutines.flow.MutableStateFlow(0)
+    fun increment() { count.value++ }
+    fun set(value: Int) { count.value = value }
+    fun clear() { count.value = 0 }
+}
+
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
 class TimelineViewModel @AssistedInject constructor(
     @Assisted private val bskyConn: BlueskyConn,
@@ -378,14 +385,14 @@ class TimelineViewModel @AssistedInject constructor(
                 return@launch
             }
 
-            uiState = uiState.copy(
-                unreadNotificationsAmt = rawNotifs.notifications.fold(0) { acc, notification ->
-                    when (notification.isRead) {
-                        false -> acc + 1
-                        true -> acc
-                    }
+            val unreadCount = rawNotifs.notifications.fold(0) { acc, notification ->
+                when (notification.isRead) {
+                    false -> acc + 1
+                    true -> acc
                 }
-            )
+            }
+            uiState = uiState.copy(unreadNotificationsAmt = unreadCount)
+            NotificationBadge.set(unreadCount)
 
             val repeatable = mutableListOf<Notification>()
             val postsToFetch = rawNotifs.notifications.flatMap {
@@ -685,6 +692,7 @@ class TimelineViewModel @AssistedInject constructor(
                 }
             }.onSuccess {
                 uiState = uiState.copy(unreadNotificationsAmt = 0)
+                NotificationBadge.clear()
             }
         }
     }

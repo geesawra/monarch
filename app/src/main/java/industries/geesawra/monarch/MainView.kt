@@ -106,6 +106,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -135,6 +136,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.shape.RoundedCornerShape
 import industries.geesawra.monarch.datalayer.AvatarShape
+import industries.geesawra.monarch.datalayer.NotificationBadge
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -473,9 +475,9 @@ private fun InnerTimelineView(
         }
 
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            LaunchedEffect(timelineViewModel.uiState.unreadNotificationsAmt) {
-                TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue =
-                    timelineViewModel.uiState.unreadNotificationsAmt
+            val notifBadgeCount by NotificationBadge.count.collectAsState()
+            LaunchedEffect(notifBadgeCount) {
+                TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = notifBadgeCount
             }
 
             val navLayoutType = if (settingsState.forceCompactLayout) {

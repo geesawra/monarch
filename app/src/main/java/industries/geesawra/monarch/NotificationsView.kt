@@ -260,7 +260,7 @@ private fun RenderNotification(
             postTextSize = settingsState.postTextSize,
             avatarShape = avatarClipShape,
             showLabels = settingsState.showLabels,
-            renderingReplyNotif = true,
+            renderingReplyNotif = false,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
         )

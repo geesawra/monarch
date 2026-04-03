@@ -169,6 +169,8 @@ class MessagingService : FirebaseMessagingService() {
             }
         }
 
+        NotificationBadge.increment()
+
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
 
