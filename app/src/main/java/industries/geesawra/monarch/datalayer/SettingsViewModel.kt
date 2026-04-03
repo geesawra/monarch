@@ -43,7 +43,7 @@ data class DefaultFeed(
 
 data class SettingsState(
     val themeMode: ThemeMode = ThemeMode.System,
-    val dynamicColor: Boolean = true,
+    val dynamicColor: Boolean = false,
     val postTextSize: PostTextSize = PostTextSize.Medium,
     val avatarShape: AvatarShape = AvatarShape.Circle,
     val replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads,
@@ -90,7 +90,7 @@ class SettingsViewModel @Inject constructor(
                 val narrowScreen = context.resources.configuration.screenWidthDp <= 360
                 SettingsState(
                     themeMode = prefs[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
-                    dynamicColor = prefs[DYNAMIC_COLOR]?.toBooleanStrictOrNull() ?: true,
+                    dynamicColor = prefs[DYNAMIC_COLOR]?.toBooleanStrictOrNull() ?: false,
                     postTextSize = prefs[POST_TEXT_SIZE]?.let { runCatching { PostTextSize.valueOf(it) }.getOrNull() } ?: if (narrowScreen) PostTextSize.Small else PostTextSize.Medium,
                     avatarShape = prefs[AVATAR_SHAPE]?.let { runCatching { AvatarShape.valueOf(it) }.getOrNull() } ?: AvatarShape.Circle,
                     replyFilterMode = prefs[REPLY_FILTER_MODE]?.let { runCatching { ReplyFilterMode.valueOf(it) }.getOrNull() } ?: ReplyFilterMode.OnlyFilterDeepThreads,

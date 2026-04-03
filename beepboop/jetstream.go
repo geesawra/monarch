@@ -261,6 +261,10 @@ func (eh *eventHandler) handleLike(
 	subject syntax.ATURI,
 	like *bsky.FeedLike,
 ) ([]*messaging.Message, error) {
+	if subject.Authority().String() == e.Did {
+		return nil, nil
+	}
+
 	tokens := eh.t.tokensFor(subject.Authority().String())
 	if len(tokens) == 0 {
 		eh.m.eventsSkipped.Add(ctx, 1, attrReason("no_token"))
@@ -325,8 +329,10 @@ func (eh *eventHandler) handleReply(
 
 			mention := ff.RichtextFacet_Mention
 
-			if tokens := eh.t.tokensFor(mention.Did); len(tokens) > 0 {
-				notifyDIDs[mention.Did] = replyData{kind: "app.bsky.feed.mention"}
+			if mention.Did != e.Did {
+				if tokens := eh.t.tokensFor(mention.Did); len(tokens) > 0 {
+					notifyDIDs[mention.Did] = replyData{kind: "app.bsky.feed.mention"}
+				}
 			}
 		}
 	}
@@ -339,8 +345,10 @@ func (eh *eventHandler) handleReply(
 		}
 
 		did := puri.Authority().String()
-		if tokens := eh.t.tokensFor(did); len(tokens) > 0 {
-			notifyDIDs[did] = replyData{kind: "app.bsky.feed.reply"}
+		if did != e.Did {
+			if tokens := eh.t.tokensFor(did); len(tokens) > 0 {
+				notifyDIDs[did] = replyData{kind: "app.bsky.feed.reply"}
+			}
 		}
 	}
 
@@ -366,11 +374,13 @@ func (eh *eventHandler) handleReply(
 			}
 
 			did := ruri.Authority().String()
-			if tokens := eh.t.tokensFor(did); len(tokens) > 0 {
-				notifyDIDs[did] = replyData{
-					kind:              "app.bsky.feed.quote",
-					quotedPostContent: qpost.Text,
-					quotedPostImage:   mediaForPost(qpost, did, mediaSizeThumb),
+			if did != e.Did {
+				if tokens := eh.t.tokensFor(did); len(tokens) > 0 {
+					notifyDIDs[did] = replyData{
+						kind:              "app.bsky.feed.quote",
+						quotedPostContent: qpost.Text,
+						quotedPostImage:   mediaForPost(qpost, did, mediaSizeThumb),
+					}
 				}
 			}
 		}
@@ -432,6 +442,10 @@ func (eh *eventHandler) handleFollow(
 	e *models.Event,
 	follow *bsky.GraphFollow,
 ) ([]*messaging.Message, error) {
+	if follow.Subject == e.Did {
+		return nil, nil
+	}
+
 	tokens := eh.t.tokensFor(follow.Subject)
 	if len(tokens) == 0 {
 		eh.m.eventsSkipped.Add(ctx, 1, attrReason("no_token"))
@@ -479,6 +493,10 @@ func (eh *eventHandler) handleRepost(
 	ruri, err := syntax.ParseATURI(repost.Subject.Uri)
 	if err != nil {
 		return nil, fmt.Errorf("parse reposted post uri %q: %w", repost.Subject.Uri, err)
+	}
+
+	if ruri.Authority().String() == e.Did {
+		return nil, nil
 	}
 
 	tokens := eh.t.tokensFor(ruri.Authority().String())

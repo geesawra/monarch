@@ -35,3 +35,10 @@ You'll need the Android SDK with platform 36 and build-tools 36.1.0. The project
 ## Requirements
 
 Android 16+ (API 36). This is a bleeding-edge target — it runs on Pixel phones with the latest updates and recent Samsung/OnePlus flagships. Older phones won't be able to install it.
+
+## Credits
+
+- App icon uses [Iosevka SS08](https://github.com/be5invis/Iosevka) — [SIL Open Font License 1.1](https://github.com/be5invis/Iosevka/blob/main/LICENSE.md)
+- Video player forked from [dealicious-inc/compose-video](https://github.com/dealicious-inc/compose-video) — [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+Vendored libraries in `thirdpartyforks/` are subject to their own license terms.
