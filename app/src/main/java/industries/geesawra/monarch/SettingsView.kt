@@ -222,6 +222,28 @@ fun SettingsView(
                 },
             )
 
+            ListItem(
+                headlineContent = { Text("Auto-like on reply") },
+                supportingContent = { Text("Automatically like a post when you reply to it") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.autoLikeOnReply,
+                        onCheckedChange = { settingsViewModel.setAutoLikeOnReply(it) }
+                    )
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("@psingletary.com mode") },
+                supportingContent = { Text("Auto-like posts as you scroll past them") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.autoLikeOnScroll,
+                        onCheckedChange = { settingsViewModel.setAutoLikeOnScroll(it) }
+                    )
+                },
+            )
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(

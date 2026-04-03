@@ -51,6 +51,8 @@ data class SettingsState(
     val defaultFeed: DefaultFeed = DefaultFeed(),
     val forceCompactLayout: Boolean = false,
     val swipeableFeeds: Boolean = true,
+    val autoLikeOnReply: Boolean = false,
+    val autoLikeOnScroll: Boolean = false,
     val pushNotificationsEnabled: Boolean = false,
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
     val loaded: Boolean = false,
@@ -73,6 +75,8 @@ class SettingsViewModel @Inject constructor(
         private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
         private val FORCE_COMPACT_LAYOUT = stringPreferencesKey("force_compact_layout")
         private val SWIPEABLE_FEEDS = stringPreferencesKey("swipeable_feeds")
+        private val AUTO_LIKE_ON_REPLY = stringPreferencesKey("auto_like_on_reply")
+        private val AUTO_LIKE_ON_SCROLL = stringPreferencesKey("auto_like_on_scroll")
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
         internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
     }
@@ -98,6 +102,8 @@ class SettingsViewModel @Inject constructor(
                     ),
                     forceCompactLayout = prefs[FORCE_COMPACT_LAYOUT]?.toBooleanStrictOrNull() ?: false,
                     swipeableFeeds = prefs[SWIPEABLE_FEEDS]?.toBooleanStrictOrNull() ?: !narrowScreen,
+                    autoLikeOnReply = prefs[AUTO_LIKE_ON_REPLY]?.toBooleanStrictOrNull() ?: false,
+                    autoLikeOnScroll = prefs[AUTO_LIKE_ON_SCROLL]?.toBooleanStrictOrNull() ?: false,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
                     loaded = true,
@@ -153,6 +159,18 @@ class SettingsViewModel @Inject constructor(
     fun setSwipeableFeeds(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[SWIPEABLE_FEEDS] = enabled.toString() }
+        }
+    }
+
+    fun setAutoLikeOnScroll(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[AUTO_LIKE_ON_SCROLL] = enabled.toString() }
+        }
+    }
+
+    fun setAutoLikeOnReply(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[AUTO_LIKE_ON_REPLY] = enabled.toString() }
         }
     }
 

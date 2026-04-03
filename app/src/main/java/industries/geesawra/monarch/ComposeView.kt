@@ -320,6 +320,7 @@ fun ComposeView(
                     coroutineScope,
                     maxChars,
                     timelineViewModel,
+                    autoLikeOnReply = settingsState.autoLikeOnReply,
                     scaffoldState,
                     inReplyTo.value,
                     isQuotePost.value,
@@ -750,6 +751,7 @@ fun ActionRow(
     coroutineScope: CoroutineScope,
     maxChars: Int,
     timelineViewModel: TimelineViewModel,
+    autoLikeOnReply: Boolean = false,
     scaffoldState: BottomSheetScaffoldState,
     inReplyToData: SkeetData? = null,
     isQuotePost: Boolean = false,
@@ -859,6 +861,9 @@ fun ActionRow(
                             threadgateRules = threadgateRules.value,
                         ).onSuccess {
                             wasEdited.value = false
+                            if (autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
+                                timelineViewModel.like(inReplyToData.uri, inReplyToData.cid) {}
+                            }
                             coroutineScope.launch {
                                 scaffoldState.bottomSheetState.hide()
                             }

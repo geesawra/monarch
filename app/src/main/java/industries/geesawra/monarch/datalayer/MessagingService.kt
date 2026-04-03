@@ -131,6 +131,9 @@ class MessagingService : FirebaseMessagingService() {
         val embedBitmap = embedImageUrl?.let { downloadBitmap(it) }
         val quotedImageBitmap = quotedEmbedImage?.let { downloadBitmap(it) }
 
+        val notificationId = System.currentTimeMillis().toInt()
+        val notifPostUri = message.data["notifPostUri"]
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -138,6 +141,41 @@ class MessagingService : FirebaseMessagingService() {
             .setGroup(GROUP_KEY)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+
+        if (notifPostUri != null && kind in listOf("app.bsky.feed.reply", "app.bsky.feed.mention", "app.bsky.feed.quote")) {
+            val likeIntent = Intent(this, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_LIKE
+                putExtra(NotificationActionReceiver.EXTRA_POST_URI, notifPostUri)
+                putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+            }
+            val likePendingIntent = PendingIntent.getBroadcast(
+                this, notificationId, likeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            builder.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_notification, "Like", likePendingIntent
+                ).build()
+            )
+
+            val replyInput = androidx.core.app.RemoteInput.Builder(NotificationActionReceiver.KEY_REPLY_TEXT)
+                .setLabel("Reply")
+                .build()
+            val replyIntent = Intent(this, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_REPLY
+                putExtra(NotificationActionReceiver.EXTRA_POST_URI, notifPostUri)
+                putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+            }
+            val replyPendingIntent = PendingIntent.getBroadcast(
+                this, notificationId + 1, replyIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            builder.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_notification, "Reply", replyPendingIntent
+                ).addRemoteInput(replyInput).build()
+            )
+        }
 
         if (avatar != null) {
             builder.setLargeIcon(avatar)
@@ -172,7 +210,7 @@ class MessagingService : FirebaseMessagingService() {
         NotificationBadge.increment()
 
         val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
+        notificationManager.notify(notificationId, builder.build())
 
         val summaryBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)

@@ -37,6 +37,9 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -277,6 +280,27 @@ fun ShowSkeets(
     LaunchedEffect(endOfListReached) {
         if (endOfListReached && viewModel.uiState.skeets.isNotEmpty() && shouldFetchMoreData) {
             viewModel.fetchTimeline()
+        }
+    }
+
+    if (settingsState.autoLikeOnScroll && !isShowingThread) {
+        val autoLikedCids = remember { mutableSetOf<Cid>() }
+        LaunchedEffect(state) {
+            snapshotFlow {
+                val layoutInfo = state.layoutInfo
+                val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2
+                layoutInfo.visibleItemsInfo.minByOrNull {
+                    kotlin.math.abs((it.offset + it.size / 2) - viewportCenter)
+                }?.key as? String
+            }.distinctUntilChanged().collectLatest { rkey ->
+                if (rkey == null) return@collectLatest
+                val skeet = filteredData.find { it.rkey == rkey } ?: return@collectLatest
+                if (skeet.didLike) return@collectLatest
+                if (skeet.cid in autoLikedCids) return@collectLatest
+                if (skeet.root() != null || skeet.parent().first != null) return@collectLatest
+                autoLikedCids.add(skeet.cid)
+                viewModel.like(skeet.uri, skeet.cid) {}
+            }
         }
     }
 }

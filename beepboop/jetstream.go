@@ -407,6 +407,7 @@ func (eh *eventHandler) handleReply(
 				Data: map[string]string{
 					"authorDid":        e.Did,
 					"uri":              string(subject),
+					"notifPostUri":     fmt.Sprintf("at://%s/%s/%s", e.Did, e.Commit.Collection, e.Commit.RKey),
 					"title":            authorName + " " + titleSuffix,
 					"body":             post.Text,
 					"image":            authorAvatar,
