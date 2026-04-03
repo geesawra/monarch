@@ -386,6 +386,9 @@ fun Embeds(
         }
 
         is PostViewEmbedUnion.RecordWithMediaView -> run {
+            if (nested) {
+                return@run
+            }
             val media = embed.value.media
             val mediaValue = when (media) {
                 is RecordWithMediaViewMediaUnion.ExternalView -> PostViewEmbedUnion.ExternalView(
@@ -700,7 +703,6 @@ fun RecordView(
                 viewModel = viewModel,
                 skeet = s,
                 nested = true,
-                disableEmbeds = true,
                 postTextSize = postTextSize,
                 avatarShape = avatarShape,
                 showLabels = showLabels,
@@ -740,7 +742,6 @@ private fun RecordWithMediaView(
             viewModel = viewModel,
             skeet = record,
             nested = true,
-            disableEmbeds = true,
             postTextSize = postTextSize,
             avatarShape = avatarShape,
             showLabels = showLabels,
