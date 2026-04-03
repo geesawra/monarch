@@ -16,15 +16,21 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberStandardBottomSheetState
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -201,20 +207,56 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(route = ViewList.ShowThread.name) {
-                            ThreadView(
-                                modifier = Modifier
-                                    .windowInsetsPadding(WindowInsets.statusBars),
-                                timelineViewModel = timelineViewModel,
-                                settingsState = settings,
-                                coroutineScope = rememberCoroutineScope(),
-                                backButton = {
-                                    navController.popBackStack()
-                                },
-                                onProfileTap = { did ->
-                                    timelineViewModel.openProfile(did)
-                                    navController.navigate(ViewList.Profile.name)
-                                },
+                            val threadCoroutineScope = rememberCoroutineScope()
+                            val threadScaffoldState = rememberBottomSheetScaffoldState(
+                                bottomSheetState = rememberStandardBottomSheetState(
+                                    skipHiddenState = false,
+                                    initialValue = SheetValue.Hidden,
+                                )
                             )
+                            val threadInReplyTo = remember { mutableStateOf<SkeetData?>(null) }
+                            val threadIsQuotePost = remember { mutableStateOf(false) }
+                            val threadScrollState = rememberScrollState()
+                            val threadContext = LocalContext.current
+
+                            BottomSheetScaffold(
+                                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+                                scaffoldState = threadScaffoldState,
+                                sheetPeekHeight = 0.dp,
+                                sheetDragHandle = {},
+                                sheetContent = {
+                                    ComposeView(
+                                        context = threadContext,
+                                        coroutineScope = threadCoroutineScope,
+                                        timelineViewModel = timelineViewModel,
+                                        settingsState = settings,
+                                        inReplyTo = threadInReplyTo,
+                                        isQuotePost = threadIsQuotePost,
+                                        scaffoldState = threadScaffoldState,
+                                        scrollState = threadScrollState,
+                                    )
+                                },
+                            ) {
+                                ThreadView(
+                                    timelineViewModel = timelineViewModel,
+                                    settingsState = settings,
+                                    coroutineScope = threadCoroutineScope,
+                                    backButton = {
+                                        navController.popBackStack()
+                                    },
+                                    onProfileTap = { did ->
+                                        timelineViewModel.openProfile(did)
+                                        navController.navigate(ViewList.Profile.name)
+                                    },
+                                    onReplyTap = { skeetData, quotePost ->
+                                        threadInReplyTo.value = skeetData
+                                        threadIsQuotePost.value = quotePost
+                                        threadCoroutineScope.launch {
+                                            threadScaffoldState.bottomSheetState.expand()
+                                        }
+                                    },
+                                )
+                            }
                         }
                         composable(route = ViewList.Profile.name) {
                             ProfileView(

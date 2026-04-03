@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import industries.geesawra.monarch.datalayer.SettingsState
+import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import sh.christian.ozone.api.Did
@@ -40,6 +41,7 @@ fun ThreadView(
     backButton: () -> Unit,
     coroutineScope: CoroutineScope,
     onProfileTap: ((Did) -> Unit)? = null,
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         rememberTopAppBarState()
@@ -107,6 +109,7 @@ fun ThreadView(
                         isShowingThread = true,
                         settingsState = settingsState,
                         onProfileTap = onProfileTap,
+                        onReplyTap = onReplyTap,
                     )
                 }
             }

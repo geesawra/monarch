@@ -202,6 +202,9 @@ private fun RenderNotification(
                         postTextSize = settingsState.postTextSize,
                         avatarShape = avatarClipShape,
                         showLabels = settingsState.showLabels,
+                        onShowThread = {
+                            onProfileTap?.invoke(notification.follow.did)
+                        },
                     )
                 }
             }
