@@ -60,7 +60,7 @@ fun NotificationsView(
 ) {
     LaunchedEffect(Unit) {
         if (viewModel.uiState.unreadNotificationsAmt != 0) {
-            delay(500)
+            delay(5000)
             viewModel.updateSeenNotifications()
         }
     }

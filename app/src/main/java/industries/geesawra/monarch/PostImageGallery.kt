@@ -77,7 +77,7 @@ fun PostImageGallery(
             }
 
             DeletableImageView(
-                modifier = Modifier.heightIn(max = 360.dp),
+                modifier = modifier.fillMaxWidth().heightIn(max = 360.dp),
                 image = img,
                 originalIndex = 0,
                 onCrossClick = onCrossClick,
@@ -225,11 +225,13 @@ private fun DeletableImageView(
             contentScale = ContentScale.Crop,
             modifier = if (aspectRatio != null) {
                 Modifier
+                    .fillMaxWidth()
                     .aspectRatio(aspectRatio)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onMediaClick(originalIndex) }
             } else {
                 Modifier
+                    .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onMediaClick(originalIndex) }

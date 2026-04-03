@@ -25,6 +25,7 @@ import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -70,7 +71,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -466,29 +468,31 @@ fun ComposeView(
                     }
                 }
 
-                OutlinedTextField(
+                TextField(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 250.dp)
                         .focusRequester(focusRequester)
                         .contentReceiver(receiveContentListener),
+                    contentPadding = PaddingValues(horizontal = 2.dp),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         autoCorrectEnabled = true,
                         keyboardType = KeyboardType.Text,
                     ),
-                    label = {
-                        if (wasEdited.value) {
-                            Text(
-                                text = "${maxChars - charCount.intValue}",
-                                color = if (textfieldState.text.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                            )
-                        } else {
-                            Text(
-                                text = "Less cringe this time, okay?",
-                            )
+                    placeholder = {
+                        if (!wasEdited.value) {
+                            Text("Less cringe this time, okay?")
                         }
                     },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        errorContainerColor = Color.Transparent,
+                        errorIndicatorColor = Color.Transparent,
+                    ),
                     isError = textfieldState.text.length > maxChars,
                     lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 10),
                     state = textfieldState,
@@ -809,6 +813,17 @@ fun ActionRow(
         }
 
         val haptic = LocalHapticFeedback.current
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+        if (postText.isNotEmpty()) {
+            Text(
+                text = "${maxChars - postText.length}",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (postText.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (uploadingPost.value) {
             CircularWavyProgressIndicator()
         } else {
@@ -865,6 +880,7 @@ fun ActionRow(
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text("Skeet")
             }
+        }
         }
     }
 }
