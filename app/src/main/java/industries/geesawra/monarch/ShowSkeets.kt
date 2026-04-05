@@ -388,13 +388,8 @@ fun ShowSkeets(
                 }
             }
 
-            if (isShowingThread && isGroupEnd) {
-                Spacer(modifier = Modifier.height(6.dp))
-                HorizontalDivider(
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+            if (isShowingThread && isGroupEnd && !hasConnectors) {
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
