@@ -469,36 +469,49 @@ fun ComposeView(
                     }
                 }
 
-                TextField(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 250.dp)
-                        .focusRequester(focusRequester)
-                        .contentReceiver(receiveContentListener),
-                    contentPadding = PaddingValues(horizontal = 2.dp),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        autoCorrectEnabled = true,
-                        keyboardType = KeyboardType.Text,
-                    ),
-                    placeholder = {
-                        if (!wasEdited.value) {
-                            Text("Less cringe this time, okay?")
-                        }
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        errorContainerColor = Color.Transparent,
-                        errorIndicatorColor = Color.Transparent,
-                    ),
-                    isError = textfieldState.text.length > maxChars,
-                    lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 10),
-                    state = textfieldState,
-                    outputTransformation = facetHighlighter,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp),
+                ) {
+                    AsyncImage(
+                        model = timelineViewModel.uiState.user?.avatar?.uri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .size(40.dp)
+                            .clip(if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape),
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                    TextField(
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(focusRequester)
+                            .contentReceiver(receiveContentListener),
+                        contentPadding = PaddingValues(horizontal = 2.dp),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            autoCorrectEnabled = true,
+                            keyboardType = KeyboardType.Text,
+                        ),
+                        placeholder = {
+                            if (!wasEdited.value) {
+                                Text("Less cringe this time, okay?")
+                            }
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            errorContainerColor = Color.Transparent,
+                            errorIndicatorColor = Color.Transparent,
+                        ),
+                        isError = textfieldState.text.length > maxChars,
+                        lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 10),
+                        state = textfieldState,
+                        outputTransformation = facetHighlighter,
+                    )
+                }
 
                 inReplyTo.value?.let {
                     OutlinedCard(
