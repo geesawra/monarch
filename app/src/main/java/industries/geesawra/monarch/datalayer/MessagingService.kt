@@ -104,7 +104,8 @@ class MessagingService : FirebaseMessagingService() {
 
     private fun onMessageReceivedInner(message: RemoteMessage) {
 
-        val title = message.notification?.title ?: message.data["title"] ?: "Monarch"
+        val entryPoint = getEntryPoint()
+        val rawTitle = message.notification?.title ?: message.data["title"] ?: "Monarch"
         val body = message.notification?.body ?: message.data["body"] ?: ""
         val imageUrl = message.notification?.imageUrl?.toString() ?: message.data["image"]
         val embedImageUrl = message.data["embedImage"]?.ifEmpty { null }
@@ -134,6 +135,15 @@ class MessagingService : FirebaseMessagingService() {
         val notificationId = System.currentTimeMillis().toInt()
         val notifPostUri = message.data["notifPostUri"]
         val recipientDid = message.data["recipientDid"]
+
+        val accountManager = entryPoint.accountManager()
+        val title = if (recipientDid != null) {
+            val accounts = kotlinx.coroutines.runBlocking { accountManager.getAccounts() }
+            if (accounts.size > 1) {
+                val recipient = accounts.firstOrNull { it.did == recipientDid }
+                if (recipient != null) "@${recipient.handle} · $rawTitle" else rawTitle
+            } else rawTitle
+        } else rawTitle
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)

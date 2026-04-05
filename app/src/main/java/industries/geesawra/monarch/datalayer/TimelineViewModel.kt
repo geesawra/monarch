@@ -571,19 +571,19 @@ class TimelineViewModel @AssistedInject constructor(
             }
 
             val processedRepeatable =
-                mutableMapOf<RepeatableNotification, MutableMap<SkeetData, RepeatedNotification>>()
+                mutableMapOf<RepeatableNotification, MutableMap<Cid, RepeatedNotification>>()
 
             val processRepeatable =
-                { kind: RepeatableNotification, list: MutableMap<SkeetData, RepeatedNotification>, ref: StrongRef, post: SkeetData, author: ProfileView, createdAt: Instant, new: Boolean ->
-                    if (list.contains(post)) {
-                        val l = list[post]!!
+                { kind: RepeatableNotification, list: MutableMap<Cid, RepeatedNotification>, ref: StrongRef, post: SkeetData, author: ProfileView, createdAt: Instant, new: Boolean ->
+                    if (list.contains(post.cid)) {
+                        val l = list[post.cid]!!
                         l.authors += RepeatedAuthor(author, createdAt)
                         if (createdAt > l.timestamp) {
                             l.timestamp = createdAt
                         }
-                        list[post] = l
+                        list[post.cid] = l
                     } else {
-                        list[post] = RepeatedNotification(
+                        list[post.cid] = RepeatedNotification(
                             kind = kind,
                             authors = listOf(
                                 RepeatedAuthor(
