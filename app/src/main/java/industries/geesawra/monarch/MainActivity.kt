@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
             MonarchTheme(
                 darkTheme = darkTheme,
                 dynamicColor = settings.dynamicColor,
+                appTheme = settings.appTheme,
             ) {
                 val context = LocalContext.current
                 SingletonImageLoader.setSafe {

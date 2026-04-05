@@ -24,6 +24,11 @@ enum class ThemeMode {
     Dark,
 }
 
+enum class AppTheme {
+    Monarch,
+    Bluesky,
+}
+
 enum class PostTextSize {
     Small,
     Medium,
@@ -43,6 +48,7 @@ data class DefaultFeed(
 
 data class SettingsState(
     val themeMode: ThemeMode = ThemeMode.System,
+    val appTheme: AppTheme = AppTheme.Monarch,
     val dynamicColor: Boolean = false,
     val postTextSize: PostTextSize = PostTextSize.Medium,
     val avatarShape: AvatarShape = AvatarShape.Circle,
@@ -65,6 +71,7 @@ class SettingsViewModel @Inject constructor(
 
     companion object {
         private val THEME_MODE = stringPreferencesKey("theme_mode")
+        private val APP_THEME = stringPreferencesKey("app_theme")
         private val DYNAMIC_COLOR = stringPreferencesKey("dynamic_color")
         private val POST_TEXT_SIZE = stringPreferencesKey("post_text_size")
         private val AVATAR_SHAPE = stringPreferencesKey("avatar_shape")
@@ -90,6 +97,7 @@ class SettingsViewModel @Inject constructor(
                 val narrowScreen = context.resources.configuration.screenWidthDp <= 360
                 SettingsState(
                     themeMode = prefs[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
+                    appTheme = prefs[APP_THEME]?.let { runCatching { AppTheme.valueOf(it) }.getOrNull() } ?: AppTheme.Monarch,
                     dynamicColor = prefs[DYNAMIC_COLOR]?.toBooleanStrictOrNull() ?: false,
                     postTextSize = prefs[POST_TEXT_SIZE]?.let { runCatching { PostTextSize.valueOf(it) }.getOrNull() } ?: if (narrowScreen) PostTextSize.Small else PostTextSize.Medium,
                     avatarShape = prefs[AVATAR_SHAPE]?.let { runCatching { AvatarShape.valueOf(it) }.getOrNull() } ?: AvatarShape.Circle,
@@ -117,6 +125,12 @@ class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[THEME_MODE] = mode.name }
+        }
+    }
+
+    fun setAppTheme(theme: AppTheme) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[APP_THEME] = theme.name }
         }
     }
 

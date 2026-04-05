@@ -68,6 +68,7 @@ import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.PushNotificationManager
 import industries.geesawra.monarch.datalayer.ReplyFilterMode
 import industries.geesawra.monarch.datalayer.SettingsViewModel
+import industries.geesawra.monarch.datalayer.AppTheme
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.launch
@@ -132,6 +133,25 @@ fun SettingsView(
                                 shape = SegmentedButtonDefaults.itemShape(idx, ThemeMode.entries.size),
                             ) {
                                 Text(mode.name)
+                            }
+                        }
+                    }
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Color scheme") },
+                supportingContent = {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        AppTheme.entries.forEachIndexed { idx, theme ->
+                            SegmentedButton(
+                                selected = settings.appTheme == theme,
+                                onClick = { settingsViewModel.setAppTheme(theme) },
+                                shape = SegmentedButtonDefaults.itemShape(idx, AppTheme.entries.size),
+                            ) {
+                                Text(theme.name)
                             }
                         }
                     }

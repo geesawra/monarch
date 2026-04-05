@@ -7,11 +7,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import industries.geesawra.monarch.datalayer.AppTheme
 
 @Composable
 fun MonarchTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
+    appTheme: AppTheme = AppTheme.Monarch,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -20,8 +22,10 @@ fun MonarchTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        else -> when (appTheme) {
+            AppTheme.Monarch -> if (darkTheme) DarkColorScheme else LightColorScheme
+            AppTheme.Bluesky -> if (darkTheme) BlueskyDarkColorScheme else BlueskyLightColorScheme
+        }
     }
 
     MaterialTheme(
