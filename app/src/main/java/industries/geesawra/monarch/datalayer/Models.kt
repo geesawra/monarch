@@ -909,8 +909,10 @@ data class ThreadPost(
             )
         )
 
-        replies.forEachIndexed { i, reply ->
-            val isLast = i == replies.lastIndex
+        val sortedReplies = replies.sortedWith(compareByDescending { it.post.did == post.did })
+
+        sortedReplies.forEachIndexed { i, reply ->
+            val isLast = i == sortedReplies.lastIndex
             val childLevel = if (isContinuation || level == 0) myLevel else (myLevel + 1).coerceAtMost(MAX_NESTING)
 
             if (!isContinuation && level > 0) {
