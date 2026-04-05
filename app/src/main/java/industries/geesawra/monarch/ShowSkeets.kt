@@ -173,9 +173,6 @@ fun ShowSkeets(
             val connectorWidth = nestingIndent()
 
             if (hasConnectors) {
-                if (idx > 0) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -244,7 +241,7 @@ fun ShowSkeets(
                     )
 
                     Card(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).padding(top = 4.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                         ),
