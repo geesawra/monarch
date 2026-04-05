@@ -28,6 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -141,17 +143,21 @@ fun SettingsView(
 
             ListItem(
                 headlineContent = { Text("Color scheme") },
-                supportingContent = {
-                    SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        AppTheme.entries.forEachIndexed { idx, theme ->
-                            SegmentedButton(
-                                selected = settings.appTheme == theme,
-                                onClick = { settingsViewModel.setAppTheme(theme) },
-                                shape = SegmentedButtonDefaults.itemShape(idx, AppTheme.entries.size),
-                            ) {
-                                Text(theme.name)
+                trailingContent = {
+                    var expanded by remember { mutableStateOf(false) }
+                    Box {
+                        TextButton(onClick = { expanded = true }) {
+                            Text(settings.appTheme.name)
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            AppTheme.entries.forEach { theme ->
+                                DropdownMenuItem(
+                                    text = { Text(theme.name) },
+                                    onClick = {
+                                        settingsViewModel.setAppTheme(theme)
+                                        expanded = false
+                                    },
+                                )
                             }
                         }
                     }
