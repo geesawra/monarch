@@ -185,25 +185,23 @@ class MessagingService : FirebaseMessagingService() {
             if (body.isNotEmpty()) "$body\n———\n$qt" else qt
         }
 
+        val bigText = formattedQuote ?: body
+
         when {
             embedBitmap != null -> {
                 val style = NotificationCompat.BigPictureStyle()
                     .bigPicture(embedBitmap)
-                if (formattedQuote != null) {
-                    style.setSummaryText(formattedQuote)
-                }
+                    .setSummaryText(bigText)
                 builder.setStyle(style)
             }
             quotedImageBitmap != null -> {
                 val style = NotificationCompat.BigPictureStyle()
                     .bigPicture(quotedImageBitmap)
-                if (formattedQuote != null) {
-                    style.setSummaryText(formattedQuote)
-                }
+                    .setSummaryText(bigText)
                 builder.setStyle(style)
             }
-            formattedQuote != null -> {
-                builder.setStyle(NotificationCompat.BigTextStyle().bigText(formattedQuote))
+            else -> {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             }
         }
 
