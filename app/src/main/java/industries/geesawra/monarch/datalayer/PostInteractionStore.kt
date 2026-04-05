@@ -44,4 +44,8 @@ class PostInteractionStore @Inject constructor() {
     fun seed(skeet: SkeetData) {
         getState(skeet.cid, PostInteraction.from(skeet))
     }
+
+    fun clear() {
+        states.clear()
+    }
 }

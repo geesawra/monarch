@@ -352,6 +352,15 @@ class BlueskyConn(val context: Context) {
         pdsURL = null
     }
 
+    suspend fun initializeInMemory(pdsURL: String, appviewProxy: String, sessionData: SessionData) {
+        resetClients()
+        refreshIfNeeded(pdsURL, appviewProxy, sessionData)
+        this.pdsURL = pdsURL
+        this.appviewProxy = appviewProxy
+        this.pdsClient = mkPdsClient(pdsURL, this.session!!)
+        this.client = mkClient(pdsURL, appviewProxy, this.session!!)
+    }
+
     suspend fun changeAppview(newAppviewProxy: String) {
         this.appviewProxy = newAppviewProxy
         context.dataStore.edit { settings ->

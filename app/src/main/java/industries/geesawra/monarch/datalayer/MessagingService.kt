@@ -133,6 +133,7 @@ class MessagingService : FirebaseMessagingService() {
 
         val notificationId = System.currentTimeMillis().toInt()
         val notifPostUri = message.data["notifPostUri"]
+        val recipientDid = message.data["recipientDid"]
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -147,6 +148,7 @@ class MessagingService : FirebaseMessagingService() {
                 action = NotificationActionReceiver.ACTION_LIKE
                 putExtra(NotificationActionReceiver.EXTRA_POST_URI, notifPostUri)
                 putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                recipientDid?.let { putExtra(NotificationActionReceiver.EXTRA_RECIPIENT_DID, it) }
             }
             val likePendingIntent = PendingIntent.getBroadcast(
                 this, notificationId, likeIntent,
@@ -165,6 +167,7 @@ class MessagingService : FirebaseMessagingService() {
                 action = NotificationActionReceiver.ACTION_REPLY
                 putExtra(NotificationActionReceiver.EXTRA_POST_URI, notifPostUri)
                 putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                recipientDid?.let { putExtra(NotificationActionReceiver.EXTRA_RECIPIENT_DID, it) }
             }
             val replyPendingIntent = PendingIntent.getBroadcast(
                 this, notificationId + 1, replyIntent,

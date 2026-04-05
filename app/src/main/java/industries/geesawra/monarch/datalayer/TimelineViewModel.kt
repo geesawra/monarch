@@ -196,6 +196,7 @@ class TimelineViewModel @AssistedInject constructor(
                 SessionData.decodeFromJson(target.sessionJson)
             )
             bskyConn.resetClients()
+            postInteractionStore.clear()
             uiState = TimelineUiState()
             uiState = uiState.copy(authenticated = true, sessionChecked = true)
             refreshAccounts()
@@ -427,14 +428,14 @@ class TimelineViewModel @AssistedInject constructor(
 
             val posts =
                 postsToFetch.chunked(25).fold(mapOf<AtUri, Pair<SkeetData, Post>>()) { acc, chunk ->
-                    acc + bskyConn.getPosts(chunk).getOrThrow()
-                        .associate {
-                            val record = it.record.decodeAs<Post>()
-                            it.uri to (SkeetData.fromPostView(
-                                it,
-                                it.author
-                            ) to record)
-                        }
+                    val fetched = bskyConn.getPosts(chunk).getOrNull() ?: return@fold acc
+                    acc + fetched.associate {
+                        val record = it.record.decodeAs<Post>()
+                        it.uri to (SkeetData.fromPostView(
+                            it,
+                            it.author
+                        ) to record)
+                    }
                 }
 
             // we could bulk request posts here and avoid much of the network IO
@@ -494,6 +495,7 @@ class TimelineViewModel @AssistedInject constructor(
                         val lp = posts[quotedUrl] ?: return@mapNotNull null
                         val skeetData = lp.first
                         val post = lp.second
+                        if (skeetData.did == null || skeetData.authorHandle == null) return@mapNotNull null
                         Notification.Quote(
                             Pair(it.cid, it.uri),
                             p,
@@ -504,8 +506,8 @@ class TimelineViewModel @AssistedInject constructor(
                                             uri = skeetData.uri,
                                             cid = skeetData.cid,
                                             author = ProfileViewBasic(
-                                                did = skeetData.did!!,
-                                                handle = skeetData.authorHandle!!,
+                                                did = skeetData.did,
+                                                handle = skeetData.authorHandle,
                                                 displayName = skeetData.authorName,
                                                 avatar = skeetData.authorAvatarURL?.let { uri ->
                                                     sh.christian.ozone.api.Uri(

@@ -6,6 +6,10 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.RemoteInput
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -19,16 +23,40 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_REPLY = "industries.geesawra.monarch.ACTION_REPLY"
         const val EXTRA_POST_URI = "post_uri"
         const val EXTRA_NOTIFICATION_ID = "notification_id"
+        const val EXTRA_RECIPIENT_DID = "recipient_did"
         const val KEY_REPLY_TEXT = "reply_text"
+    }
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface ReceiverEntryPoint {
+        fun accountManager(): AccountManager
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         val postUri = intent.getStringExtra(EXTRA_POST_URI) ?: return
+        val recipientDid = intent.getStringExtra(EXTRA_RECIPIENT_DID)
         val pendingResult = goAsync()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val conn = BlueskyConn(context)
+
+                if (recipientDid != null) {
+                    val entryPoint = EntryPointAccessors.fromApplication(
+                        context.applicationContext,
+                        ReceiverEntryPoint::class.java
+                    )
+                    val account = entryPoint.accountManager().getAccount(recipientDid)
+                    if (account != null) {
+                        conn.initializeInMemory(
+                            account.pdsHost,
+                            account.appviewProxy,
+                            SessionData.decodeFromJson(account.sessionJson)
+                        )
+                    }
+                }
+
                 val posts = conn.getPosts(listOf(AtUri(postUri))).getOrNull()
                 val post = posts?.firstOrNull() ?: return@launch
 

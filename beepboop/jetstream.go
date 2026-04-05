@@ -287,13 +287,14 @@ func (eh *eventHandler) handleLike(
 	for _, token := range tokens {
 		ret = append(ret, &messaging.Message{
 			Data: map[string]string{
-				"authorDid":  e.Did,
-				"uri":        string(subject),
-				"title":      authorName + " liked your post",
-				"body":       post.Text,
-				"image":      authorAvatar,
-				"embedImage": mediaForPost(post, subject.Authority().String(), mediaSizeThumb),
-				"kind":       e.Commit.Collection,
+				"authorDid":    e.Did,
+				"recipientDid": subject.Authority().String(),
+				"uri":          string(subject),
+				"title":        authorName + " liked your post",
+				"body":         post.Text,
+				"image":        authorAvatar,
+				"embedImage":   mediaForPost(post, subject.Authority().String(), mediaSizeThumb),
+				"kind":         e.Commit.Collection,
 			},
 			Android: &messaging.AndroidConfig{
 				Priority: "high",
@@ -416,6 +417,7 @@ func (eh *eventHandler) handleReply(
 			ret = append(ret, &messaging.Message{
 				Data: map[string]string{
 					"authorDid":        e.Did,
+					"recipientDid":     did,
 					"uri":              string(subject),
 					"notifPostUri":     fmt.Sprintf("at://%s/%s/%s", e.Did, e.Commit.Collection, e.Commit.RKey),
 					"title":            authorName + " " + titleSuffix,
@@ -468,11 +470,12 @@ func (eh *eventHandler) handleFollow(
 	for _, token := range tokens {
 		ret = append(ret, &messaging.Message{
 			Data: map[string]string{
-				"authorDid": e.Did,
-				"title":     authorName + " has followed you!",
-				"body":      bio,
-				"image":     authorAvatar,
-				"kind":      e.Commit.Collection,
+				"authorDid":    e.Did,
+				"recipientDid": follow.Subject,
+				"title":        authorName + " has followed you!",
+				"body":         bio,
+				"image":        authorAvatar,
+				"kind":         e.Commit.Collection,
 			},
 			Android: &messaging.AndroidConfig{
 				Priority: "high",
@@ -521,13 +524,14 @@ func (eh *eventHandler) handleRepost(
 	for _, token := range tokens {
 		ret = append(ret, &messaging.Message{
 			Data: map[string]string{
-				"authorDid":  e.Did,
-				"uri":        string(subject),
-				"title":      authorName + " reposted your post",
-				"body":       rpost.Text,
-				"image":      authorAvatar,
-				"embedImage": mediaForPost(rpost, ruri.Authority().String(), mediaSizeThumb),
-				"kind":       e.Commit.Collection,
+				"authorDid":    e.Did,
+				"recipientDid": ruri.Authority().String(),
+				"uri":          string(subject),
+				"title":        authorName + " reposted your post",
+				"body":         rpost.Text,
+				"image":        authorAvatar,
+				"embedImage":   mediaForPost(rpost, ruri.Authority().String(), mediaSizeThumb),
+				"kind":         e.Commit.Collection,
 			},
 			Android: &messaging.AndroidConfig{
 				Priority: "high",
