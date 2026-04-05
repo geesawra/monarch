@@ -127,7 +127,7 @@ fun ShowSkeets(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = feedHorizontalPadding()),
-        verticalArrangement = Arrangement.spacedBy(feedItemSpacing()),
+        verticalArrangement = if (isShowingThread) Arrangement.spacedBy(0.dp) else Arrangement.spacedBy(feedItemSpacing()),
     ) {
         if (isLoading && data.isEmpty()) {
             items(8, key = { "skeleton_$it" }) {
@@ -273,6 +273,7 @@ fun ShowSkeets(
                 }
                 Card(
                     shape = threadCardShape,
+                    elevation = if (isShowingThread) CardDefaults.cardElevation(defaultElevation = 0.dp) else CardDefaults.cardElevation(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ),
