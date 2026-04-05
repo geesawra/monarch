@@ -144,6 +144,25 @@ fun ShowSkeets(
 
             val connectors = skeet.threadConnectors
             val hasConnectors = isShowingThread && connectors.isNotEmpty()
+
+            val isGroupStart = if (isShowingThread && !hasConnectors) {
+                val prev = filteredData.getOrNull(idx - 1)
+                prev == null || prev.threadConnectors.isNotEmpty() ||
+                    (prev.nestingLevel == 0 && !skeet.isSameAuthorContinuation && idx > 0)
+            } else false
+
+            val isGroupEnd = if (isShowingThread && !hasConnectors) {
+                val next = filteredData.getOrNull(idx + 1)
+                next == null || next.threadConnectors.isNotEmpty() ||
+                    (next.nestingLevel == 0 && !next.isSameAuthorContinuation)
+            } else false
+
+            val threadCardShape = if (isShowingThread && !hasConnectors) {
+                val topRadius = if (isGroupStart) 12.dp else 0.dp
+                val bottomRadius = if (isGroupEnd) 12.dp else 0.dp
+                RoundedCornerShape(topStart = topRadius, topEnd = topRadius, bottomStart = bottomRadius, bottomEnd = bottomRadius)
+            } else MaterialTheme.shapes.medium
+
             val connectorColors = listOf(
                 MaterialTheme.colorScheme.primary,
                 MaterialTheme.colorScheme.secondary,
@@ -246,7 +265,14 @@ fun ShowSkeets(
                     }
                 }
             } else {
+                if (isShowingThread && !isGroupStart && !hasConnectors) {
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                }
                 Card(
+                    shape = threadCardShape,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ),
@@ -358,20 +384,8 @@ fun ShowSkeets(
                 }
             }
 
-            if (isShowingThread) {
-                val nextSkeet = filteredData.getOrNull(idx + 1)
-                if (nextSkeet != null &&
-                    nextSkeet.nestingLevel == 0 &&
-                    !nextSkeet.isSameAuthorContinuation &&
-                    !skeet.isSameAuthorContinuation
-                ) {
-                    HorizontalDivider(
-                        thickness = 2.dp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp)
-                    )
-                }
+            if (isShowingThread && isGroupEnd) {
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }

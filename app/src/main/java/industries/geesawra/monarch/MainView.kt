@@ -851,6 +851,7 @@ private fun InnerTimelineView(
                                                         state = pagerState,
                                                         modifier = Modifier.fillMaxSize(),
                                                         beyondViewportPageCount = 0,
+                                                        contentPadding = PaddingValues(horizontal = 16.dp),
                                                     ) { page ->
                                                         val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
                                                         val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
