@@ -88,9 +88,14 @@ private fun cdnVideoPlaylist(authorDid: Did, blob: Blob?): Uri? {
     return Uri("https://video.cdn.bsky.app/hls/${authorDid.did}/${id}/playlist.m3u8")
 }
 
+enum class ThreadConnectorType { PASS_THROUGH, BRANCH, LAST_BRANCH }
+data class ThreadConnector(val level: Int, val type: ThreadConnectorType)
+
 data class SkeetData(
     val nestingLevel: Int = 0,
     val isReplyToRoot: Boolean = false,
+    val isSameAuthorContinuation: Boolean = false,
+    val threadConnectors: List<ThreadConnector> = listOf(),
     val likes: Long? = null,
     val reposts: Long? = null,
     val replies: Long? = null,
@@ -857,12 +862,71 @@ data class ThreadPost(
     val level: Int = 0,
     val replies: List<ThreadPost> = listOf()
 ) {
+    companion object {
+        private const val MAX_NESTING = 5
+    }
+
     fun flatten(): List<SkeetData> {
-        val list = mutableListOf<SkeetData>()
-        list.add(post.copy(nestingLevel = level, isReplyToRoot = level == 1))
-        replies.forEach { reply ->
-            list.addAll(reply.flatten())
+        val out = mutableListOf<SkeetData>()
+        flattenInner(out, activeConnectors = mutableListOf(), parentDid = null, effectiveLevel = 0)
+        return out
+    }
+
+    private fun flattenInner(
+        out: MutableList<SkeetData>,
+        activeConnectors: MutableList<Boolean>,
+        parentDid: Did?,
+        effectiveLevel: Int,
+    ) {
+        val isContinuation = parentDid != null &&
+                post.did == parentDid &&
+                level > 0
+
+        val myLevel = if (isContinuation) effectiveLevel else effectiveLevel.coerceAtMost(MAX_NESTING)
+
+        val connectors = if (myLevel > 0 && !isContinuation) {
+            activeConnectors.mapIndexed { idx, hasMoreSiblings ->
+                if (idx == activeConnectors.lastIndex) {
+                    ThreadConnector(
+                        idx,
+                        if (hasMoreSiblings) ThreadConnectorType.BRANCH else ThreadConnectorType.LAST_BRANCH
+                    )
+                } else {
+                    if (hasMoreSiblings) ThreadConnector(idx, ThreadConnectorType.PASS_THROUGH)
+                    else null
+                }
+            }.filterNotNull()
+        } else {
+            listOf()
         }
-        return list
+
+        out.add(
+            post.copy(
+                nestingLevel = myLevel,
+                isReplyToRoot = level == 1,
+                isSameAuthorContinuation = isContinuation,
+                threadConnectors = connectors,
+            )
+        )
+
+        replies.forEachIndexed { i, reply ->
+            val isLast = i == replies.lastIndex
+            val childLevel = if (isContinuation || level == 0) myLevel else (myLevel + 1).coerceAtMost(MAX_NESTING)
+
+            if (!isContinuation && level > 0) {
+                activeConnectors.add(!isLast)
+            } else if (level == 0) {
+                activeConnectors.clear()
+                activeConnectors.add(!isLast)
+            }
+
+            reply.flattenInner(out, activeConnectors, post.did, childLevel)
+
+            if (!isContinuation && level > 0) {
+                activeConnectors.removeAt(activeConnectors.lastIndex)
+            } else if (level == 0 && isLast) {
+                activeConnectors.clear()
+            }
+        }
     }
 }

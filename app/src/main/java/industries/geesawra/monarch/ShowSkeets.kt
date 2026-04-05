@@ -43,6 +43,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.ReplyRefParentUnion
@@ -53,6 +57,8 @@ import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
+import industries.geesawra.monarch.datalayer.ThreadConnector
+import industries.geesawra.monarch.datalayer.ThreadConnectorType
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.Did
@@ -135,123 +141,226 @@ fun ShowSkeets(
             contentType = { _, skeet -> if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0 },
         ) { idx, skeet ->
             val isVisible = visibleKeys.contains(skeet.rkey)
-            Card(
-                modifier = Modifier.padding(start = (skeet.nestingLevel * nestingIndent()).dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                ),
-            ) {
-                val isRepost = when (skeet.reason) {
-                    is FeedViewPostReasonUnion.ReasonRepost -> true
-                    else -> false
-                }
 
-                val root = skeet.root()
-                val (parent, parentsParent) = skeet.parent()
+            val connectors = skeet.threadConnectors
+            val hasConnectors = isShowingThread && connectors.isNotEmpty()
+            val connectorColors = listOf(
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.secondary,
+                MaterialTheme.colorScheme.tertiary,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
+            )
+            val connectorWidth = nestingIndent()
 
-                if (!isShowingThread) {
-                    if (!isRepost) {
-                        root?.let {
-                            SkeetView(
-                                viewModel = viewModel,
-                                skeet = it,
-                                onReplyTap = onReplyTap,
-                                inThread = true,
-                                postTextSize = settingsState.postTextSize,
-                                avatarShape = avatarClipShape,
-                                showLabels = settingsState.showLabels,
-                                onAvatarTap = onProfileTap,
-                                onShowThread = { skeet ->
-                                    if (onSeeMoreTap != null) {
-                                        viewModel.setThread(skeet)
-                                        onSeeMoreTap(skeet)
-                                    }
-                                },
-                                isVisible = isVisible,
-                            )
-                        }
+            if (hasConnectors) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width((skeet.nestingLevel * connectorWidth).dp)
+                            .fillMaxHeight()
+                            .drawBehind {
+                                val slotWidth = connectorWidth.dp.toPx()
+                                val lineWidth = 2.dp.toPx()
+                                val branchLength = slotWidth * 0.5f
 
-                        parent?.let {
-                            if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(IntrinsicSize.Min)
-                                        .padding(start = 16.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(40.dp)
-                                            .fillMaxHeight(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        VerticalDivider(
-                                            thickness = 3.dp,
-                                            modifier = Modifier
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(12.dp)),
-                                            color = MaterialTheme.colorScheme.outlineVariant
-                                        )
-                                    }
-                                    FilledTonalButton(
-                                        modifier = Modifier.padding(start = 12.dp),
-                                        onClick = {
-                                            if (onSeeMoreTap != null) {
-                                                viewModel.setThread(root)
-                                                onSeeMoreTap(root)
-                                            }
+                                connectors.forEach { connector ->
+                                    val color = connectorColors[connector.level % connectorColors.size]
+                                    val x = connector.level * slotWidth + slotWidth / 2f
+
+                                    when (connector.type) {
+                                        ThreadConnectorType.PASS_THROUGH -> {
+                                            drawLine(
+                                                color = color,
+                                                start = Offset(x, 0f),
+                                                end = Offset(x, size.height),
+                                                strokeWidth = lineWidth,
+                                                cap = StrokeCap.Round,
+                                            )
                                         }
-                                    ) {
-                                        Text("See full thread")
+
+                                        ThreadConnectorType.BRANCH -> {
+                                            drawLine(
+                                                color = color,
+                                                start = Offset(x, 0f),
+                                                end = Offset(x, size.height),
+                                                strokeWidth = lineWidth,
+                                                cap = StrokeCap.Round,
+                                            )
+                                            drawLine(
+                                                color = color,
+                                                start = Offset(x, size.height / 2f),
+                                                end = Offset(x + branchLength, size.height / 2f),
+                                                strokeWidth = lineWidth,
+                                                cap = StrokeCap.Round,
+                                            )
+                                        }
+
+                                        ThreadConnectorType.LAST_BRANCH -> {
+                                            drawLine(
+                                                color = color,
+                                                start = Offset(x, 0f),
+                                                end = Offset(x, size.height / 2f),
+                                                strokeWidth = lineWidth,
+                                                cap = StrokeCap.Round,
+                                            )
+                                            drawLine(
+                                                color = color,
+                                                start = Offset(x, size.height / 2f),
+                                                end = Offset(x + branchLength, size.height / 2f),
+                                                strokeWidth = lineWidth,
+                                                cap = StrokeCap.Round,
+                                            )
+                                        }
                                     }
                                 }
                             }
+                    )
 
-                            SkeetView(
-                                viewModel = viewModel,
-                                skeet = it,
-                                onReplyTap = onReplyTap,
-                                inThread = true,
-                                postTextSize = settingsState.postTextSize,
-                                avatarShape = avatarClipShape,
-                                showLabels = settingsState.showLabels,
-                                onAvatarTap = onProfileTap,
-                                onShowThread = { skeet ->
-                                    if (onSeeMoreTap != null) {
-                                        viewModel.setThread(skeet)
-                                        onSeeMoreTap(skeet)
-                                    }
-                                },
-                                isVisible = isVisible,
-                            )
-                        }
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ),
+                    ) {
+                        SkeetView(
+                            viewModel = viewModel,
+                            skeet = skeet,
+                            onReplyTap = onReplyTap,
+                            postTextSize = settingsState.postTextSize,
+                            avatarShape = avatarClipShape,
+                            showLabels = settingsState.showLabels,
+                            onAvatarTap = onProfileTap,
+                            onShowThread = { skeet ->
+                                if (onSeeMoreTap != null) {
+                                    viewModel.setThread(skeet)
+                                    onSeeMoreTap(skeet)
+                                }
+                            },
+                            isVisible = isVisible,
+                        )
                     }
                 }
+            } else {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    ),
+                ) {
+                    val isRepost = when (skeet.reason) {
+                        is FeedViewPostReasonUnion.ReasonRepost -> true
+                        else -> false
+                    }
 
-                SkeetView(
-                    viewModel = viewModel,
-                    skeet = skeet,
-                    onReplyTap = onReplyTap,
-                    showInReplyTo = parent == null,
-                    postTextSize = settingsState.postTextSize,
-                    avatarShape = avatarClipShape,
-                    showLabels = settingsState.showLabels,
-                    onAvatarTap = onProfileTap,
-                    onShowThread = { skeet ->
-                        if (onSeeMoreTap != null) {
-                            viewModel.setThread(skeet)
-                            onSeeMoreTap(skeet)
+                    val root = skeet.root()
+                    val (parent, parentsParent) = skeet.parent()
+
+                    if (!isShowingThread) {
+                        if (!isRepost) {
+                            root?.let {
+                                SkeetView(
+                                    viewModel = viewModel,
+                                    skeet = it,
+                                    onReplyTap = onReplyTap,
+                                    inThread = true,
+                                    postTextSize = settingsState.postTextSize,
+                                    avatarShape = avatarClipShape,
+                                    showLabels = settingsState.showLabels,
+                                    onAvatarTap = onProfileTap,
+                                    onShowThread = { skeet ->
+                                        if (onSeeMoreTap != null) {
+                                            viewModel.setThread(skeet)
+                                            onSeeMoreTap(skeet)
+                                        }
+                                    },
+                                    isVisible = isVisible,
+                                )
+                            }
+
+                            parent?.let {
+                                if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(IntrinsicSize.Min)
+                                            .padding(start = 16.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(40.dp)
+                                                .fillMaxHeight(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            VerticalDivider(
+                                                thickness = 3.dp,
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .clip(RoundedCornerShape(12.dp)),
+                                                color = MaterialTheme.colorScheme.outlineVariant
+                                            )
+                                        }
+                                        FilledTonalButton(
+                                            modifier = Modifier.padding(start = 12.dp),
+                                            onClick = {
+                                                if (onSeeMoreTap != null) {
+                                                    viewModel.setThread(root)
+                                                    onSeeMoreTap(root)
+                                                }
+                                            }
+                                        ) {
+                                            Text("See full thread")
+                                        }
+                                    }
+                                }
+
+                                SkeetView(
+                                    viewModel = viewModel,
+                                    skeet = it,
+                                    onReplyTap = onReplyTap,
+                                    inThread = true,
+                                    postTextSize = settingsState.postTextSize,
+                                    avatarShape = avatarClipShape,
+                                    showLabels = settingsState.showLabels,
+                                    onAvatarTap = onProfileTap,
+                                    onShowThread = { skeet ->
+                                        if (onSeeMoreTap != null) {
+                                            viewModel.setThread(skeet)
+                                            onSeeMoreTap(skeet)
+                                        }
+                                    },
+                                    isVisible = isVisible,
+                                )
+                            }
                         }
-                    },
-                    isVisible = isVisible,
-                )
+                    }
+
+                    SkeetView(
+                        viewModel = viewModel,
+                        skeet = skeet,
+                        onReplyTap = onReplyTap,
+                        showInReplyTo = if (isShowingThread) false else (skeet.root() == null && skeet.parent().first == null),
+                        postTextSize = settingsState.postTextSize,
+                        avatarShape = avatarClipShape,
+                        showLabels = settingsState.showLabels,
+                        onAvatarTap = onProfileTap,
+                        onShowThread = { skeet ->
+                            if (onSeeMoreTap != null) {
+                                viewModel.setThread(skeet)
+                                onSeeMoreTap(skeet)
+                            }
+                        },
+                        isVisible = isVisible,
+                    )
+                }
             }
 
             if (isShowingThread) {
-                if (idx + 1 >= data.lastIndex) {
-                    return@itemsIndexed
-                }
-                if (data[idx + 1].isReplyToRoot) {
+                val nextSkeet = filteredData.getOrNull(idx + 1)
+                if (nextSkeet != null && nextSkeet.isReplyToRoot && !nextSkeet.isSameAuthorContinuation) {
                     HorizontalDivider(
                         thickness = 2.dp,
                         modifier = Modifier
