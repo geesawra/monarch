@@ -360,7 +360,11 @@ fun ShowSkeets(
 
             if (isShowingThread) {
                 val nextSkeet = filteredData.getOrNull(idx + 1)
-                if (nextSkeet != null && nextSkeet.isReplyToRoot && !nextSkeet.isSameAuthorContinuation) {
+                if (nextSkeet != null &&
+                    nextSkeet.nestingLevel == 0 &&
+                    !nextSkeet.isSameAuthorContinuation &&
+                    !skeet.isSameAuthorContinuation
+                ) {
                     HorizontalDivider(
                         thickness = 2.dp,
                         modifier = Modifier
