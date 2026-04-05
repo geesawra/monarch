@@ -173,6 +173,9 @@ fun ShowSkeets(
             val connectorWidth = nestingIndent()
 
             if (hasConnectors) {
+                if (idx > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -386,7 +389,12 @@ fun ShowSkeets(
             }
 
             if (isShowingThread && isGroupEnd) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
