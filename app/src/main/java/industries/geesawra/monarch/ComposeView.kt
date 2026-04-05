@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -470,22 +471,28 @@ fun ComposeView(
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = postHorizontalPadding(), top = 8.dp),
-                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = postHorizontalPadding(), end = postHorizontalPadding(), top = 8.dp),
                 ) {
-                    AsyncImage(
-                        model = timelineViewModel.uiState.user?.avatar?.uri,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .size(40.dp)
-                            .clip(if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape),
-                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(avatarSize()),
+                    ) {
+                        AsyncImage(
+                            model = timelineViewModel.uiState.user?.avatar?.uri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(avatarSize())
+                                .clip(if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape),
+                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        )
+                    }
                     TextField(
                         modifier = Modifier
                             .weight(1f)
+                            .padding(start = avatarTextGap())
                             .focusRequester(focusRequester)
                             .contentReceiver(receiveContentListener),
                         contentPadding = PaddingValues(horizontal = 2.dp),
