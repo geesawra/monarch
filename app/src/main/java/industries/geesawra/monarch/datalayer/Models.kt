@@ -41,6 +41,7 @@ import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.Handle
+import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.Uri
 import sh.christian.ozone.api.model.Blob
 import kotlin.time.ExperimentalTime
@@ -98,6 +99,8 @@ data class SkeetData(
     val did: Did? = null,
     val didRepost: Boolean = false,
     val didLike: Boolean = false,
+    val likeRkey: RKey? = null,
+    val repostRkey: RKey? = null,
     val authorAvatarURL: String? = null,
     val authorName: String? = null,
     val authorHandle: Handle? = null,
@@ -209,6 +212,8 @@ data class SkeetData(
                 cid = post.post.cid,
                 didRepost = post.post.viewer?.repost != null,
                 didLike = post.post.viewer?.like != null,
+                likeRkey = post.post.viewer?.like?.let { RKey(it.atUri.substringAfterLast("/")) },
+                repostRkey = post.post.viewer?.repost?.let { RKey(it.atUri.substringAfterLast("/")) },
                 replyDisabled = post.post.viewer?.replyDisabled == true,
                 authorAvatarURL = post.post.author.avatar?.uri,
                 authorName = post.post.author.displayName,
@@ -312,6 +317,8 @@ data class SkeetData(
                 cid = post.cid,
                 didRepost = post.viewer?.repost != null,
                 didLike = post.viewer?.like != null,
+                likeRkey = post.viewer?.like?.let { RKey(it.atUri.substringAfterLast("/")) },
+                repostRkey = post.viewer?.repost?.let { RKey(it.atUri.substringAfterLast("/")) },
                 replyDisabled = post.viewer?.replyDisabled == true,
                 authorAvatarURL = post.author.avatar?.uri,
                 authorName = post.author.displayName,

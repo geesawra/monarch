@@ -75,8 +75,6 @@ data class TimelineUiState(
     val unreadNotificationsAmt: Int = 0,
     val seenNotificationsAt: Instant? = null,
 
-    val cidInteractedWith: Map<Cid, RKey> = mapOf(),
-
     val currentlyShownThread: ThreadPost = ThreadPost(),
 
     val loginError: String? = null,
@@ -114,6 +112,7 @@ class TimelineViewModel @AssistedInject constructor(
     @Assisted private val bskyConn: BlueskyConn,
     private val accountManager: AccountManager,
     private val pushNotificationManager: PushNotificationManager,
+    val postInteractionStore: PostInteractionStore,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -338,6 +337,7 @@ class TimelineViewModel @AssistedInject constructor(
                     timelineCursor = response.cursor,
                     isFetchingMoreTimeline = false
                 )
+                newSkeets.forEach { postInteractionStore.seed(it) }
                 then()
             }.onFailure {
                 if (it is CancellationException) {
@@ -723,6 +723,7 @@ class TimelineViewModel @AssistedInject constructor(
                 bskyConn.getPosts(listOf(uri)).onSuccess { posts ->
                     val newSkeet = posts.firstOrNull()?.let { SkeetData.fromPostView(it, it.author) }
                     if (newSkeet != null) {
+                        postInteractionStore.seed(newSkeet)
                         uiState = uiState.copy(skeets = listOf(newSkeet) + uiState.skeets)
                     }
                 }
@@ -759,34 +760,32 @@ class TimelineViewModel @AssistedInject constructor(
         fetchTimeline(fresh = true) { then() }
     }
 
-    fun like(uri: AtUri, cid: Cid, then: () -> Unit) {
+    fun like(uri: AtUri, cid: Cid) {
         viewModelScope.launch {
             bskyConn.like(uri, cid).onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
                     else -> uiState.copy(error = it.message)
                 }
-            }.onSuccess {
-                uiState = uiState.copy(
-                    cidInteractedWith = uiState.cidInteractedWith.plus(cid to it)
-                )
-                then()
+            }.onSuccess { rkey ->
+                postInteractionStore.update(cid) {
+                    it.copy(didLike = true, likes = it.likes + 1, likeRkey = rkey)
+                }
             }
         }
     }
 
-    fun repost(uri: AtUri, cid: Cid, then: () -> Unit) {
+    fun repost(uri: AtUri, cid: Cid) {
         viewModelScope.launch {
             bskyConn.repost(uri, cid).onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
                     else -> uiState.copy(error = it.message)
                 }
-            }.onSuccess {
-                uiState = uiState.copy(
-                    cidInteractedWith = uiState.cidInteractedWith.plus(cid to it)
-                )
-                then()
+            }.onSuccess { rkey ->
+                postInteractionStore.update(cid) {
+                    it.copy(didRepost = true, reposts = it.reposts + 1, repostRkey = rkey)
+                }
             }
         }
     }
@@ -816,34 +815,34 @@ class TimelineViewModel @AssistedInject constructor(
         return skeet.did == bskyConn.session?.did
     }
 
-    fun deleteLike(cid: Cid, then: () -> Unit) {
+    fun deleteLike(cid: Cid) {
+        val rkey = postInteractionStore.getState(cid, PostInteraction(0, 0, 0, false, false)).value.likeRkey ?: return
         viewModelScope.launch {
-            bskyConn.deleteLike(uiState.cidInteractedWith[cid]!!).onFailure {
+            bskyConn.deleteLike(rkey).onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
                     else -> uiState.copy(error = it.message)
                 }
             }.onSuccess {
-                uiState = uiState.copy(
-                    cidInteractedWith = uiState.cidInteractedWith.minus(cid)
-                )
-                then()
+                postInteractionStore.update(cid) {
+                    it.copy(didLike = false, likes = it.likes - 1, likeRkey = null)
+                }
             }
         }
     }
 
-    fun deleteRepost(cid: Cid, then: () -> Unit) {
+    fun deleteRepost(cid: Cid) {
+        val rkey = postInteractionStore.getState(cid, PostInteraction(0, 0, 0, false, false)).value.repostRkey ?: return
         viewModelScope.launch {
-            bskyConn.deleteRepost(uiState.cidInteractedWith[cid]!!).onFailure {
+            bskyConn.deleteRepost(rkey).onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
                     else -> uiState.copy(error = it.message)
                 }
             }.onSuccess {
-                uiState = uiState.copy(
-                    cidInteractedWith = uiState.cidInteractedWith.minus(cid)
-                )
-                then()
+                postInteractionStore.update(cid) {
+                    it.copy(didRepost = false, reposts = it.reposts - 1, repostRkey = null)
+                }
             }
         }
     }
@@ -939,6 +938,7 @@ class TimelineViewModel @AssistedInject constructor(
                 uiState = uiState.copy(
                     currentlyShownThread = asd
                 )
+                asd.flatten().forEach { postInteractionStore.seed(it) }
                 then()
             }
         }
@@ -995,6 +995,7 @@ class TimelineViewModel @AssistedInject constructor(
                     profileFeedCursor = timeline.cursor,
                     isFetchingProfileFeed = false,
                 )
+                newPosts.forEach { postInteractionStore.seed(it) }
             }
         }
     }
@@ -1129,6 +1130,7 @@ class TimelineViewModel @AssistedInject constructor(
                     searchPostsCursor = cursor,
                     isSearching = false,
                 )
+                newSkeets.forEach { postInteractionStore.seed(it) }
             }
         }
     }

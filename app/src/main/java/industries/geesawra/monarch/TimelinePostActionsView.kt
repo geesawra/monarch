@@ -70,6 +70,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import industries.geesawra.monarch.datalayer.PostInteraction
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.delay
@@ -131,9 +132,18 @@ fun TimelinePostActionsView(
     skeet: SkeetData,
     inThread: Boolean = false,
 ) {
-    val likes = remember { mutableLongStateOf(skeet.likes ?: 0) }
-    val reposts = remember { mutableLongStateOf(skeet.reposts ?: 0) }
-    val replies = remember { mutableLongStateOf(skeet.replies ?: 0) }
+    val interactionState = timelineViewModel?.postInteractionStore?.getState(
+        skeet.cid, PostInteraction.from(skeet)
+    )
+    val interaction = interactionState?.value
+    val likes = remember { mutableLongStateOf(interaction?.likes ?: skeet.likes ?: 0) }
+    val reposts = remember { mutableLongStateOf(interaction?.reposts ?: skeet.reposts ?: 0) }
+    val replies = remember { mutableLongStateOf(interaction?.replies ?: skeet.replies ?: 0) }
+    if (interaction != null) {
+        likes.longValue = interaction.likes
+        reposts.longValue = interaction.reposts
+        replies.longValue = interaction.replies
+    }
     val haptic = LocalHapticFeedback.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     val isOwnPost = timelineViewModel?.isOwnPost(skeet) == true
@@ -240,7 +250,8 @@ fun TimelinePostActionsView(
             )
         }
 
-        var isLiked by rememberSaveable { mutableStateOf(skeet.didLike) }
+        var isLiked by rememberSaveable { mutableStateOf(interaction?.didLike ?: skeet.didLike) }
+        if (interaction != null) { isLiked = interaction.didLike }
         var likeBounce by remember { mutableStateOf(false) }
         val likeScale by animateFloatAsState(
             targetValue = if (likeBounce) 1.3f else 1f,
@@ -266,15 +277,8 @@ fun TimelinePostActionsView(
                 likeBounce = true
                 haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                 when (isLiked) {
-                    false -> timelineViewModel?.like(skeet.uri, skeet.cid) {
-                        isLiked = true
-                        likes.longValue++
-                    }
-
-                    true -> timelineViewModel?.deleteLike(skeet.cid) {
-                        isLiked = false
-                        likes.longValue--
-                    }
+                    false -> timelineViewModel?.like(skeet.uri, skeet.cid)
+                    true -> timelineViewModel?.deleteLike(skeet.cid)
                 }
             }
         ) {
@@ -287,7 +291,8 @@ fun TimelinePostActionsView(
             )
         }
 
-        var isReposted by rememberSaveable { mutableStateOf(skeet.didRepost) }
+        var isReposted by rememberSaveable { mutableStateOf(interaction?.didRepost ?: skeet.didRepost) }
+        if (interaction != null) { isReposted = interaction.didRepost }
         var repostBounce by remember { mutableStateOf(false) }
         val repostScale by animateFloatAsState(
             targetValue = if (repostBounce) 1.3f else 1f,
@@ -313,15 +318,8 @@ fun TimelinePostActionsView(
                 repostBounce = true
                 haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                 when (isReposted) {
-                    false -> timelineViewModel?.repost(skeet.uri, skeet.cid) {
-                        isReposted = true
-                        reposts.longValue++
-                    }
-
-                    true -> timelineViewModel?.deleteRepost(skeet.cid) {
-                        isReposted = false
-                        reposts.longValue--
-                    }
+                    false -> timelineViewModel?.repost(skeet.uri, skeet.cid)
+                    true -> timelineViewModel?.deleteRepost(skeet.cid)
                 }
             },
             onLongClick = {

@@ -1,5 +1,6 @@
 package industries.geesawra.monarch.datalayer
 
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -47,6 +48,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                             content = replyText,
                             replyRef = replyRef,
                         )
+
+                        val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0)
+                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        nm.cancel(notificationId)
 
                         val prefs = context.settingsDataStore.data.first()
                         val autoLike = prefs[stringPreferencesKey("auto_like_on_reply")]?.toBooleanStrictOrNull() ?: false

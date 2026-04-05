@@ -299,7 +299,7 @@ fun ShowSkeets(
                 if (skeet.cid in autoLikedCids) return@collectLatest
                 if (skeet.root() != null || skeet.parent().first != null) return@collectLatest
                 autoLikedCids.add(skeet.cid)
-                viewModel.like(skeet.uri, skeet.cid) {}
+                viewModel.like(skeet.uri, skeet.cid)
             }
         }
     }

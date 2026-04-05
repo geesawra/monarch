@@ -6,6 +6,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.SmartToy
@@ -356,9 +358,11 @@ fun Embeds(
 
         is PostViewEmbedUnion.VideoView -> {
             val ar = embed.value.aspectRatio
+            val aspectRatio = if (ar != null && ar.height > 0) ar.width.toFloat() / ar.height.toFloat() else null
             VideoView(
                 embed.value.playlist.uri.toUri(),
-                aspectRatio = if (ar != null && ar.height > 0) ar.width.toFloat() / ar.height.toFloat() else null,
+                thumbnailUri = embed.value.thumbnail?.uri,
+                aspectRatio = aspectRatio,
                 isVisible = isVisible,
             )
         }
@@ -388,9 +392,6 @@ fun Embeds(
         }
 
         is PostViewEmbedUnion.RecordWithMediaView -> run {
-            if (nested) {
-                return@run
-            }
             val media = embed.value.media
             val mediaValue = when (media) {
                 is RecordWithMediaViewMediaUnion.ExternalView -> PostViewEmbedUnion.ExternalView(
@@ -404,18 +405,20 @@ fun Embeds(
 
             Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels)
 
-            OutlinedCard(
-                modifier = Modifier.padding(top = 4.dp)
-            ) {
-                RecordWithMediaView(
-                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                    embed.value,
-                    onShowThread = onShowThread,
-                    viewModel = viewModel,
-                    postTextSize = postTextSize,
-                    avatarShape = avatarShape,
-                    showLabels = showLabels,
-                )
+            if (!nested) {
+                OutlinedCard(
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    RecordWithMediaView(
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                        embed.value,
+                        onShowThread = onShowThread,
+                        viewModel = viewModel,
+                        postTextSize = postTextSize,
+                        avatarShape = avatarShape,
+                        showLabels = showLabels,
+                    )
+                }
             }
         }
 
@@ -446,57 +449,90 @@ private fun ImageView(img: List<ImagesViewImage>) {
 }
 
 @Composable
-fun VideoView(uri: Uri, aspectRatio: Float? = null, isVisible: Boolean = true) {
-    val activeVideoKey = LocalActiveVideoKey.current
-    val id = remember { java.util.UUID.randomUUID().toString() }
-    LaunchedEffect(isVisible) {
-        if (isVisible) activeVideoKey?.value = id
-    }
-    val isActive = if (activeVideoKey != null) isVisible && activeVideoKey.value == id else isVisible
+fun VideoView(uri: Uri, thumbnailUri: String? = null, aspectRatio: Float? = null, isVisible: Boolean = true) {
+    var playing by remember { mutableStateOf(false) }
+
+    val sizeModifier = if (aspectRatio != null)
+        Modifier.aspectRatio(aspectRatio)
+    else
+        Modifier.heightIn(max = 500.dp)
 
     OutlinedCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp, bottom = 8.dp),
     ) {
-        VideoPlayer(
-            mediaItems = listOf(
-                VideoPlayerMediaItem.NetworkMediaItem(
-                    url = uri.toString(),
-                    mimeType = MimeTypes.APPLICATION_M3U8,
+        if (playing) {
+            val activeVideoKey = LocalActiveVideoKey.current
+            val id = remember { java.util.UUID.randomUUID().toString() }
+            LaunchedEffect(isVisible) {
+                if (isVisible) activeVideoKey?.value = id
+            }
+            val isActive = if (activeVideoKey != null) isVisible && activeVideoKey.value == id else isVisible
+
+            VideoPlayer(
+                mediaItems = listOf(
+                    VideoPlayerMediaItem.NetworkMediaItem(
+                        url = uri.toString(),
+                        mimeType = MimeTypes.APPLICATION_M3U8,
+                    )
+                ),
+                handleLifecycle = false,
+                autoPlay = true,
+                usePlayerController = true,
+                enablePip = false,
+                handleAudioFocus = true,
+                controllerConfig = VideoPlayerControllerConfig(
+                    showSpeedAndPitchOverlay = false,
+                    showSubtitleButton = false,
+                    showCurrentTimeAndTotalTime = true,
+                    showBufferingProgress = false,
+                    showForwardIncrementButton = true,
+                    showBackwardIncrementButton = true,
+                    showBackTrackButton = false,
+                    showNextTrackButton = false,
+                    showRepeatModeButton = true,
+                    controllerShowTimeMilliSeconds = 5_000,
+                    controllerAutoShow = true,
+                    showFullScreenButton = true,
+                ),
+                volume = 0.5f,
+                repeatMode = RepeatMode.NONE,
+                isVisible = isActive,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(sizeModifier)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(sizeModifier)
+                    .clickable { playing = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = thumbnailUri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 )
-            ),
-            handleLifecycle = false,
-            autoPlay = false,
-            usePlayerController = true,
-            enablePip = false,
-            handleAudioFocus = true,
-            controllerConfig = VideoPlayerControllerConfig(
-                showSpeedAndPitchOverlay = false,
-                showSubtitleButton = false,
-                showCurrentTimeAndTotalTime = true,
-                showBufferingProgress = false,
-                showForwardIncrementButton = true,
-                showBackwardIncrementButton = true,
-                showBackTrackButton = false,
-                showNextTrackButton = false,
-                showRepeatModeButton = true,
-                controllerShowTimeMilliSeconds = 5_000,
-                controllerAutoShow = true,
-                showFullScreenButton = true,
-            ),
-            volume = 0.5f,
-            repeatMode = RepeatMode.NONE,
-            isVisible = isActive,
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    if (aspectRatio != null)
-                        Modifier.aspectRatio(aspectRatio)
-                    else
-                        Modifier.heightIn(max = 500.dp)
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = "Play video",
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            CircleShape
+                        )
+                        .padding(8.dp),
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
-        )
+            }
+        }
     }
 }
 

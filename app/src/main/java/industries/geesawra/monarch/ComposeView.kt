@@ -862,7 +862,7 @@ fun ActionRow(
                         ).onSuccess {
                             wasEdited.value = false
                             if (autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
-                                timelineViewModel.like(inReplyToData.uri, inReplyToData.cid) {}
+                                timelineViewModel.like(inReplyToData.uri, inReplyToData.cid)
                             }
                             coroutineScope.launch {
                                 scaffoldState.bottomSheetState.hide()

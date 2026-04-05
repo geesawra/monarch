@@ -842,7 +842,7 @@ private fun InnerTimelineView(
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(2.dp))
 
                                         if (isExpandedScreen) {
                                             Row(modifier = Modifier.fillMaxSize()) {
