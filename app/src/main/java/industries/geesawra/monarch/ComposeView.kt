@@ -470,13 +470,14 @@ fun ComposeView(
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = postHorizontalPadding(), top = 8.dp),
+                    verticalAlignment = Alignment.Top,
                 ) {
                     AsyncImage(
                         model = timelineViewModel.uiState.user?.avatar?.uri,
                         contentDescription = null,
                         modifier = Modifier
-                            .padding(top = 8.dp)
+                            .padding(top = 12.dp)
                             .size(40.dp)
                             .clip(if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape),
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
