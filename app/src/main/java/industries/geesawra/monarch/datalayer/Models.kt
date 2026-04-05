@@ -915,19 +915,18 @@ data class ThreadPost(
             val isLast = i == sortedReplies.lastIndex
             val childLevel = if (isContinuation || level == 0) myLevel else (myLevel + 1).coerceAtMost(MAX_NESTING)
 
-            if (!isContinuation && level > 0) {
-                activeConnectors.add(!isLast)
-            } else if (level == 0) {
+            if (level == 0) {
                 activeConnectors.clear()
+            } else if (!isContinuation) {
                 activeConnectors.add(!isLast)
             }
 
             reply.flattenInner(out, activeConnectors, post.did, childLevel)
 
-            if (!isContinuation && level > 0) {
-                activeConnectors.removeAt(activeConnectors.lastIndex)
-            } else if (level == 0 && isLast) {
+            if (level == 0) {
                 activeConnectors.clear()
+            } else if (!isContinuation) {
+                activeConnectors.removeAt(activeConnectors.lastIndex)
             }
         }
     }
