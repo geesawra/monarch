@@ -670,8 +670,10 @@ class TimelineViewModel @AssistedInject constructor(
 
             notifs = notifs.sortedByDescending { it.createdAt() }.toMutableList()
 
+            val merged = (uiState.notifications + notifs).distinctBy { it.uniqueKey() }
+
             uiState = uiState.copy(
-                notifications = uiState.notifications + notifs,
+                notifications = merged,
                 notificationsCursor = rawNotifs.cursor,
                 isFetchingMoreNotifications = false,
             )
