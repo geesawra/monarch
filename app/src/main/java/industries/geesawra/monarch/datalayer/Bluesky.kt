@@ -1408,7 +1408,7 @@ class BlueskyConn(val context: Context) {
         return deleteRecord(rKey, "app.bsky.feed.post")
     }
 
-    suspend fun getThread(uri: AtUri): Result<GetPostThreadResponse> {
+    suspend fun getThread(uri: AtUri, parentHeight: Long = 80): Result<GetPostThreadResponse> {
         return runCatching {
             create().onFailure {
                 return Result.failure(it)
@@ -1417,6 +1417,8 @@ class BlueskyConn(val context: Context) {
             val res = client!!.getPostThread(
                 GetPostThreadQueryParams(
                     uri = uri,
+                    depth = 50,
+                    parentHeight = parentHeight,
                 )
             )
 

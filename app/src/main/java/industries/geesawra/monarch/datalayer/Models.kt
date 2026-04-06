@@ -96,6 +96,7 @@ data class SkeetData(
     val isReplyToRoot: Boolean = false,
     val isSameAuthorContinuation: Boolean = false,
     val threadConnectors: List<ThreadConnector> = listOf(),
+    val hasMoreReplies: Boolean = false,
     val likes: Long? = null,
     val reposts: Long? = null,
     val replies: Long? = null,
@@ -860,7 +861,8 @@ data class RepeatedAuthor(
 data class ThreadPost(
     val post: SkeetData = SkeetData(),
     val level: Int = 0,
-    val replies: List<ThreadPost> = listOf()
+    val replies: List<ThreadPost> = listOf(),
+    val hasMoreReplies: Boolean = false,
 ) {
     companion object {
         private const val MAX_NESTING = 5
@@ -887,7 +889,8 @@ data class ThreadPost(
 
         val connectors = if (myLevel > 0 && !isContinuation) {
             activeConnectors.mapIndexed { idx, hasMoreSiblings ->
-                if (idx == activeConnectors.lastIndex) {
+                if (idx >= myLevel) return@mapIndexed null
+                if (idx == activeConnectors.lastIndex || idx == myLevel - 1) {
                     ThreadConnector(
                         idx,
                         if (hasMoreSiblings) ThreadConnectorType.BRANCH else ThreadConnectorType.LAST_BRANCH
@@ -907,6 +910,7 @@ data class ThreadPost(
                 isReplyToRoot = level == 1,
                 isSameAuthorContinuation = isContinuation,
                 threadConnectors = connectors,
+                hasMoreReplies = hasMoreReplies,
             )
         )
 

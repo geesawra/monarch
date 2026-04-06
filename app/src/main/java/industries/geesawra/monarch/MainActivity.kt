@@ -256,6 +256,9 @@ class MainActivity : ComponentActivity() {
                                             threadScaffoldState.bottomSheetState.expand()
                                         }
                                     },
+                                    onThreadTap = {
+                                        navController.navigate(ViewList.ShowThread.name)
+                                    },
                                 )
                             }
                         }

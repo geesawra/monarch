@@ -42,6 +42,7 @@ fun ThreadView(
     coroutineScope: CoroutineScope,
     onProfileTap: ((Did) -> Unit)? = null,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onThreadTap: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         rememberTopAppBarState()
@@ -84,8 +85,9 @@ fun ThreadView(
                 )
             },
         ) { padding ->
+            val parentHeight = if (timelineViewModel.uiState.isContinueThread) 0L else 80L
             LaunchedEffect(Unit) {
-                timelineViewModel.getThread {
+                timelineViewModel.getThread(parentHeight = parentHeight) {
                     isRefreshing.value = false
                 }
             }
@@ -110,6 +112,10 @@ fun ThreadView(
                         settingsState = settingsState,
                         onProfileTap = onProfileTap,
                         onReplyTap = onReplyTap,
+                        onSeeMoreTap = { skeet ->
+                            timelineViewModel.continueThread(skeet)
+                            onThreadTap()
+                        },
                     )
                 }
             }

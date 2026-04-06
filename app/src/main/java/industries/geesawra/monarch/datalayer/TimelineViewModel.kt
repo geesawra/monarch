@@ -76,6 +76,7 @@ data class TimelineUiState(
     val seenNotificationsAt: Instant? = null,
 
     val currentlyShownThread: ThreadPost = ThreadPost(),
+    val isContinueThread: Boolean = false,
 
     val loginError: String? = null,
     val error: String? = null,
@@ -855,6 +856,13 @@ class TimelineViewModel @AssistedInject constructor(
         uiState = uiState.copy(currentlyShownThread = ThreadPost(post = tappedElement))
     }
 
+    fun continueThread(skeet: SkeetData) {
+        uiState = uiState.copy(
+            currentlyShownThread = ThreadPost(post = skeet),
+            isContinueThread = true,
+        )
+    }
+
     private fun readThread(
         threadUnion: GetPostThreadResponseThreadUnion,
         level: Int = 0
@@ -888,6 +896,9 @@ class TimelineViewModel @AssistedInject constructor(
         val currentPostSkeetData =
             SkeetData.fromPostView(threadUnion.value.post, threadUnion.value.post.author)
 
+        val hasMoreReplies = threadUnion.value.replies.isEmpty() &&
+            (currentPostSkeetData.replies ?: 0) > 0
+
         val replies = threadUnion.value.replies.map { replyUnion ->
             readThread(
                 threadUnion = when (replyUnion) {
@@ -912,7 +923,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
 
         if (parents.isNotEmpty()) {
-            var result = ThreadPost(post = currentPostSkeetData, level = parents.size, replies = replies)
+            var result = ThreadPost(post = currentPostSkeetData, level = parents.size, replies = replies, hasMoreReplies = hasMoreReplies)
             for (i in parents.indices.reversed()) {
                 result = ThreadPost(post = parents[i], level = i, replies = listOf(result))
             }
@@ -922,7 +933,8 @@ class TimelineViewModel @AssistedInject constructor(
         return ThreadPost(
             post = currentPostSkeetData,
             level = level,
-            replies = replies
+            replies = replies,
+            hasMoreReplies = hasMoreReplies,
         )
     }
 
@@ -930,9 +942,9 @@ class TimelineViewModel @AssistedInject constructor(
         return bskyConn.searchActorsTypeahead(query)
     }
 
-    fun getThread(then: () -> Unit) {
+    fun getThread(parentHeight: Long = 80, then: () -> Unit) {
         viewModelScope.launch {
-            bskyConn.getThread(uiState.currentlyShownThread.post.uri).onFailure {
+            bskyConn.getThread(uiState.currentlyShownThread.post.uri, parentHeight).onFailure {
                 uiState = when (it) {
                     is LoginException -> uiState.copy(loginError = it.message)
                     else -> uiState.copy(error = it.message)
@@ -940,7 +952,8 @@ class TimelineViewModel @AssistedInject constructor(
             }.onSuccess {
                 val asd = readThread(it.thread)
                 uiState = uiState.copy(
-                    currentlyShownThread = asd
+                    currentlyShownThread = asd,
+                    isContinueThread = false,
                 )
                 asd.flatten().forEach { postInteractionStore.seed(it) }
                 then()

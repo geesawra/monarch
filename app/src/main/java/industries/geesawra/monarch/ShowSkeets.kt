@@ -385,6 +385,23 @@ fun ShowSkeets(
                 }
             }
 
+            if (isShowingThread && skeet.hasMoreReplies && onSeeMoreTap != null) {
+                val continueConnectorWidth = nestingIndent()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = (skeet.nestingLevel * continueConnectorWidth).dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilledTonalButton(
+                        modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp),
+                        onClick = { onSeeMoreTap(skeet) }
+                    ) {
+                        Text("Continue thread")
+                    }
+                }
+            }
+
             if (isShowingThread && isGroupEnd && !hasConnectors) {
                 Spacer(modifier = Modifier.height(4.dp))
             }
