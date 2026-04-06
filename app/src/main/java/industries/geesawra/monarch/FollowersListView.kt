@@ -60,13 +60,14 @@ fun FollowersListView(
     backButton: () -> Unit,
     onProfileTap: (Did) -> Unit,
 ) {
-    val profile = timelineViewModel.uiState.profileUser ?: return
+    val listDid = timelineViewModel.uiState.followersListDid ?: return
+    val listName = timelineViewModel.uiState.followersListName ?: ""
     var selectedTab by rememberSaveable { mutableIntStateOf(if (timelineViewModel.uiState.showFollowersTab) 0 else 1) }
     var mutualsOnly by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        timelineViewModel.fetchFollowers(profile.did, fresh = true)
-        timelineViewModel.fetchFollows(profile.did, fresh = true)
+        timelineViewModel.fetchFollowers(listDid, fresh = true)
+        timelineViewModel.fetchFollows(listDid, fresh = true)
     }
 
     val followers = timelineViewModel.uiState.profileFollowers
@@ -98,9 +99,9 @@ fun FollowersListView(
     LaunchedEffect(endReached, selectedTab) {
         if (!endReached) return@LaunchedEffect
         if (selectedTab == 0 && timelineViewModel.uiState.profileFollowersCursor != null) {
-            timelineViewModel.fetchFollowers(profile.did)
+            timelineViewModel.fetchFollowers(listDid)
         } else if (selectedTab == 1 && timelineViewModel.uiState.profileFollowsCursor != null) {
-            timelineViewModel.fetchFollows(profile.did)
+            timelineViewModel.fetchFollows(listDid)
         }
     }
 
@@ -108,7 +109,7 @@ fun FollowersListView(
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
         topBar = {
             TopAppBar(
-                title = { Text(profile.displayName ?: profile.handle.handle) },
+                title = { Text(listName) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -165,10 +166,18 @@ fun FollowersListView(
                         )
                     }
                     items(displayKnown, key = { "known_${it.did.did}" }) { user ->
+                        val followsYou = user.viewer?.followedBy != null
+                        val youFollow = user.viewer?.following != null
+                        val badge = when {
+                            youFollow && followsYou -> "Mutuals"
+                            youFollow -> "Following"
+                            followsYou -> "Follows you"
+                            else -> ""
+                        }
                         FollowerItem(
                             user = user,
-                            badgeText = if (selectedTab == 0) "Following" else "Follows you",
-                            showBadge = true,
+                            badgeText = badge,
+                            showBadge = badge.isNotEmpty(),
                             onTap = { onProfileTap(user.did) },
                         )
                     }
@@ -186,8 +195,11 @@ fun FollowersListView(
                         }
                     }
                     items(displayOthers, key = { "other_${it.did.did}" }) { user ->
+                        val followsYou = user.viewer?.followedBy != null
                         FollowerItem(
                             user = user,
+                            badgeText = if (followsYou) "Follows you" else "",
+                            showBadge = followsYou,
                             onTap = { onProfileTap(user.did) },
                         )
                     }

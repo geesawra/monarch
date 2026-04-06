@@ -84,6 +84,8 @@ data class TimelineUiState(
 
     val mutedWords: List<MutedWord> = listOf(),
 
+    val followersListDid: Did? = null,
+    val followersListName: String? = null,
     val profileFollowers: List<ProfileView> = listOf(),
     val profileFollows: List<ProfileView> = listOf(),
     val profileFollowersCursor: String? = null,
@@ -912,7 +914,10 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun openFollowersList(showFollowers: Boolean) {
+        val profile = uiState.profileUser ?: return
         uiState = uiState.copy(
+            followersListDid = profile.did,
+            followersListName = profile.displayName ?: profile.handle.handle,
             profileFollowers = listOf(),
             profileFollows = listOf(),
             profileFollowersCursor = null,
