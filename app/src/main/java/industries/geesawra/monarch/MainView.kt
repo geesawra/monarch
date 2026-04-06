@@ -3,6 +3,9 @@
 package industries.geesawra.monarch
 
 import android.widget.Toast
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -10,6 +13,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,6 +56,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Forum
@@ -356,6 +361,8 @@ private fun InnerTimelineView(
     onSeeMoreTap: (SkeetData) -> Unit,
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
+    var timelineSearchQuery by rememberSaveable { mutableStateOf("") }
+    var isTimelineSearchActive by remember { mutableStateOf(false) }
     val adaptiveInfo = currentWindowAdaptiveInfo()
     val isExpandedScreen = !settingsState.forceCompactLayout &&
         adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
@@ -625,7 +632,34 @@ private fun InnerTimelineView(
                         ),
                         title = {
                             when (currentDestination) {
-                                TabBarDestinations.TIMELINE -> if (settingsState.swipeableFeeds) {
+                                TabBarDestinations.TIMELINE -> if (isTimelineSearchActive) {
+                                    val focusRequester = remember { FocusRequester() }
+                                    BasicTextField(
+                                        value = timelineSearchQuery,
+                                        onValueChange = { timelineSearchQuery = it },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .focusRequester(focusRequester),
+                                        singleLine = true,
+                                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        ),
+                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                        decorationBox = { innerTextField ->
+                                            if (timelineSearchQuery.isEmpty()) {
+                                                Text(
+                                                    "Filter posts...",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                            innerTextField()
+                                        },
+                                    )
+                                    LaunchedEffect(Unit) {
+                                        focusRequester.requestFocus()
+                                    }
+                                } else if (settingsState.swipeableFeeds) {
                                     Text(text = timelineViewModel.uiState.user?.displayName
                                         ?: timelineViewModel.uiState.user?.handle?.handle
                                         ?: "")
@@ -671,7 +705,14 @@ private fun InnerTimelineView(
                         navigationIcon = {
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> {
-                                    if (!settingsState.swipeableFeeds) {
+                                    if (isTimelineSearchActive) {
+                                        IconButton(onClick = {
+                                            isTimelineSearchActive = false
+                                            timelineSearchQuery = ""
+                                        }) {
+                                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close search")
+                                        }
+                                    } else if (!settingsState.swipeableFeeds) {
                                         IconButton(onClick = {
                                             coroutineScope.launch {
                                                 drawerState.expand()
@@ -687,7 +728,17 @@ private fun InnerTimelineView(
                         },
                         actions = {
                             when (currentDestination) {
-                                TabBarDestinations.TIMELINE -> {
+                                TabBarDestinations.TIMELINE -> if (isTimelineSearchActive) {
+                                    if (timelineSearchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { timelineSearchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, "Clear search")
+                                        }
+                                    }
+                                } else {
+                                    IconButton(onClick = { isTimelineSearchActive = true }) {
+                                        Icon(Icons.Default.Search, "Search timeline")
+                                    }
+
                                     val user = timelineViewModel.uiState.user
                                     var showAccountSwitcher by remember { mutableStateOf(false) }
                                     val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
@@ -869,6 +920,7 @@ private fun InnerTimelineView(
                                                             onSeeMoreTap = expandedOnSeeMoreTap,
                                                             onProfileTap = expandedOnProfileTap,
                                                             shouldFetchMoreData = page == pagerState.settledPage,
+                                                            searchFilter = timelineSearchQuery,
                                                         )
                                                     }
                                                 }
@@ -942,6 +994,7 @@ private fun InnerTimelineView(
                                                     onSeeMoreTap = onSeeMoreTap,
                                                     onProfileTap = onProfileTap,
                                                     shouldFetchMoreData = page == pagerState.settledPage,
+                                                    searchFilter = timelineSearchQuery,
                                                 )
                                             }
                                         }
@@ -959,6 +1012,7 @@ private fun InnerTimelineView(
                                                 isScrollEnabled = isScrollEnabled,
                                                 onSeeMoreTap = expandedOnSeeMoreTap,
                                                 onProfileTap = expandedOnProfileTap,
+                                                searchFilter = timelineSearchQuery,
                                             )
                                         }
 
@@ -1020,6 +1074,7 @@ private fun InnerTimelineView(
                                         isScrollEnabled = isScrollEnabled,
                                         onSeeMoreTap = onSeeMoreTap,
                                         onProfileTap = onProfileTap,
+                                        searchFilter = timelineSearchQuery,
                                     )
                                 }
                             }

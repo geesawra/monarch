@@ -84,6 +84,7 @@ fun ShowSkeets(
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onSeeMoreTap: ((SkeetData) -> Unit)? = null,
     onProfileTap: ((Did) -> Unit)? = null,
+    searchFilter: String = "",
 ) {
     val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
     // Collect CIDs already shown as thread context (root/parent) to avoid duplicates
@@ -103,7 +104,7 @@ fun ShowSkeets(
     }
 
     val mutedWords = viewModel.uiState.mutedWords
-    val filteredData = remember(data, threadContextCids, mutedWords) {
+    val filteredData = remember(data, threadContextCids, mutedWords, searchFilter) {
         val seenRootCids = mutableSetOf<Cid>()
         val now = Clock.System.now()
         data.filter {
@@ -119,6 +120,11 @@ fun ShowSkeets(
         }.filter {
             if (isShowingThread || mutedWords.isEmpty()) return@filter true
             !isMutedByWord(it, mutedWords, now)
+        }.filter {
+            if (searchFilter.isBlank()) return@filter true
+            it.content.contains(searchFilter, ignoreCase = true) ||
+                it.authorName?.contains(searchFilter, ignoreCase = true) == true ||
+                it.authorHandle?.handle?.contains(searchFilter, ignoreCase = true) == true
         }
     }
 
