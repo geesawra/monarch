@@ -75,6 +75,7 @@ enum class ViewList() {
     Profile,
     Settings,
     MutedWords,
+    FollowersList,
 }
 
 @AndroidEntryPoint
@@ -280,6 +281,21 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSettingsTap = {
                                     navController.navigate(ViewList.Settings.name)
+                                },
+                                onFollowersTap = {
+                                    navController.navigate(ViewList.FollowersList.name)
+                                },
+                            )
+                        }
+                        composable(route = ViewList.FollowersList.name) {
+                            FollowersListView(
+                                timelineViewModel = timelineViewModel,
+                                backButton = {
+                                    navController.popBackStack()
+                                },
+                                onProfileTap = { did ->
+                                    timelineViewModel.openProfile(did)
+                                    navController.navigate(ViewList.Profile.name)
                                 },
                             )
                         }

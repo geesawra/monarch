@@ -113,6 +113,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.christian.ozone.BlueskyJson
 import sh.christian.ozone.XrpcBlueskyApi
+import sh.christian.ozone.api.AtIdentifier
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.AuthenticatedXrpcBlueskyApi
 import sh.christian.ozone.api.BlueskyAuthPlugin
@@ -1544,6 +1545,42 @@ class BlueskyConn(val context: Context) {
 
     suspend fun unfollow(followUri: AtUri): Result<Unit> {
         return deleteRecord(followUri.rkey(), "app.bsky.graph.follow")
+    }
+
+    suspend fun getFollowers(did: Did, cursor: String? = null): Result<app.bsky.graph.GetFollowersResponse> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val res = client!!.getFollowers(
+                app.bsky.graph.GetFollowersQueryParams(
+                    actor = AtIdentifier(did.did),
+                    cursor = cursor,
+                )
+            )
+            return when (res) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get followers: ${res.error?.message}"))
+                is AtpResponse.Success -> Result.success(res.response)
+            }
+        }
+    }
+
+    suspend fun getFollows(did: Did, cursor: String? = null): Result<app.bsky.graph.GetFollowsResponse> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val res = client!!.getFollows(
+                app.bsky.graph.GetFollowsQueryParams(
+                    actor = AtIdentifier(did.did),
+                    cursor = cursor,
+                )
+            )
+            return when (res) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get follows: ${res.error?.message}"))
+                is AtpResponse.Success -> Result.success(res.response)
+            }
+        }
     }
 
     suspend fun muteActor(did: Did): Result<Unit> {

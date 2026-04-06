@@ -134,6 +134,7 @@ fun ProfileView(
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
     onSettingsTap: () -> Unit = {},
+    onFollowersTap: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listStates = profileNavTabs.associate { it.filter to rememberLazyListState() }
@@ -377,6 +378,7 @@ fun ProfileView(
                                 scaffoldState.bottomSheetState.expand()
                             }
                         },
+                        onFollowersTap = onFollowersTap,
                     )
                 }
             }
@@ -420,6 +422,7 @@ internal fun ProfileContent(
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onFollowersTap: () -> Unit = {},
 ) {
     val posts = timelineViewModel.uiState.profilePosts
     val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
@@ -437,6 +440,14 @@ internal fun ProfileContent(
                 profile = profile,
                 timelineViewModel = timelineViewModel,
                 avatarShape = avatarClipShape,
+                onFollowersTap = {
+                    timelineViewModel.openFollowersList(showFollowers = true)
+                    onFollowersTap()
+                },
+                onFollowingTap = {
+                    timelineViewModel.openFollowersList(showFollowers = false)
+                    onFollowersTap()
+                },
             )
         }
 
@@ -506,6 +517,8 @@ internal fun ProfileHeader(
     profile: ProfileViewDetailed,
     timelineViewModel: TimelineViewModel,
     avatarShape: Shape = CircleShape,
+    onFollowersTap: () -> Unit = {},
+    onFollowingTap: () -> Unit = {},
 ) {
     var showImageViewer by remember { mutableStateOf<String?>(null) }
 
@@ -648,7 +661,7 @@ internal fun ProfileHeader(
 
             // Stats row
             Spacer(modifier = Modifier.height(12.dp))
-            ProfileStats(profile)
+            ProfileStats(profile, onFollowersTap = onFollowersTap, onFollowingTap = onFollowingTap)
         }
     }
 }
@@ -695,19 +708,26 @@ private fun FollowButton(
 }
 
 @Composable
-private fun ProfileStats(profile: ProfileViewDetailed) {
+private fun ProfileStats(
+    profile: ProfileViewDetailed,
+    onFollowersTap: () -> Unit = {},
+    onFollowingTap: () -> Unit = {},
+) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        StatItem(count = profile.followersCount ?: 0, label = "followers")
-        StatItem(count = profile.followsCount ?: 0, label = "following")
+        StatItem(count = profile.followersCount ?: 0, label = "followers", onClick = onFollowersTap)
+        StatItem(count = profile.followsCount ?: 0, label = "following", onClick = onFollowingTap)
         StatItem(count = profile.postsCount ?: 0, label = "posts")
     }
 }
 
 @Composable
-private fun StatItem(count: Long, label: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun StatItem(count: Long, label: String, onClick: (() -> Unit)? = null) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier,
+    ) {
         Text(
             text = formatCount(count),
             style = MaterialTheme.typography.titleSmall,

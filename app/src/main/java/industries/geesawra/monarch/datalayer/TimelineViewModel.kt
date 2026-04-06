@@ -15,6 +15,7 @@ import app.bsky.actor.MutedWordTarget
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
+import app.bsky.actor.ViewerState
 import app.bsky.feed.GetAuthorFeedFilter
 import app.bsky.feed.SearchPostsSort
 import app.bsky.embed.RecordView
@@ -82,6 +83,12 @@ data class TimelineUiState(
     val isContinueThread: Boolean = false,
 
     val mutedWords: List<MutedWord> = listOf(),
+
+    val profileFollowers: List<ProfileView> = listOf(),
+    val profileFollows: List<ProfileView> = listOf(),
+    val profileFollowersCursor: String? = null,
+    val profileFollowsCursor: String? = null,
+    val showFollowersTab: Boolean = true,
 
     val loginError: String? = null,
     val error: String? = null,
@@ -904,6 +911,52 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    fun openFollowersList(showFollowers: Boolean) {
+        uiState = uiState.copy(
+            profileFollowers = listOf(),
+            profileFollows = listOf(),
+            profileFollowersCursor = null,
+            profileFollowsCursor = null,
+            showFollowersTab = showFollowers,
+        )
+    }
+
+    fun fetchFollowers(did: Did, fresh: Boolean = false) {
+        viewModelScope.launch {
+            val cursor = if (fresh) null else uiState.profileFollowersCursor
+            bskyConn.getFollowers(did, cursor).onSuccess { res ->
+                val updated = if (fresh) res.followers else uiState.profileFollowers + res.followers
+                uiState = uiState.copy(
+                    profileFollowers = updated,
+                    profileFollowersCursor = res.cursor,
+                )
+            }.onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }
+        }
+    }
+
+    fun fetchFollows(did: Did, fresh: Boolean = false) {
+        viewModelScope.launch {
+            val cursor = if (fresh) null else uiState.profileFollowsCursor
+            bskyConn.getFollows(did, cursor).onSuccess { res ->
+                val updated = if (fresh) res.follows else uiState.profileFollows + res.follows
+                uiState = uiState.copy(
+                    profileFollows = updated,
+                    profileFollowsCursor = res.cursor,
+                )
+            }.onFailure {
+                uiState = when (it) {
+                    is LoginException -> uiState.copy(loginError = it.message)
+                    else -> uiState.copy(error = it.message)
+                }
+            }
+        }
+    }
+
     private fun readThread(
         threadUnion: GetPostThreadResponseThreadUnion,
         level: Int = 0
@@ -1075,11 +1128,15 @@ class TimelineViewModel @AssistedInject constructor(
                     is LoginException -> uiState.copy(loginError = it.message)
                     else -> uiState.copy(error = it.message)
                 }
-            }.onSuccess {
-                // Re-fetch profile to get updated viewer state
-                bskyConn.fetchActor(profile.did).onSuccess {
-                    uiState = uiState.copy(profileUser = it)
-                }
+            }.onSuccess { rkey ->
+                val followUri = AtUri("at://${bskyConn.session?.did?.did}/app.bsky.graph.follow/${rkey.rkey}")
+                val updatedViewer = (profile.viewer ?: ViewerState()).copy(following = followUri)
+                uiState = uiState.copy(
+                    profileUser = profile.copy(
+                        viewer = updatedViewer,
+                        followersCount = (profile.followersCount ?: 0) + 1,
+                    )
+                )
             }
         }
     }
@@ -1094,9 +1151,13 @@ class TimelineViewModel @AssistedInject constructor(
                     else -> uiState.copy(error = it.message)
                 }
             }.onSuccess {
-                bskyConn.fetchActor(profile.did).onSuccess {
-                    uiState = uiState.copy(profileUser = it)
-                }
+                val updatedViewer = profile.viewer!!.copy(following = null)
+                uiState = uiState.copy(
+                    profileUser = profile.copy(
+                        viewer = updatedViewer,
+                        followersCount = ((profile.followersCount ?: 0) - 1).coerceAtLeast(0),
+                    )
+                )
             }
         }
     }
