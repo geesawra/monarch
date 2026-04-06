@@ -9,6 +9,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.bsky.actor.ActorTarget
+import app.bsky.actor.MutedWord
+import app.bsky.actor.MutedWordTarget
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
@@ -77,6 +80,8 @@ data class TimelineUiState(
 
     val currentlyShownThread: ThreadPost = ThreadPost(),
     val isContinueThread: Boolean = false,
+
+    val mutedWords: List<MutedWord> = listOf(),
 
     val loginError: String? = null,
     val error: String? = null,
@@ -247,6 +252,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun fetchAllNewData(then: () -> Unit = {}) {
         fetchTimeline(fresh = true)
         fetchNotifications(fresh = true)
+        fetchMutedWords()
         val fsJob = fetchSelf()
         val fJob = feeds()
 
@@ -861,6 +867,41 @@ class TimelineViewModel @AssistedInject constructor(
             currentlyShownThread = ThreadPost(post = skeet),
             isContinueThread = true,
         )
+    }
+
+    fun fetchMutedWords() {
+        viewModelScope.launch {
+            bskyConn.getMutedWords().onSuccess {
+                uiState = uiState.copy(mutedWords = it)
+            }
+        }
+    }
+
+    fun addMutedWord(value: String, targets: List<MutedWordTarget>, actorTarget: ActorTarget) {
+        viewModelScope.launch {
+            val newWord = MutedWord(
+                value = value,
+                targets = targets,
+                actorTarget = actorTarget,
+            )
+            val updated = uiState.mutedWords + newWord
+            bskyConn.setMutedWords(updated).onSuccess {
+                uiState = uiState.copy(mutedWords = updated)
+            }.onFailure {
+                uiState = uiState.copy(error = it.message)
+            }
+        }
+    }
+
+    fun removeMutedWord(word: MutedWord) {
+        viewModelScope.launch {
+            val updated = uiState.mutedWords.filter { it.value != word.value || it.targets != word.targets }
+            bskyConn.setMutedWords(updated).onSuccess {
+                uiState = uiState.copy(mutedWords = updated)
+            }.onFailure {
+                uiState = uiState.copy(error = it.message)
+            }
+        }
     }
 
     private fun readThread(

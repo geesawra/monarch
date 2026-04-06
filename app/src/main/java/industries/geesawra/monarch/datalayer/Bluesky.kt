@@ -14,8 +14,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.actor.GetProfileQueryParams
 import app.bsky.actor.GetProfileResponse
+import app.bsky.actor.MutedWord
+import app.bsky.actor.MutedWordsPref
 import app.bsky.actor.PreferencesUnion
 import app.bsky.actor.Profile
+import app.bsky.actor.PutPreferencesRequest
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.SearchActorsQueryParams
@@ -1240,6 +1243,38 @@ class BlueskyConn(val context: Context) {
             }.filter { it.value != null && it.key != null }
 
             return Result.success(kek)
+        }
+    }
+
+    suspend fun getMutedWords(): Result<List<MutedWord>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val prefs = pdsClient!!.getPreferences().requireResponse()
+            val mutedWordsPref = prefs.preferences.firstOrNull {
+                it is PreferencesUnion.MutedWordsPref
+            } as? PreferencesUnion.MutedWordsPref
+
+            return Result.success(mutedWordsPref?.value?.items ?: emptyList())
+        }
+    }
+
+    suspend fun setMutedWords(words: List<MutedWord>): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val prefs = pdsClient!!.getPreferences().requireResponse()
+            val updatedPrefs = prefs.preferences.toMutableList()
+            val existingIndex = updatedPrefs.indexOfFirst { it is PreferencesUnion.MutedWordsPref }
+            val newPref = PreferencesUnion.MutedWordsPref(MutedWordsPref(items = words))
+            if (existingIndex >= 0) {
+                updatedPrefs[existingIndex] = newPref
+            } else {
+                updatedPrefs.add(newPref)
+            }
+            pdsClient!!.putPreferences(PutPreferencesRequest(preferences = updatedPrefs)).requireResponse()
         }
     }
 

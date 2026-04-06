@@ -83,6 +83,7 @@ fun SettingsView(
     pushNotificationManager: PushNotificationManager? = null,
     backButton: () -> Unit,
     onLogout: () -> Unit = {},
+    onMutedWordsTap: () -> Unit = {},
 ) {
     val settings = settingsViewModel.settingsState
 
@@ -325,6 +326,18 @@ fun SettingsView(
                         onCheckedChange = { settingsViewModel.setShowLabels(it) }
                     )
                 },
+            )
+
+            val mutedWordsCount = timelineViewModel?.uiState?.mutedWords?.size ?: 0
+            ListItem(
+                headlineContent = { Text("Muted words") },
+                supportingContent = {
+                    Text(
+                        if (mutedWordsCount == 0) "No muted words"
+                        else "$mutedWordsCount muted word${if (mutedWordsCount != 1) "s" else ""}"
+                    )
+                },
+                modifier = Modifier.clickable { onMutedWordsTap() },
             )
 
             if (pushNotificationManager != null && timelineViewModel != null) {

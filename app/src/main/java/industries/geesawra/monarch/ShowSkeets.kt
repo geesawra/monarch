@@ -53,12 +53,17 @@ import app.bsky.feed.ReplyRefParentUnion
 import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
 import io.github.fornewid.placeholder.material3.fade
 import io.github.fornewid.placeholder.material3.placeholder
+import app.bsky.actor.ActorTarget
+import app.bsky.actor.MutedWord
+import app.bsky.actor.MutedWordTarget
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.ThreadConnector
 import industries.geesawra.monarch.datalayer.ThreadConnectorType
+import kotlinx.datetime.Instant
+import kotlinx.datetime.Clock
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.Did
@@ -97,8 +102,10 @@ fun ShowSkeets(
         }
     }
 
-    val filteredData = remember(data, threadContextCids) {
+    val mutedWords = viewModel.uiState.mutedWords
+    val filteredData = remember(data, threadContextCids, mutedWords) {
         val seenRootCids = mutableSetOf<Cid>()
+        val now = Clock.System.now()
         data.filter {
             !it.replyToNotFollowing && it.cid !in threadContextCids &&
             (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.BlockedPost) &&
@@ -109,6 +116,9 @@ fun ShowSkeets(
             if (isRepost) return@filter true
             val rootCid = it.root()?.cid ?: return@filter true
             seenRootCids.add(rootCid)
+        }.filter {
+            if (isShowingThread || mutedWords.isEmpty()) return@filter true
+            !isMutedByWord(it, mutedWords, now)
         }
     }
 
@@ -539,5 +549,36 @@ private fun SkeletonPost() {
                 }
             }
         }
+    }
+}
+
+private fun isMutedByWord(skeet: SkeetData, mutedWords: List<MutedWord>, now: Instant): Boolean {
+    val contentLower = skeet.content.lowercase()
+    val tags = skeet.facets.flatMap { facet ->
+        facet.features.mapNotNull { feature ->
+            (feature as? app.bsky.richtext.FacetFeatureUnion.Tag)?.value?.tag?.lowercase()
+        }
+    }
+    return mutedWords.any { word ->
+        if (word.expiresAt != null && word.expiresAt < now) return@any false
+        if (word.actorTarget is ActorTarget.ExcludeFollowing && skeet.following) return@any false
+        val valueLower = word.value.lowercase()
+        val matchesContent = word.targets.contains(MutedWordTarget.Content) &&
+            contentLower.containsWordBoundary(valueLower)
+        val matchesTag = word.targets.contains(MutedWordTarget.Tag) &&
+            tags.any { it == valueLower }
+        matchesContent || matchesTag
+    }
+}
+
+private fun String.containsWordBoundary(word: String): Boolean {
+    var idx = 0
+    while (true) {
+        idx = indexOf(word, idx)
+        if (idx < 0) return false
+        val before = if (idx > 0) this[idx - 1] else ' '
+        val after = if (idx + word.length < length) this[idx + word.length] else ' '
+        if (!before.isLetterOrDigit() && !after.isLetterOrDigit()) return true
+        idx += 1
     }
 }

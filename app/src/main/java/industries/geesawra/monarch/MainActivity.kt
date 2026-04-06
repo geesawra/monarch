@@ -74,6 +74,7 @@ enum class ViewList() {
     ShowThread,
     Profile,
     Settings,
+    MutedWords,
 }
 
 @AndroidEntryPoint
@@ -302,6 +303,18 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     }
+                                },
+                                onMutedWordsTap = {
+                                    navController.navigate(ViewList.MutedWords.name)
+                                },
+                            )
+                        }
+
+                        composable(route = ViewList.MutedWords.name) {
+                            MutedWordsView(
+                                timelineViewModel = timelineViewModel,
+                                backButton = {
+                                    navController.popBackStack()
                                 },
                             )
                         }
