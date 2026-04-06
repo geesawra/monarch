@@ -90,6 +90,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.atproto.label.Label
+import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -636,6 +637,21 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
         return
     }
 
+    val needsFetch = ev.title.isEmpty() && ev.description.isEmpty() && ev.thumb == null
+    var enrichedTitle by remember(ev.uri.uri) { mutableStateOf(ev.title) }
+    var enrichedDescription by remember(ev.uri.uri) { mutableStateOf(ev.description) }
+    var enrichedThumb by remember(ev.uri.uri) { mutableStateOf(ev.thumb?.uri) }
+
+    if (needsFetch && isVisible) {
+        LaunchedEffect(ev.uri.uri) {
+            LinkPreviewFetcher.fetch(ev.uri.uri)?.let { preview ->
+                enrichedTitle = preview.title ?: ""
+                enrichedDescription = preview.description ?: ""
+                enrichedThumb = preview.imageUrl
+            }
+        }
+    }
+
     val domain = runCatching { ev.uri.uri.toUri().host }.getOrNull() ?: ""
 
     OutlinedCard(
@@ -653,10 +669,11 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
                     customTabsIntent.launchUrl(context, ev.uri.uri.toUri())
                 }
         ) {
-            ev.thumb?.let {
+            val thumbUrl = if (needsFetch) enrichedThumb else ev.thumb?.uri
+            if (thumbUrl != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(it.uri)
+                        .data(thumbUrl)
                         .crossfade(true)
                         .build(),
                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
@@ -670,9 +687,10 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
                 )
             }
 
-            if (ev.title.isNotEmpty()) {
+            val title = if (needsFetch) enrichedTitle else ev.title
+            if (title.isNotEmpty()) {
                 Text(
-                    text = ev.title,
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
@@ -682,9 +700,10 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
                 )
             }
 
-            if (ev.description.isNotEmpty()) {
+            val description = if (needsFetch) enrichedDescription else ev.description
+            if (description.isNotEmpty()) {
                 Text(
-                    text = ev.description,
+                    text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
