@@ -560,7 +560,8 @@ private fun isMutedByWord(skeet: SkeetData, mutedWords: List<MutedWord>, now: In
         }
     }
     return mutedWords.any { word ->
-        if (word.expiresAt != null && word.expiresAt < now) return@any false
+        val expiresAt = word.expiresAt
+        if (expiresAt != null && expiresAt < now) return@any false
         if (word.actorTarget is ActorTarget.ExcludeFollowing && skeet.following) return@any false
         val valueLower = word.value.lowercase()
         val matchesContent = word.targets.contains(MutedWordTarget.Content) &&
