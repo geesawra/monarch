@@ -113,7 +113,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.christian.ozone.BlueskyJson
 import sh.christian.ozone.XrpcBlueskyApi
-import sh.christian.ozone.api.AtIdentifier
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.AuthenticatedXrpcBlueskyApi
 import sh.christian.ozone.api.BlueskyAuthPlugin
@@ -1554,7 +1553,7 @@ class BlueskyConn(val context: Context) {
             }
             val res = client!!.getFollowers(
                 app.bsky.graph.GetFollowersQueryParams(
-                    actor = AtIdentifier(did.did),
+                    actor = did,
                     cursor = cursor,
                 )
             )
@@ -1572,7 +1571,7 @@ class BlueskyConn(val context: Context) {
             }
             val res = client!!.getFollows(
                 app.bsky.graph.GetFollowsQueryParams(
-                    actor = AtIdentifier(did.did),
+                    actor = did,
                     cursor = cursor,
                 )
             )
