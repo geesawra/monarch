@@ -82,7 +82,7 @@ fun LikeRepostRowView(
 ) {
     val avatarSize = 28.dp
     val showAvatars = remember { mutableStateOf(false) }
-    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
+    val avatarClipShape = settingsState.avatarClipShape
 
     Column(
         modifier = modifier

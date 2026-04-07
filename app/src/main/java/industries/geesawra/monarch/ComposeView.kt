@@ -484,7 +484,7 @@ fun ComposeView(
                             contentDescription = null,
                             modifier = Modifier
                                 .size(avatarSize())
-                                .clip(if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape),
+                                .clip(settingsState.avatarClipShape),
                             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                         )
@@ -534,223 +534,59 @@ fun ComposeView(
                             disableEmbeds = false,
                             showLabels = false,
                             showInReplyTo = false,
-                            avatarShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape,
+                            avatarShape = settingsState.avatarClipShape,
                             postTextSize = settingsState.postTextSize,
                         )
                     }
                 }
 
                 if (showMentionDropdown.value) {
-                    OutlinedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .heightIn(max = 200.dp)
-                    ) {
-                        LazyColumn {
-                            items(mentionResults.value) { profile ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            val text = textfieldState.text.toString()
-                                            val cursorPos = textfieldState.selection.min
-                                            val textBeforeCursor =
-                                                text.substring(0, cursorPos)
-                                            val atIndex =
-                                                textBeforeCursor.lastIndexOf('@')
+                    MentionDropdown(
+                        mentionResults = mentionResults.value,
+                        onProfileSelected = { profile ->
+                            val text = textfieldState.text.toString()
+                            val cursorPos = textfieldState.selection.min
+                            val textBeforeCursor = text.substring(0, cursorPos)
+                            val atIndex = textBeforeCursor.lastIndexOf('@')
 
-                                            if (atIndex >= 0) {
-                                                val fullHandle = profile.handle.handle
-                                                val replacement = "@$fullHandle "
-                                                val afterCursor =
-                                                    text.substring(cursorPos)
-                                                val newText =
-                                                    text.substring(0, atIndex) + replacement + afterCursor
+                            if (atIndex >= 0) {
+                                val fullHandle = profile.handle.handle
+                                val replacement = "@$fullHandle "
+                                val afterCursor = text.substring(cursorPos)
+                                val newText = text.substring(0, atIndex) + replacement + afterCursor
 
-                                                textfieldState.edit {
-                                                    replace(0, length, newText)
-                                                    val newCursorPos =
-                                                        atIndex + replacement.length
-                                                    selection = TextRange(
-                                                        newCursorPos,
-                                                        newCursorPos
-                                                    )
-                                                }
-
-                                                mentionDids[fullHandle] = profile.did
-                                            }
-
-                                            showMentionDropdown.value = false
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(profile.avatar?.uri)
-                                            .build(),
-                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentDescription = "${profile.displayName ?: profile.handle.handle}'s avatar",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape),
-                                    )
-                                    Column {
-                                        profile.displayName?.let { name ->
-                                            Text(
-                                                text = name,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                            )
-                                        }
-                                        Text(
-                                            text = "@${profile.handle.handle}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
+                                textfieldState.edit {
+                                    replace(0, length, newText)
+                                    val newCursorPos = atIndex + replacement.length
+                                    selection = TextRange(newCursorPos, newCursorPos)
                                 }
+
+                                mentionDids[fullHandle] = profile.did
                             }
-                        }
-                    }
+
+                            showMentionDropdown.value = false
+                        },
+                    )
                 }
 
-                // Link preview card
-                if (linkPreviewLoading.value) {
-                    OutlinedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularWavyProgressIndicator()
-                        }
-                    }
-                } else if (linkPreview.value != null && !linkPreviewDismissed.value) {
-                    val preview = linkPreview.value!!
-                    OutlinedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Box {
-                            Column(
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                preview.imageUrl?.let { imgUrl ->
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(imgUrl)
-                                            .build(),
-                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentScale = ContentScale.Crop,
-                                        contentDescription = "Link preview thumbnail",
-                                        modifier = Modifier
-                                            .height(150.dp)
-                                            .fillMaxWidth()
-                                    )
-                                    HorizontalDivider(
-                                        color = MaterialTheme.colorScheme.outlineVariant
-                                    )
-                                }
-                                preview.title?.let { title ->
-                                    Text(
-                                        text = title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(
-                                            top = 8.dp, start = 8.dp, end = 8.dp, bottom = 4.dp
-                                        )
-                                    )
-                                }
-                                preview.description?.let { desc ->
-                                    Text(
-                                        text = desc,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 3,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(
-                                            start = 8.dp, end = 8.dp, bottom = 4.dp
-                                        )
-                                    )
-                                }
-                                Text(
-                                    text = try {
-                                        URI(preview.url).host ?: preview.url
-                                    } catch (_: Exception) {
-                                        preview.url
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(
-                                        start = 8.dp, end = 8.dp, bottom = 8.dp
-                                    )
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    linkPreview.value = null
-                                    linkPreviewDismissed.value = true
-                                },
-                                modifier = Modifier.align(Alignment.TopEnd)
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Dismiss link preview"
-                                )
-                            }
-                        }
-                    }
-                }
+                LinkPreviewCard(
+                    isLoading = linkPreviewLoading.value,
+                    preview = if (!linkPreviewDismissed.value) linkPreview.value else null,
+                    onDismiss = {
+                        linkPreview.value = null
+                        linkPreviewDismissed.value = true
+                    },
+                )
 
-                if (mediaSelected.value.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        when (mediaSelectedIsVideo.value) {
-                            false -> PostImageGallery(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp),
-                                images = mediaSelected.value.map { uri ->
-                                    Image(url = uri.toString(), alt = "Selected media")
-                                },
-                                onCrossClick = {
-                                    val toDelUri = mediaSelected.value[it]
-                                    mediaSelected.value =
-                                        mediaSelected.value.filter { uri ->
-                                            uri != toDelUri
-                                        }
-                                }
-                            )
-
-                            true -> DeletableMediaView(
-                                originalIndex = 0,
-                                onCrossClick = {
-                                    mediaSelected.value = listOf()
-                                },
-                                onMediaClick = { }
-                            ) {
-                                VideoView(uri = mediaSelected.value.first())
-                            }
-                        }
-                    }
-                }
+                MediaSelectionSection(
+                    mediaSelected = mediaSelected.value,
+                    mediaSelectedIsVideo = mediaSelectedIsVideo.value,
+                    onImageRemove = { index ->
+                        val toDelUri = mediaSelected.value[index]
+                        mediaSelected.value = mediaSelected.value.filter { uri -> uri != toDelUri }
+                    },
+                    onVideoRemove = { mediaSelected.value = listOf() },
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -784,7 +620,7 @@ fun ActionRow(
     var showThreadgateSheet by remember { mutableStateOf(false) }
 
     if (showThreadgateSheet) {
-        ThreadgateSheet(
+        ThreadgateSettings(
             currentRules = threadgateRules.value,
             onDismiss = { showThreadgateSheet = false },
             onApply = { rules ->
@@ -992,9 +828,198 @@ private fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap())
     return facets
 }
 
+@Composable
+private fun MentionDropdown(
+    mentionResults: List<ProfileViewBasic>,
+    onProfileSelected: (ProfileViewBasic) -> Unit,
+) {
+    OutlinedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .heightIn(max = 200.dp)
+    ) {
+        LazyColumn {
+            items(mentionResults) { profile ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onProfileSelected(profile) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(profile.avatar?.uri)
+                            .build(),
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        contentDescription = "${profile.displayName ?: profile.handle.handle}'s avatar",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape),
+                    )
+                    Column {
+                        profile.displayName?.let { name ->
+                            Text(
+                                text = name,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        Text(
+                            text = "@${profile.handle.handle}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun LinkPreviewCard(
+    isLoading: Boolean,
+    preview: LinkPreviewData?,
+    onDismiss: () -> Unit,
+) {
+    if (isLoading) {
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularWavyProgressIndicator()
+            }
+        }
+    } else if (preview != null) {
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Box {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    preview.imageUrl?.let { imgUrl ->
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(imgUrl)
+                                .build(),
+                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                            contentScale = ContentScale.Crop,
+                            contentDescription = "Link preview thumbnail",
+                            modifier = Modifier
+                                .height(150.dp)
+                                .fillMaxWidth()
+                        )
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
+                    preview.title?.let { title ->
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(
+                                top = 8.dp, start = 8.dp, end = 8.dp, bottom = 4.dp
+                            )
+                        )
+                    }
+                    preview.description?.let { desc ->
+                        Text(
+                            text = desc,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(
+                                start = 8.dp, end = 8.dp, bottom = 4.dp
+                            )
+                        )
+                    }
+                    Text(
+                        text = try {
+                            URI(preview.url).host ?: preview.url
+                        } catch (_: Exception) {
+                            preview.url
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(
+                            start = 8.dp, end = 8.dp, bottom = 8.dp
+                        )
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Dismiss link preview"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaSelectionSection(
+    mediaSelected: List<Uri>,
+    mediaSelectedIsVideo: Boolean,
+    onImageRemove: (Int) -> Unit,
+    onVideoRemove: () -> Unit,
+) {
+    if (mediaSelected.isNotEmpty()) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            when (mediaSelectedIsVideo) {
+                false -> PostImageGallery(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    images = mediaSelected.map { uri ->
+                        Image(url = uri.toString(), alt = "Selected media")
+                    },
+                    onCrossClick = { onImageRemove(it) }
+                )
+
+                true -> DeletableMediaView(
+                    originalIndex = 0,
+                    onCrossClick = { onVideoRemove() },
+                    onMediaClick = { }
+                ) {
+                    VideoView(uri = mediaSelected.first())
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ThreadgateSheet(
+private fun ThreadgateSettings(
     currentRules: List<ThreadgateAllowUnion>?,
     onDismiss: () -> Unit,
     onApply: (List<ThreadgateAllowUnion>?) -> Unit,

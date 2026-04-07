@@ -14,6 +14,7 @@ import androidx.compose.ui.text.withStyle
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.VerifiedStatus
+import app.bsky.embed.AspectRatio
 import app.bsky.embed.ExternalView
 import app.bsky.embed.ExternalViewExternal
 import app.bsky.embed.ImagesView
@@ -46,6 +47,11 @@ import sh.christian.ozone.api.Uri
 import sh.christian.ozone.api.model.Blob
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+
+fun AspectRatio?.toFloat(): Float? {
+    if (this == null || height <= 0) return null
+    return width.toFloat() / height.toFloat()
+}
 
 enum class ReplyFilterMode {
     None,
@@ -343,6 +349,66 @@ data class SkeetData(
             )
         }
 
+        private fun transformEmbed(embed: PostEmbedUnion?, authorDid: Did, cid: Cid): PostViewEmbedUnion? {
+            return when (embed) {
+                is PostEmbedUnion.External -> {
+                    val c = embed
+                    PostViewEmbedUnion.ExternalView(
+                        ExternalView(
+                            ExternalViewExternal(
+                                uri = c.value.external.uri,
+                                title = c.value.external.title,
+                                description = c.value.external.description,
+                                thumb = cdnBlobURL(
+                                    authorDid,
+                                    c.value.external.thumb,
+                                    CDNImageSize.Thumb
+                                )
+                            )
+                        )
+                    )
+                }
+
+                is PostEmbedUnion.Images -> {
+                    val c = embed
+                    PostViewEmbedUnion.ImagesView(
+                        ImagesView(c.value.images.map {
+                            ImagesViewImage(
+                                fullsize = cdnBlobURL(
+                                    authorDid,
+                                    it.image,
+                                    CDNImageSize.Full
+                                )!!,
+                                thumb = cdnBlobURL(
+                                    authorDid,
+                                    it.image,
+                                    CDNImageSize.Thumb
+                                )!!,
+                                alt = it.alt,
+                                aspectRatio = it.aspectRatio,
+                            )
+                        })
+                    )
+                }
+
+                is PostEmbedUnion.Video -> {
+                    val c = embed.value
+                    PostViewEmbedUnion.VideoView(
+                        VideoView(
+                            playlist = cdnVideoPlaylist(authorDid, c.video)!!,
+                            thumbnail = cdnVideoThumb(authorDid, c.video),
+                            alt = c.alt,
+                            aspectRatio = c.aspectRatio,
+                            cid = cid
+                        )
+                    )
+                }
+
+                null -> null
+                else -> null
+            }
+        }
+
         fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileView): SkeetData {
             return SkeetData(
                 cid = parent.first,
@@ -354,82 +420,7 @@ data class SkeetData(
                 verified = author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 did = author.did,
                 content = post.text,
-                embed = when (post.embed) {
-                    is PostEmbedUnion.External -> {
-                        val c = (post.embed as PostEmbedUnion.External)
-                        PostViewEmbedUnion.ExternalView(
-                            ExternalView(
-                                ExternalViewExternal(
-                                    uri = c.value.external.uri,
-                                    title = c.value.external.title,
-                                    description = c.value.external.description,
-                                    thumb = cdnBlobURL(
-                                        author.did,
-                                        c.value.external.thumb,
-                                        CDNImageSize.Thumb
-                                    )
-                                )
-                            )
-                        )
-                    }
-
-                    is PostEmbedUnion.Images -> {
-                        val c = (post.embed as PostEmbedUnion.Images)
-                        PostViewEmbedUnion.ImagesView(
-                            ImagesView(c.value.images.map {
-                                ImagesViewImage(
-                                    fullsize = cdnBlobURL(
-                                        author.did,
-                                        it.image,
-                                        CDNImageSize.Full
-                                    )!!,
-                                    thumb = cdnBlobURL(
-                                        author.did,
-                                        it.image,
-                                        CDNImageSize.Thumb
-                                    )!!,
-                                    alt = it.alt,
-                                    aspectRatio = it.aspectRatio,
-                                )
-                            })
-                        )
-                    }
-
-                    // Record need to be hydrated before being rendered!
-
-//                    is PostEmbedUnion.Record -> {
-//                        val c = (post.embed as PostEmbedUnion.Record).value
-//
-//                        PostViewEmbedUnion.RecordView(
-//                            RecordView(post.embed.value.record)
-//                        )
-//                    }
-//
-//                    is PostEmbedUnion.RecordWithMedia -> PostViewEmbedUnion.RecordWithMediaView(
-//                        RecordWithMediaView(
-//                            post.embed.value.record,
-//                            post.embed.value.media
-//                        )
-//                    )
-//
-//                    is PostEmbedUnion.Unknown -> PostViewEmbedUnion.Unknown(post.embed.value)
-                    is PostEmbedUnion.Video -> {
-                        val c = (post.embed as PostEmbedUnion.Video).value
-                        PostViewEmbedUnion.VideoView(
-                            VideoView(
-                                playlist = cdnVideoPlaylist(author.did, c.video)!!,
-                                thumbnail = cdnVideoThumb(author.did, c.video),
-                                alt = c.alt,
-                                aspectRatio = c.aspectRatio,
-                                cid = parent.first
-                            )
-                        )
-                    }
-
-                    null -> null
-                    else -> null
-                },
-                // TODO: fix embeds
+                embed = transformEmbed(post.embed, author.did, parent.first),
                 createdAt = post.createdAt.toStdlibInstant(),
                 facets = post.facets,
             )
@@ -445,82 +436,7 @@ data class SkeetData(
                 authorLabels = author.labels,
                 verified = author.verification?.verifiedStatus == VerifiedStatus.Valid,
                 content = post.text,
-                embed = when (post.embed) {
-                    is PostEmbedUnion.External -> {
-                        val c = (post.embed as PostEmbedUnion.External)
-                        PostViewEmbedUnion.ExternalView(
-                            ExternalView(
-                                ExternalViewExternal(
-                                    uri = c.value.external.uri,
-                                    title = c.value.external.title,
-                                    description = c.value.external.description,
-                                    thumb = cdnBlobURL(
-                                        author.did,
-                                        c.value.external.thumb,
-                                        CDNImageSize.Thumb
-                                    )
-                                )
-                            )
-                        )
-                    }
-
-                    is PostEmbedUnion.Images -> {
-                        val c = (post.embed as PostEmbedUnion.Images)
-                        PostViewEmbedUnion.ImagesView(
-                            ImagesView(c.value.images.map {
-                                ImagesViewImage(
-                                    fullsize = cdnBlobURL(
-                                        author.did,
-                                        it.image,
-                                        CDNImageSize.Full
-                                    )!!,
-                                    thumb = cdnBlobURL(
-                                        author.did,
-                                        it.image,
-                                        CDNImageSize.Thumb
-                                    )!!,
-                                    alt = it.alt,
-                                    aspectRatio = it.aspectRatio,
-                                )
-                            })
-                        )
-                    }
-
-                    // Record need to be hydrated before being rendered!
-
-//                    is PostEmbedUnion.Record -> {
-//                        val c = (post.embed as PostEmbedUnion.Record).value
-//
-//                        PostViewEmbedUnion.RecordView(
-//                            RecordView(post.embed.value.record)
-//                        )
-//                    }
-//
-//                    is PostEmbedUnion.RecordWithMedia -> PostViewEmbedUnion.RecordWithMediaView(
-//                        RecordWithMediaView(
-//                            post.embed.value.record,
-//                            post.embed.value.media
-//                        )
-//                    )
-//
-//                    is PostEmbedUnion.Unknown -> PostViewEmbedUnion.Unknown(post.embed.value)
-                    is PostEmbedUnion.Video -> {
-                        val c = (post.embed as PostEmbedUnion.Video).value
-                        PostViewEmbedUnion.VideoView(
-                            VideoView(
-                                playlist = cdnVideoPlaylist(author.did, c.video)!!,
-                                thumbnail = cdnVideoThumb(author.did, c.video),
-                                alt = c.alt,
-                                aspectRatio = c.aspectRatio,
-                                cid = parent.first
-                            )
-                        )
-                    }
-
-                    null -> null
-                    else -> null
-                },
-                // TODO: fix embeds
+                embed = transformEmbed(post.embed, author.did, parent.first),
                 createdAt = post.createdAt.toStdlibInstant(),
                 facets = post.facets,
                 did = author.did,

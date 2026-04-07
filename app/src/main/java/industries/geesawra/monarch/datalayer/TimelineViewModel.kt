@@ -162,6 +162,13 @@ class TimelineViewModel @AssistedInject constructor(
         uiState = uiState.copy(error = null)
     }
 
+    private fun handleError(error: Throwable) {
+        when (error) {
+            is LoginException -> uiState = uiState.copy(loginError = error.message)
+            else -> uiState = uiState.copy(error = error.message)
+        }
+    }
+
     fun labelDisplayName(label: Label): String = bskyConn.labelDisplayName(label)
     fun labelDescription(label: Label): String? = bskyConn.labelDescription(label)
     fun labelerAvatar(label: Label): String? = bskyConn.labelerAvatar(label)
@@ -271,35 +278,10 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    suspend fun fetchRecord(uri: AtUri): Result<JsonContent> {
-        val ret = bskyConn.fetchRecord(uri).onFailure {
-            uiState = when (it) {
-                is LoginException -> uiState.copy(loginError = it.message)
-                else -> uiState.copy(error = it.message)
-            }
-        }.getOrThrow()
-
-        return Result.success(ret)
-    }
-
-    private suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> {
-        val ret = bskyConn.fetchActor(did).onFailure {
-            uiState = when (it) {
-                is LoginException -> uiState.copy(loginError = it.message)
-                else -> uiState.copy(error = it.message)
-            }
-        }.getOrThrow()
-
-        return Result.success(ret)
-    }
-
     fun fetchSelf(): Job {
         return viewModelScope.launch {
             bskyConn.fetchSelf().onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 uiState = uiState.copy(user = it)
                 saveCurrentAccount()
@@ -411,282 +393,16 @@ class TimelineViewModel @AssistedInject constructor(
             uiState = uiState.copy(unreadNotificationsAmt = unreadCount)
             NotificationBadge.set(unreadCount)
 
-            val repeatable = mutableListOf<Notification>()
-            val postsToFetch = rawNotifs.notifications.flatMap {
-                when (it.reason) {
-                    ListNotificationsReason.Like -> {
-                        val l: Like = it.record.decodeAs()
-                        listOf(l.subject.uri)
-                    }
-
-                    ListNotificationsReason.Repost -> {
-                        val l: Repost = it.record.decodeAs()
-                        listOf(l.subject.uri)
-                    }
-
-                    ListNotificationsReason.Quote -> {
-                        val l: Post = it.record.decodeAs()
-                        val e = l.embed
-                        val quotedUri = when (e) {
-                            is PostEmbedUnion.Record -> e.value.record.uri
-                            is PostEmbedUnion.RecordWithMedia -> e.value.record.record.uri
-                            else -> null
-                        }
-                        listOfNotNull(it.uri, quotedUri)
-                    }
-
-                    ListNotificationsReason.Mention -> listOf(it.uri)
-                    ListNotificationsReason.Reply -> listOf(it.uri)
-
-                    else -> emptyList()
-                }
-            }.distinct()
-
-            val posts =
-                postsToFetch.chunked(25).fold(mapOf<AtUri, Pair<SkeetData, Post>>()) { acc, chunk ->
-                    val fetched = bskyConn.getPosts(chunk).getOrNull() ?: return@fold acc
-                    acc + fetched.associate {
-                        val record = it.record.decodeAs<Post>()
-                        it.uri to (SkeetData.fromPostView(
-                            it,
-                            it.author
-                        ) to record)
-                    }
-                }
-
-            // we could bulk request posts here and avoid much of the network IO
-            var notifs = rawNotifs.notifications.mapNotNull {
-                when (it.reason) {
-                    ListNotificationsReason.Follow -> {
-                        val l: Follow = it.record.decodeAs()
-                        Notification.Follow(it.author, l.createdAt.toStdlibInstant(), !it.isRead)
-                    }
-
-                    ListNotificationsReason.Like -> {
-                        val l: Like = it.record.decodeAs()
-                        val lp = posts[l.subject.uri] ?: return@mapNotNull null
-
-                        repeatable += Notification.RawLike(
-                            l.subject,
-                            lp.first,
-                            it.author,
-                            l.createdAt.toStdlibInstant(),
-                            !it.isRead
-                        )
-
-                        null // repeatable, will be processed later
-                    }
-
-                    ListNotificationsReason.Mention -> {
-                        val p: Post = it.record.decodeAs()
-                        val hydrated = posts[it.uri]?.first
-                        Notification.Mention(
-                            Pair(it.cid, it.uri),
-                            p,
-                            it.author,
-                            p.createdAt.toStdlibInstant(),
-                            !it.isRead,
-                            hydrated,
-                        )
-                    }
-
-                    ListNotificationsReason.Quote -> {
-                        val p: Post = it.record.decodeAs()
-                        val quotedUrl = when (p.embed) {
-                            is PostEmbedUnion.Record -> {
-                                (p.embed as PostEmbedUnion.Record).value.record.uri
-                            }
-
-                            is PostEmbedUnion.RecordWithMedia -> {
-                                (p.embed as PostEmbedUnion.RecordWithMedia).value.record.record.uri
-                            }
-
-                            else -> null
-
-                        }
-
-                        if (quotedUrl == null) {
-                            return@mapNotNull null
-                        }
-                        val lp = posts[quotedUrl] ?: return@mapNotNull null
-                        val skeetData = lp.first
-                        val post = lp.second
-                        if (skeetData.did == null || skeetData.authorHandle == null) return@mapNotNull null
-                        Notification.Quote(
-                            Pair(it.cid, it.uri),
-                            p,
-                            PostViewEmbedUnion.RecordView(
-                                value = RecordView(
-                                    record = RecordViewRecordUnion.ViewRecord(
-                                        value = RecordViewRecord(
-                                            uri = skeetData.uri,
-                                            cid = skeetData.cid,
-                                            author = ProfileViewBasic(
-                                                did = skeetData.did,
-                                                handle = skeetData.authorHandle,
-                                                displayName = skeetData.authorName,
-                                                avatar = skeetData.authorAvatarURL?.let { uri ->
-                                                    sh.christian.ozone.api.Uri(
-                                                        uri
-                                                    )
-                                                },
-                                                associated = it.author.associated,
-                                                viewer = it.author.viewer,
-                                                labels = it.author.labels,
-                                                createdAt = it.author.createdAt,
-                                                verification = it.author.verification,
-                                            ),
-                                            value = Json.encodeAsJsonContent(post),
-                                            indexedAt = post.createdAt
-                                        )
-                                    )
-                                )
-                            ), // TODO: handle recordwithmedia
-                            it.author,
-                            p.createdAt.toStdlibInstant(),
-                            !it.isRead,
-                            posts[it.uri]?.first,
-                        )
-                    }
-
-                    ListNotificationsReason.Reply -> {
-                        val p: Post = it.record.decodeAs()
-                        val hydrated = posts[it.uri]?.first
-                        Notification.Reply(
-                            Pair(it.cid, it.uri),
-                            p,
-                            it.author,
-                            p.createdAt.toStdlibInstant(),
-                            !it.isRead,
-                            hydrated,
-                        )
-                    }
-
-                    ListNotificationsReason.Repost -> {
-                        val p: Repost = it.record.decodeAs()
-                        val rpp = posts[p.subject.uri] ?: return@mapNotNull null
-                        repeatable += Notification.RawRepost(
-                            p.subject,
-                            rpp.first,
-                            it.author,
-                            p.createdAt.toStdlibInstant(),
-                            !it.isRead
-                        )
-
-                        null
-                    }
-
-                    else -> {
-                        null
-                    }
-                }
-            }.toMutableList()
+            val posts = parseRawNotifications(rawNotifs)
+            val (notifs, repeatable) = buildNotificationList(rawNotifs, posts)
+            val grouped = groupRepeatableNotifications(repeatable)
+            val processed = processGroupedNotifications(notifs, grouped)
 
             if (fresh) {
                 uiState = uiState.copy(notifications = listOf())
             }
 
-            val processedRepeatable =
-                mutableMapOf<RepeatableNotification, MutableMap<Cid, RepeatedNotification>>()
-
-            val processRepeatable =
-                { kind: RepeatableNotification, list: MutableMap<Cid, RepeatedNotification>, ref: StrongRef, post: SkeetData, author: ProfileView, createdAt: Instant, new: Boolean ->
-                    if (list.contains(post.cid)) {
-                        val l = list[post.cid]!!
-                        l.authors += RepeatedAuthor(author, createdAt)
-                        if (createdAt > l.timestamp) {
-                            l.timestamp = createdAt
-                        }
-                        list[post.cid] = l
-                    } else {
-                        list[post.cid] = RepeatedNotification(
-                            kind = kind,
-                            authors = listOf(
-                                RepeatedAuthor(
-                                    author,
-                                    createdAt
-                                )
-                            ),
-                            post = post,
-                            timestamp = createdAt,
-                            new = new,
-                        )
-                    }
-                }
-
-            repeatable.fastForEach {
-                when (it) {
-                    is Notification.RawLike -> {
-                        val list = processedRepeatable.getOrPut(RepeatableNotification.Like) {
-                            mutableMapOf()
-                        }
-
-                        processRepeatable(
-                            RepeatableNotification.Like,
-                            list,
-                            it.subject,
-                            it.post,
-                            it.author,
-                            it.createdAt,
-                            it.new,
-                        )
-                    }
-
-                    is Notification.RawRepost -> {
-                        val list = processedRepeatable.getOrPut(RepeatableNotification.Repost) {
-                            mutableMapOf()
-                        }
-
-                        processRepeatable(
-                            RepeatableNotification.Repost,
-                            list,
-                            it.subject,
-                            it.post,
-                            it.author,
-                            it.createdAt,
-                            it.new
-                        )
-                    }
-
-                    else -> null
-                }
-            }
-
-            processedRepeatable.forEach { a, n ->
-                when (a) {
-                    RepeatableNotification.Like -> {
-                        n.forEach { _, r ->
-                            notifs += Notification.Like(
-                                data = r.copy(
-                                    r.kind,
-                                    r.post,
-                                    r.authors.sortedByDescending { it.timestamp },
-                                    r.timestamp,
-                                ),
-                                new = r.new
-                            )
-                        }
-                    }
-
-                    RepeatableNotification.Repost -> {
-                        n.forEach { _, r ->
-                            notifs += Notification.Like(
-                                data = r.copy(
-                                    r.kind,
-                                    r.post,
-                                    r.authors.sortedByDescending { it.timestamp },
-                                    r.timestamp
-                                ),
-                                new = r.new
-                            )
-                        }
-                    }
-                }
-            }
-
-            notifs = notifs.sortedByDescending { it.createdAt() }.toMutableList()
-
-            val merged = (uiState.notifications + notifs).distinctBy { it.uniqueKey() }
+            val merged = (uiState.notifications + processed).distinctBy { it.uniqueKey() }
 
             uiState = uiState.copy(
                 notifications = merged,
@@ -698,6 +414,276 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    private suspend fun parseRawNotifications(
+        rawNotifs: app.bsky.notification.ListNotificationsResponse,
+    ): Map<AtUri, Pair<SkeetData, Post>> {
+        val postsToFetch = rawNotifs.notifications.flatMap {
+            when (it.reason) {
+                ListNotificationsReason.Like -> {
+                    val l: Like = it.record.decodeAs()
+                    listOf(l.subject.uri)
+                }
+
+                ListNotificationsReason.Repost -> {
+                    val l: Repost = it.record.decodeAs()
+                    listOf(l.subject.uri)
+                }
+
+                ListNotificationsReason.Quote -> {
+                    val l: Post = it.record.decodeAs()
+                    val e = l.embed
+                    val quotedUri = when (e) {
+                        is PostEmbedUnion.Record -> e.value.record.uri
+                        is PostEmbedUnion.RecordWithMedia -> e.value.record.record.uri
+                        else -> null
+                    }
+                    listOfNotNull(it.uri, quotedUri)
+                }
+
+                ListNotificationsReason.Mention -> listOf(it.uri)
+                ListNotificationsReason.Reply -> listOf(it.uri)
+
+                else -> emptyList()
+            }
+        }.distinct()
+
+        return postsToFetch.chunked(25).fold(mapOf()) { acc, chunk ->
+            val fetched = bskyConn.getPosts(chunk).getOrNull() ?: return@fold acc
+            acc + fetched.associate {
+                val record = it.record.decodeAs<Post>()
+                it.uri to (SkeetData.fromPostView(it, it.author) to record)
+            }
+        }
+    }
+
+    private fun buildNotificationList(
+        rawNotifs: app.bsky.notification.ListNotificationsResponse,
+        posts: Map<AtUri, Pair<SkeetData, Post>>,
+    ): Pair<List<Notification>, List<Notification>> {
+        val repeatable = mutableListOf<Notification>()
+        val notifs = rawNotifs.notifications.mapNotNull {
+            when (it.reason) {
+                ListNotificationsReason.Follow -> {
+                    val l: Follow = it.record.decodeAs()
+                    Notification.Follow(it.author, l.createdAt.toStdlibInstant(), !it.isRead)
+                }
+
+                ListNotificationsReason.Like -> {
+                    val l: Like = it.record.decodeAs()
+                    val lp = posts[l.subject.uri] ?: return@mapNotNull null
+
+                    repeatable += Notification.RawLike(
+                        l.subject,
+                        lp.first,
+                        it.author,
+                        l.createdAt.toStdlibInstant(),
+                        !it.isRead
+                    )
+
+                    null
+                }
+
+                ListNotificationsReason.Mention -> {
+                    val p: Post = it.record.decodeAs()
+                    val hydrated = posts[it.uri]?.first
+                    Notification.Mention(
+                        Pair(it.cid, it.uri),
+                        p,
+                        it.author,
+                        p.createdAt.toStdlibInstant(),
+                        !it.isRead,
+                        hydrated,
+                    )
+                }
+
+                ListNotificationsReason.Quote -> {
+                    val p: Post = it.record.decodeAs()
+                    val quotedUrl = when (p.embed) {
+                        is PostEmbedUnion.Record -> {
+                            (p.embed as PostEmbedUnion.Record).value.record.uri
+                        }
+
+                        is PostEmbedUnion.RecordWithMedia -> {
+                            (p.embed as PostEmbedUnion.RecordWithMedia).value.record.record.uri
+                        }
+
+                        else -> null
+
+                    }
+
+                    if (quotedUrl == null) {
+                        return@mapNotNull null
+                    }
+                    val lp = posts[quotedUrl] ?: return@mapNotNull null
+                    val skeetData = lp.first
+                    val post = lp.second
+                    if (skeetData.did == null || skeetData.authorHandle == null) return@mapNotNull null
+                    Notification.Quote(
+                        Pair(it.cid, it.uri),
+                        p,
+                        PostViewEmbedUnion.RecordView(
+                            value = RecordView(
+                                record = RecordViewRecordUnion.ViewRecord(
+                                    value = RecordViewRecord(
+                                        uri = skeetData.uri,
+                                        cid = skeetData.cid,
+                                        author = ProfileViewBasic(
+                                            did = skeetData.did,
+                                            handle = skeetData.authorHandle,
+                                            displayName = skeetData.authorName,
+                                            avatar = skeetData.authorAvatarURL?.let { uri ->
+                                                sh.christian.ozone.api.Uri(
+                                                    uri
+                                                )
+                                            },
+                                            associated = it.author.associated,
+                                            viewer = it.author.viewer,
+                                            labels = it.author.labels,
+                                            createdAt = it.author.createdAt,
+                                            verification = it.author.verification,
+                                        ),
+                                        value = Json.encodeAsJsonContent(post),
+                                        indexedAt = post.createdAt
+                                    )
+                                )
+                            )
+                        ),
+                        it.author,
+                        p.createdAt.toStdlibInstant(),
+                        !it.isRead,
+                        posts[it.uri]?.first,
+                    )
+                }
+
+                ListNotificationsReason.Reply -> {
+                    val p: Post = it.record.decodeAs()
+                    val hydrated = posts[it.uri]?.first
+                    Notification.Reply(
+                        Pair(it.cid, it.uri),
+                        p,
+                        it.author,
+                        p.createdAt.toStdlibInstant(),
+                        !it.isRead,
+                        hydrated,
+                    )
+                }
+
+                ListNotificationsReason.Repost -> {
+                    val p: Repost = it.record.decodeAs()
+                    val rpp = posts[p.subject.uri] ?: return@mapNotNull null
+                    repeatable += Notification.RawRepost(
+                        p.subject,
+                        rpp.first,
+                        it.author,
+                        p.createdAt.toStdlibInstant(),
+                        !it.isRead
+                    )
+
+                    null
+                }
+
+                else -> {
+                    null
+                }
+            }
+        }
+        return Pair(notifs, repeatable)
+    }
+
+    private fun groupRepeatableNotifications(
+        repeatable: List<Notification>,
+    ): Map<RepeatableNotification, Map<Cid, RepeatedNotification>> {
+        val processedRepeatable =
+            mutableMapOf<RepeatableNotification, MutableMap<Cid, RepeatedNotification>>()
+
+        val processRepeatable =
+            { kind: RepeatableNotification, list: MutableMap<Cid, RepeatedNotification>, post: SkeetData, author: ProfileView, createdAt: Instant, new: Boolean ->
+                if (list.contains(post.cid)) {
+                    val l = list[post.cid]!!
+                    l.authors += RepeatedAuthor(author, createdAt)
+                    if (createdAt > l.timestamp) {
+                        l.timestamp = createdAt
+                    }
+                    list[post.cid] = l
+                } else {
+                    list[post.cid] = RepeatedNotification(
+                        kind = kind,
+                        authors = listOf(RepeatedAuthor(author, createdAt)),
+                        post = post,
+                        timestamp = createdAt,
+                        new = new,
+                    )
+                }
+            }
+
+        repeatable.fastForEach {
+            when (it) {
+                is Notification.RawLike -> {
+                    val list = processedRepeatable.getOrPut(RepeatableNotification.Like) {
+                        mutableMapOf()
+                    }
+                    processRepeatable(
+                        RepeatableNotification.Like, list, it.post, it.author, it.createdAt, it.new,
+                    )
+                }
+
+                is Notification.RawRepost -> {
+                    val list = processedRepeatable.getOrPut(RepeatableNotification.Repost) {
+                        mutableMapOf()
+                    }
+                    processRepeatable(
+                        RepeatableNotification.Repost, list, it.post, it.author, it.createdAt, it.new,
+                    )
+                }
+
+                else -> null
+            }
+        }
+
+        return processedRepeatable
+    }
+
+    private fun processGroupedNotifications(
+        notifs: List<Notification>,
+        grouped: Map<RepeatableNotification, Map<Cid, RepeatedNotification>>,
+    ): List<Notification> {
+        val result = notifs.toMutableList()
+
+        grouped.forEach { a, n ->
+            when (a) {
+                RepeatableNotification.Like -> {
+                    n.forEach { _, r ->
+                        result += Notification.Like(
+                            data = r.copy(
+                                r.kind,
+                                r.post,
+                                r.authors.sortedByDescending { it.timestamp },
+                                r.timestamp,
+                            ),
+                            new = r.new
+                        )
+                    }
+                }
+
+                RepeatableNotification.Repost -> {
+                    n.forEach { _, r ->
+                        result += Notification.Like(
+                            data = r.copy(
+                                r.kind,
+                                r.post,
+                                r.authors.sortedByDescending { it.timestamp },
+                                r.timestamp
+                            ),
+                            new = r.new
+                        )
+                    }
+                }
+            }
+        }
+
+        return result.sortedByDescending { it.createdAt() }
+    }
+
     fun isNotificationNew(notif: Notification): Boolean {
         return notif.new() && (seenNotificationsAt == null || notif.createdAt() > seenNotificationsAt!!)
     }
@@ -706,10 +692,7 @@ class TimelineViewModel @AssistedInject constructor(
         uiState = uiState.copy(seenNotificationsAt = Clock.System.now())
         viewModelScope.launch {
             bskyConn.updateSeenNotifications().onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 uiState = uiState.copy(unreadNotificationsAmt = 0)
                 NotificationBadge.clear()
@@ -755,10 +738,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun feeds(): Job {
         return viewModelScope.launch {
             bskyConn.feeds().onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 uiState = uiState.copy(feeds = it)
             }
@@ -783,10 +763,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun like(uri: AtUri, cid: Cid) {
         viewModelScope.launch {
             bskyConn.like(uri, cid).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess { rkey ->
                 postInteractionStore.update(cid) {
                     it.copy(didLike = true, likes = it.likes + 1, likeRkey = rkey)
@@ -798,10 +775,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun repost(uri: AtUri, cid: Cid) {
         viewModelScope.launch {
             bskyConn.repost(uri, cid).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess { rkey ->
                 postInteractionStore.update(cid) {
                     it.copy(didRepost = true, reposts = it.reposts + 1, repostRkey = rkey)
@@ -817,10 +791,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun deletePost(uri: AtUri, then: () -> Unit) {
         viewModelScope.launch {
             bskyConn.deletePost(uri.rkey()).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 uiState = uiState.copy(
                     skeets = uiState.skeets.filter { it.uri != uri },
@@ -839,10 +810,7 @@ class TimelineViewModel @AssistedInject constructor(
         val rkey = postInteractionStore.getState(cid, PostInteraction(0, 0, 0, false, false)).value.likeRkey ?: return
         viewModelScope.launch {
             bskyConn.deleteLike(rkey).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 postInteractionStore.update(cid) {
                     it.copy(didLike = false, likes = it.likes - 1, likeRkey = null)
@@ -855,10 +823,7 @@ class TimelineViewModel @AssistedInject constructor(
         val rkey = postInteractionStore.getState(cid, PostInteraction(0, 0, 0, false, false)).value.repostRkey ?: return
         viewModelScope.launch {
             bskyConn.deleteRepost(rkey).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 postInteractionStore.update(cid) {
                     it.copy(didRepost = false, reposts = it.reposts - 1, repostRkey = null)
@@ -938,10 +903,7 @@ class TimelineViewModel @AssistedInject constructor(
                     followersListName = name,
                 )
             }.onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }
         }
     }
@@ -956,10 +918,7 @@ class TimelineViewModel @AssistedInject constructor(
                     profileFollowsCursor = res.cursor,
                 )
             }.onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }
         }
     }
@@ -1046,10 +1005,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun getThread(parentHeight: Long = 80, then: () -> Unit) {
         viewModelScope.launch {
             bskyConn.getThread(uiState.currentlyShownThread.post.uri, parentHeight).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 val asd = readThread(it.thread)
                 uiState = uiState.copy(
@@ -1076,10 +1032,8 @@ class TimelineViewModel @AssistedInject constructor(
 
         viewModelScope.launch {
             bskyConn.fetchActor(did).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message, isFetchingProfile = false, profileNotFound = true)
-                    else -> uiState.copy(error = it.message, isFetchingProfile = false, profileNotFound = true)
-                }
+                handleError(it)
+                uiState = uiState.copy(isFetchingProfile = false, profileNotFound = true)
             }.onSuccess {
                 uiState = uiState.copy(profileUser = it, isFetchingProfile = false)
             }
@@ -1099,10 +1053,8 @@ class TimelineViewModel @AssistedInject constructor(
                 filter = uiState.profileFeedFilter,
             ).onFailure {
                 if (it is CancellationException) return@onFailure
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message, isFetchingProfileFeed = false)
-                    else -> uiState.copy(error = it.message, isFetchingProfileFeed = false)
-                }
+                handleError(it)
+                uiState = uiState.copy(isFetchingProfileFeed = false)
             }.onSuccess { timeline ->
                 val newPosts = timeline.feed.map {
                     SkeetData.fromFeedViewPost(it, bskyConn.session?.did)
@@ -1131,10 +1083,7 @@ class TimelineViewModel @AssistedInject constructor(
         val profile = uiState.profileUser ?: return
         viewModelScope.launch {
             bskyConn.follow(profile.did).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess { rkey ->
                 val followUri = AtUri("at://${bskyConn.session?.did?.did}/app.bsky.graph.follow/${rkey.rkey}")
                 val updatedViewer = (profile.viewer ?: ViewerState()).copy(following = followUri)
@@ -1153,10 +1102,7 @@ class TimelineViewModel @AssistedInject constructor(
         val followUri = profile.viewer?.following ?: return
         viewModelScope.launch {
             bskyConn.unfollow(followUri).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 val updatedViewer = profile.viewer!!.copy(following = null)
                 uiState = uiState.copy(
@@ -1173,10 +1119,7 @@ class TimelineViewModel @AssistedInject constructor(
         val profile = uiState.profileUser ?: return
         viewModelScope.launch {
             bskyConn.muteActor(profile.did).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 bskyConn.fetchActor(profile.did).onSuccess {
                     uiState = uiState.copy(profileUser = it)
@@ -1189,10 +1132,7 @@ class TimelineViewModel @AssistedInject constructor(
         val profile = uiState.profileUser ?: return
         viewModelScope.launch {
             bskyConn.unmuteActor(profile.did).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
             }.onSuccess {
                 bskyConn.fetchActor(profile.did).onSuccess {
                     uiState = uiState.copy(profileUser = it)
@@ -1317,10 +1257,7 @@ class TimelineViewModel @AssistedInject constructor(
     ) {
         viewModelScope.launch {
             bskyConn.updateProfile(displayName, description, avatarUri, bannerUri).onFailure {
-                uiState = when (it) {
-                    is LoginException -> uiState.copy(loginError = it.message)
-                    else -> uiState.copy(error = it.message)
-                }
+                handleError(it)
                 then(false)
             }.onSuccess {
                 // Refresh both the profile view and the self user data

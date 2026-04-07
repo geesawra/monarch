@@ -4,7 +4,6 @@ package industries.geesawra.monarch
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,6 +93,7 @@ import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import industries.geesawra.monarch.datalayer.toFloat
 import sh.christian.ozone.api.Did
 import io.sanghun.compose.video.RepeatMode
 import io.sanghun.compose.video.VideoPlayer
@@ -123,29 +123,23 @@ fun SkeetView(
     isVisible: Boolean = true,
 ) {
     if (skeet.blocked) {
-        ConditionalCard(text = "Blocked :(", wrapWithCard = !nested)
+        SkeetBlockedPost(nested)
         return
     }
 
     if (skeet.notFound) {
-        ConditionalCard(text = "Post not found", wrapWithCard = !nested)
+        SkeetNotFoundPost(nested)
         return
     }
 
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
     var contentRevealed by remember { mutableStateOf(warningLabel == null) }
 
-    val minSize = avatarSize()
-
     if (nested) {
-        // Embedded posts: simple stacked layout
         Column(
             modifier = modifier
                 .clip(MaterialTheme.shapes.medium)
-                .clickable {
-                    Log.d("SkeetView", skeet.content)
-                    onShowThread(skeet)
-                }
+                .clickable { onShowThread(skeet) }
                 .padding(top = 8.dp, start = 10.dp, end = 10.dp, bottom = 8.dp)
         ) {
             if (showInReplyTo) {
@@ -159,101 +153,47 @@ fun SkeetView(
                 )
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(skeet.authorAvatarURL)
-                        .crossfade(true)
-                        .build(),
-                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    contentDescription = "Avatar",
-                    modifier = Modifier
-                        .size(minSize)
-                        .clip(avatarShape)
-                        .then(
-                            if (onAvatarTap != null && skeet.did != null)
-                                Modifier.clickable { onAvatarTap(skeet.did!!) }
-                            else Modifier
-                        )
-                )
+            SkeetHeaderSection(
+                skeet = skeet,
+                avatarShape = avatarShape,
+                showLabels = showLabels,
+                viewModel = viewModel,
+                onAvatarTap = onAvatarTap,
+            )
 
-                SkeetHeader(
-                    modifier = Modifier.padding(start = avatarTextGap()),
-                    skeet = skeet,
-                    showLabels = showLabels,
-                    labelDisplayName = { viewModel?.labelDisplayName(it) },
-                    labelDescription = { viewModel?.labelDescription(it) },
-                    labelerAvatar = { viewModel?.labelerAvatar(it) }
-                )
-            }
-
-            if (!contentRevealed && warningLabel != null) {
-                ContentWarningCard(
-                    label = labelDefinition(warningLabel.`val`).plaintext,
-                    revealed = contentRevealed,
-                    onToggle = { contentRevealed = !contentRevealed },
-                    wrapWithCard = false,
-                )
-            }
-            if (contentRevealed) {
-                SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels)
-            }
+            SkeetContentSection(
+                skeet = skeet,
+                nested = nested,
+                disableEmbeds = disableEmbeds,
+                warningLabel = warningLabel,
+                contentRevealed = contentRevealed,
+                onToggleContent = { contentRevealed = !contentRevealed },
+                showActions = false,
+                onShowThread = onShowThread,
+                viewModel = viewModel,
+                onMentionClick = onAvatarTap,
+                postTextSize = postTextSize,
+                avatarShape = avatarShape,
+                isVisible = isVisible,
+                showLabels = showLabels,
+            )
         }
     } else {
-        // Top-level posts: two-column layout, thread line spans full height
+        val minSize = avatarSize()
         Row(
             modifier = modifier
                 .clip(MaterialTheme.shapes.medium)
-                .clickable {
-                    Log.d("SkeetView", skeet.content)
-                    onShowThread(skeet)
-                }
+                .clickable { onShowThread(skeet) }
                 .padding(top = 8.dp, start = postHorizontalPadding(), end = postHorizontalPadding(), bottom = if (inThread) 0.dp else 8.dp)
                 .height(IntrinsicSize.Min)
         ) {
-            // Left column: avatar + thread line (spans full post height)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .width(minSize)
-                    .fillMaxHeight()
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(skeet.authorAvatarURL)
-                        .crossfade(true)
-                        .build(),
-                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                    contentDescription = "Avatar",
-                    modifier = Modifier
-                        .size(minSize)
-                        .clip(avatarShape)
-                        .then(
-                            if (onAvatarTap != null && skeet.did != null)
-                                Modifier.clickable { onAvatarTap(skeet.did!!) }
-                            else Modifier
-                        )
-                )
-                if (inThread) {
-                    VerticalDivider(
-                        thickness = 3.dp,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(top = 4.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                }
-            }
+            SkeetThreadLine(
+                skeet = skeet,
+                avatarShape = avatarShape,
+                inThread = inThread,
+                onAvatarTap = onAvatarTap,
+            )
 
-            // Right column: reason + header + content + actions
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -277,30 +217,167 @@ fun SkeetView(
                     labelerAvatar = { viewModel?.labelerAvatar(it) }
                 )
 
-                if (warningLabel != null) {
-                    ContentWarningCard(
-                        label = labelDefinition(warningLabel.`val`).plaintext,
-                        revealed = contentRevealed,
-                        onToggle = { contentRevealed = !contentRevealed },
-                        wrapWithCard = false,
-                    )
-                }
-                if (contentRevealed) {
-                    SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onAvatarTap, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels)
-
-                    if (!disableEmbeds) {
-                        TimelinePostActionsView(
-                            onReplyTap = onReplyTap,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            timelineViewModel = viewModel,
-                            skeet = skeet,
-                            inThread = inThread
-                        )
-                    }
-                }
+                SkeetContentSection(
+                    skeet = skeet,
+                    nested = nested,
+                    disableEmbeds = disableEmbeds,
+                    warningLabel = warningLabel,
+                    contentRevealed = contentRevealed,
+                    onToggleContent = { contentRevealed = !contentRevealed },
+                    showActions = !disableEmbeds,
+                    onReplyTap = onReplyTap,
+                    inThread = inThread,
+                    onShowThread = onShowThread,
+                    viewModel = viewModel,
+                    onMentionClick = onAvatarTap,
+                    postTextSize = postTextSize,
+                    avatarShape = avatarShape,
+                    isVisible = isVisible,
+                    showLabels = showLabels,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun SkeetBlockedPost(nested: Boolean) {
+    ConditionalCard(text = "Blocked :(", wrapWithCard = !nested)
+}
+
+@Composable
+private fun SkeetNotFoundPost(nested: Boolean) {
+    ConditionalCard(text = "Post not found", wrapWithCard = !nested)
+}
+
+@Composable
+private fun SkeetHeaderSection(
+    skeet: SkeetData,
+    avatarShape: Shape,
+    showLabels: Boolean,
+    viewModel: TimelineViewModel?,
+    onAvatarTap: ((Did) -> Unit)?,
+) {
+    val minSize = avatarSize()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(skeet.authorAvatarURL)
+                .crossfade(true)
+                .build(),
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            contentDescription = "Avatar",
+            modifier = Modifier
+                .size(minSize)
+                .clip(avatarShape)
+                .then(
+                    if (onAvatarTap != null && skeet.did != null)
+                        Modifier.clickable { onAvatarTap(skeet.did!!) }
+                    else Modifier
+                )
+        )
+
+        SkeetHeader(
+            modifier = Modifier.padding(start = avatarTextGap()),
+            skeet = skeet,
+            showLabels = showLabels,
+            labelDisplayName = { viewModel?.labelDisplayName(it) },
+            labelDescription = { viewModel?.labelDescription(it) },
+            labelerAvatar = { viewModel?.labelerAvatar(it) }
+        )
+    }
+}
+
+@Composable
+private fun SkeetThreadLine(
+    skeet: SkeetData,
+    avatarShape: Shape,
+    inThread: Boolean,
+    onAvatarTap: ((Did) -> Unit)?,
+) {
+    val minSize = avatarSize()
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(minSize)
+            .fillMaxHeight()
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(skeet.authorAvatarURL)
+                .crossfade(true)
+                .build(),
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            contentDescription = "Avatar",
+            modifier = Modifier
+                .size(minSize)
+                .clip(avatarShape)
+                .then(
+                    if (onAvatarTap != null && skeet.did != null)
+                        Modifier.clickable { onAvatarTap(skeet.did!!) }
+                    else Modifier
+                )
+        )
+        if (inThread) {
+            VerticalDivider(
+                thickness = 3.dp,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(top = 4.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun SkeetContentSection(
+    skeet: SkeetData,
+    nested: Boolean,
+    disableEmbeds: Boolean,
+    warningLabel: Label?,
+    contentRevealed: Boolean,
+    onToggleContent: () -> Unit,
+    showActions: Boolean,
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    inThread: Boolean = false,
+    onShowThread: (SkeetData) -> Unit,
+    viewModel: TimelineViewModel?,
+    onMentionClick: ((Did) -> Unit)?,
+    postTextSize: PostTextSize,
+    avatarShape: Shape,
+    isVisible: Boolean,
+    showLabels: Boolean,
+) {
+    if (warningLabel != null) {
+        ContentWarningCard(
+            label = labelDefinition(warningLabel.`val`).plaintext,
+            revealed = contentRevealed,
+            onToggle = onToggleContent,
+            wrapWithCard = false,
+        )
+    }
+    if (contentRevealed) {
+        SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onMentionClick, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels)
+
+        if (showActions) {
+            TimelinePostActionsView(
+                onReplyTap = onReplyTap,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                timelineViewModel = viewModel,
+                skeet = skeet,
+                inThread = inThread
+            )
         }
     }
 }
@@ -358,8 +435,7 @@ fun Embeds(
         }
 
         is PostViewEmbedUnion.VideoView -> {
-            val ar = embed.value.aspectRatio
-            val aspectRatio = if (ar != null && ar.height > 0) ar.width.toFloat() / ar.height.toFloat() else null
+            val aspectRatio = embed.value.aspectRatio.toFloat()
             VideoView(
                 embed.value.playlist.uri.toUri(),
                 thumbnailUri = embed.value.thumbnail?.uri,

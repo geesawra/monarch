@@ -236,32 +236,17 @@ private fun SearchPostsResults(
 
         if (isSearching) {
             item(key = "loading") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularWavyProgressIndicator()
-                }
+                LoadingBox()
             }
         }
     }
 
     // Pagination
-    val endReached by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val last = layoutInfo.visibleItemsInfo.lastOrNull()
-            last != null && last.index == layoutInfo.totalItemsCount - 1
-        }
-    }
-
-    LaunchedEffect(endReached) {
-        if (endReached && posts.isNotEmpty()) {
-            viewModel.fetchMoreSearchPosts()
-        }
-    }
+    OnEndOfListReached(
+        listState = listState,
+        items = posts,
+        onEndReached = { viewModel.fetchMoreSearchPosts() },
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -321,31 +306,16 @@ private fun SearchPeopleResults(
 
         if (isSearching) {
             item(key = "loading") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularWavyProgressIndicator()
-                }
+                LoadingBox()
             }
         }
     }
 
-    val endReached by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val last = layoutInfo.visibleItemsInfo.lastOrNull()
-            last != null && last.index == layoutInfo.totalItemsCount - 1
-        }
-    }
-
-    LaunchedEffect(endReached) {
-        if (endReached && actors.isNotEmpty()) {
-            viewModel.fetchMoreSearchActors()
-        }
-    }
+    OnEndOfListReached(
+        listState = listState,
+        items = actors,
+        onEndReached = { viewModel.fetchMoreSearchActors() },
+    )
 }
 
 @Composable
@@ -394,7 +364,7 @@ private fun ActorCard(
                         modifier = Modifier.weight(1f, fill = false),
                     )
 
-                    val isVerified = actor.verification?.verifiedStatus is VerifiedStatus.Valid
+                    val isVerified = isVerifiedStatus(actor.verification?.verifiedStatus)
                     if (isVerified) {
                         Icon(
                             imageVector = Icons.Default.Verified,

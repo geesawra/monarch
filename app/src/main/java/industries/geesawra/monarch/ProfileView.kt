@@ -173,27 +173,16 @@ fun ProfileView(
     }
 
     if (showDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = { showDiscardDialog = false },
-            title = { Text("Discard post?") },
-            text = { Text("You have unsaved changes that will be lost.") },
-            confirmButton = {
-                Button(onClick = {
-                    showDiscardDialog = false
-                    wasEdited.value = false
-                    focusManager.clearFocus()
-                    coroutineScope.launch {
-                        scaffoldState.bottomSheetState.hide()
-                    }
-                }) {
-                    Text("Discard")
+        DiscardChangesDialog(
+            onDiscard = {
+                showDiscardDialog = false
+                wasEdited.value = false
+                focusManager.clearFocus()
+                coroutineScope.launch {
+                    scaffoldState.bottomSheetState.hide()
                 }
             },
-            dismissButton = {
-                OutlinedButton(onClick = { showDiscardDialog = false }) {
-                    Text("Keep editing")
-                }
-            }
+            onKeepEditing = { showDiscardDialog = false },
         )
     }
 
@@ -241,13 +230,7 @@ fun ProfileView(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
+                    colors = monarchTopAppBarColors(),
                     navigationIcon = {
                         IconButton(onClick = backButton) {
                             Icon(
@@ -278,7 +261,7 @@ fun ProfileView(
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
                                             .size(32.dp)
-                                            .clip(if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(6.dp) else CircleShape)
+                                            .clip(settingsState.avatarClipShape)
                                     )
                                 }
                                 Text(
@@ -425,7 +408,7 @@ internal fun ProfileContent(
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
 ) {
     val posts = timelineViewModel.uiState.profilePosts
-    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
+    val avatarClipShape = settingsState.avatarClipShape
 
     LazyColumn(
         state = listState,
@@ -477,37 +460,16 @@ internal fun ProfileContent(
 
         if (timelineViewModel.uiState.isFetchingProfileFeed) {
             item(key = "loading") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularWavyProgressIndicator()
-                }
+                LoadingBox()
             }
         }
     }
 
-    // Pagination
-    val endOfListReached by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val visibleItemsInfo = layoutInfo.visibleItemsInfo
-            if (layoutInfo.totalItemsCount == 0) {
-                false
-            } else {
-                val lastVisibleItem = visibleItemsInfo.lastOrNull()
-                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
-            }
-        }
-    }
-
-    LaunchedEffect(endOfListReached) {
-        if (endOfListReached && posts.isNotEmpty()) {
-            timelineViewModel.fetchProfileFeed()
-        }
-    }
+    OnEndOfListReached(
+        listState = listState,
+        items = posts,
+        onEndReached = { timelineViewModel.fetchProfileFeed() },
+    )
 }
 
 @Composable
@@ -607,10 +569,7 @@ internal fun ProfileHeader(
                     modifier = Modifier.weight(1f, fill = false),
                 )
 
-                val isVerified = when (profile.verification?.verifiedStatus) {
-                    is VerifiedStatus.Valid -> true
-                    else -> false
-                }
+                val isVerified = isVerifiedStatus(profile.verification?.verifiedStatus)
                 if (isVerified) {
                     Icon(
                         imageVector = Icons.Default.Verified,
@@ -651,7 +610,7 @@ internal fun ProfileHeader(
             if (!profile.description.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = profile.description!!,
+                    text = profile.description.orEmpty(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

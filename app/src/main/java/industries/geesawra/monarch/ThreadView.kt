@@ -62,14 +62,7 @@ fun ThreadView(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 TopAppBar(
-                    colors = TopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface, // Ensuring correct contrast
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-                        subtitleContentColor = MaterialTheme.colorScheme.onSurface
-                    ),
+                    colors = monarchTopAppBarColors(),
                     navigationIcon = {
                         IconButton(onClick = backButton) {
                             Icon(

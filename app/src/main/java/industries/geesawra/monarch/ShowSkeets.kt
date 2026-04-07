@@ -86,7 +86,7 @@ fun ShowSkeets(
     onProfileTap: ((Did) -> Unit)? = null,
     searchFilter: String = "",
 ) {
-    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
+    val avatarClipShape = settingsState.avatarClipShape
     // Collect CIDs already shown as thread context (root/parent) to avoid duplicates
     val threadContextCids = remember(data) {
         if (isShowingThread) emptySet()
@@ -442,24 +442,15 @@ fun ShowSkeets(
     }
     }
 
-    val endOfListReached by remember {
-        derivedStateOf {
-            val layoutInfo = state.layoutInfo
-            val visibleItemsInfo = layoutInfo.visibleItemsInfo
-            if (layoutInfo.totalItemsCount == 0) {
-                false
-            } else {
-                val lastVisibleItem = visibleItemsInfo.lastOrNull()
-                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
+    OnEndOfListReached(
+        listState = state,
+        items = viewModel.uiState.skeets,
+        onEndReached = {
+            if (shouldFetchMoreData) {
+                viewModel.fetchTimeline()
             }
-        }
-    }
-
-    LaunchedEffect(endOfListReached) {
-        if (endOfListReached && viewModel.uiState.skeets.isNotEmpty() && shouldFetchMoreData) {
-            viewModel.fetchTimeline()
-        }
-    }
+        },
+    )
 
     if (settingsState.autoLikeOnScroll && !isShowingThread) {
         val autoLikedCids = remember { mutableSetOf<Cid>() }

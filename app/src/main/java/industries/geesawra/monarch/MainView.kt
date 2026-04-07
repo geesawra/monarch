@@ -234,27 +234,16 @@ fun MainView(
     }
 
     if (showDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = { showDiscardDialog = false },
-            title = { Text("Discard post?") },
-            text = { Text("You have unsaved changes that will be lost.") },
-            confirmButton = {
-                Button(onClick = {
-                    showDiscardDialog = false
-                    wasEdited.value = false
-                    focusManager.clearFocus()
-                    coroutineScope.launch {
-                        scaffoldState.bottomSheetState.hide()
-                    }
-                }) {
-                    Text("Discard")
+        DiscardChangesDialog(
+            onDiscard = {
+                showDiscardDialog = false
+                wasEdited.value = false
+                focusManager.clearFocus()
+                coroutineScope.launch {
+                    scaffoldState.bottomSheetState.hide()
                 }
             },
-            dismissButton = {
-                OutlinedButton(onClick = { showDiscardDialog = false }) {
-                    Text("Keep editing")
-                }
-            }
+            onKeepEditing = { showDiscardDialog = false },
         )
     }
 
@@ -623,13 +612,7 @@ private fun InnerTimelineView(
                 topBar = {
                     TopAppBar(
                         expandedHeight = if (isNarrowScreen()) 48.dp else TopAppBarDefaults.TopAppBarExpandedHeight,
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                            navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                            titleContentColor = MaterialTheme.colorScheme.onSurface,
-                            actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
+                        colors = monarchTopAppBarColors(),
                         title = {
                             when (currentDestination) {
                                 TabBarDestinations.TIMELINE -> if (isTimelineSearchActive) {
@@ -741,7 +724,7 @@ private fun InnerTimelineView(
 
                                     val user = timelineViewModel.uiState.user
                                     var showAccountSwitcher by remember { mutableStateOf(false) }
-                                    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
+                                    val avatarClipShape = settingsState.avatarClipShape
 
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
@@ -902,7 +885,7 @@ private fun InnerTimelineView(
                                                         state = pagerState,
                                                         modifier = Modifier.fillMaxSize(),
                                                         beyondViewportPageCount = 0,
-                                                        contentPadding = PaddingValues(horizontal = feedHorizontalPadding()),
+                                                        contentPadding = PaddingValues(horizontal = 0.dp),
                                                     ) { page ->
                                                         val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
                                                         val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()

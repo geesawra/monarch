@@ -23,7 +23,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.io.path.Path
@@ -62,6 +61,11 @@ data class CompressedImage(
 class Compressor(
     private val context: Context
 ) {
+    companion object {
+        const val VIDEO_SIZE_LIMIT_BYTES = 100 * 1024 * 1024L
+        const val VIDEO_SCALE_FACTOR = 0.3f
+    }
+
     suspend fun compressImage(
         contentUri: Uri,
         compressionThreshold: Long
@@ -134,7 +138,7 @@ class Compressor(
         contentUri: Uri,
     ): Uri? {
         return withContext(Dispatchers.IO) {
-            val sizeLimitBytes = 100 * 1024 * 1024L
+            val sizeLimitBytes = VIDEO_SIZE_LIMIT_BYTES
 
             val videoSizeBytes = withContext(Dispatchers.IO) {
                 getVideoSizeFromUri(context, contentUri)
@@ -151,10 +155,8 @@ class Compressor(
                     suffix = ".tmp",
                 ).toFile()
 
-            File.createTempFile("compressor_output", ".mp4", context.cacheDir)
-
             val scaleAndRotateTransformation = ScaleAndRotateTransformation.Builder()
-                .setScale(0.3f, 0.3f) // Scale x and y by 50%
+                .setScale(VIDEO_SCALE_FACTOR, VIDEO_SCALE_FACTOR)
                 .build()
 
             ensureActive()

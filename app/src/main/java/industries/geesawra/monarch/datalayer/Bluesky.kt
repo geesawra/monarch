@@ -183,10 +183,45 @@ data class Timeline(
 
 class BlueskyConn(val context: Context) {
     companion object {
+        const val MAX_IMAGE_SIZE_BYTES = 950_000L
+        const val VIDEO_UPLOAD_TIMEOUT_MS = 300_000L
+        const val DEFAULT_TIMEOUT_MS = 30_000L
+
         private val Context.dataStore by preferencesDataStore("bluesky")
         private val SESSION = stringPreferencesKey(AuthData.SessionData.name)
         private val PDSHOST = stringPreferencesKey(AuthData.PDSHost.name)
         private val APPVIEW_PROXY = stringPreferencesKey(AuthData.AppViewProxy.name)
+
+        private fun createRetryHttpClient(
+            baseUrl: String? = null,
+            requestTimeout: Long = DEFAULT_TIMEOUT_MS,
+            socketTimeout: Long = DEFAULT_TIMEOUT_MS,
+            configure: io.ktor.client.HttpClientConfig<io.ktor.client.engine.okhttp.OkHttpConfig>.() -> Unit = {},
+        ): HttpClient {
+            return HttpClient(OkHttp) {
+                if (baseUrl != null) {
+                    defaultRequest {
+                        url(baseUrl)
+                    }
+                }
+                install(HttpTimeout) {
+                    requestTimeoutMillis = requestTimeout
+                    connectTimeoutMillis = DEFAULT_TIMEOUT_MS
+                    socketTimeoutMillis = socketTimeout
+                }
+                install(HttpRequestRetry) {
+                    maxRetries = 3
+                    retryIf { _, response ->
+                        response.status.value in 500..599
+                    }
+                    retryOnExceptionIf { _, cause ->
+                        cause is java.io.IOException
+                    }
+                    exponentialDelay()
+                }
+                configure()
+            }
+        }
 
         suspend fun pdsForHandle(handle: String): Result<String> {
             return runCatching {
@@ -208,23 +243,7 @@ class BlueskyConn(val context: Context) {
                     }
                 }
 
-                val httpClient = HttpClient(OkHttp) {
-                    install(HttpTimeout) {
-                        requestTimeoutMillis = 30000
-                        connectTimeoutMillis = 30000
-                        socketTimeoutMillis = 30000
-                    }
-                    install(HttpRequestRetry) {
-                        maxRetries = 3
-                        retryIf { _, response ->
-                            response.status.value in 500..599
-                        }
-                        retryOnExceptionIf { _, cause ->
-                            cause is java.io.IOException
-                        }
-                        exponentialDelay()
-                    }
-                }
+                val httpClient = createRetryHttpClient()
 
                 val rawDoc = httpClient.get {
                     url {
@@ -366,8 +385,8 @@ class BlueskyConn(val context: Context) {
         refreshIfNeeded(pdsURL, appviewProxy, sessionData)
         this.pdsURL = pdsURL
         this.appviewProxy = appviewProxy
-        this.pdsClient = mkPdsClient(pdsURL, this.session!!)
-        this.client = mkClient(pdsURL, appviewProxy, this.session!!)
+        this.pdsClient = mkClient(pdsURL, this.session!!)
+        this.client = mkClient(pdsURL, this.session!!, appviewProxy = appviewProxy)
     }
 
     suspend fun changeAppview(newAppviewProxy: String) {
@@ -387,22 +406,11 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun hasSession(): Boolean {
-        val pdsURLFlow: Flow<String> = context.dataStore.data.map { settings ->
-            settings[PDSHOST] ?: ""
-        }
-        val sessionDataStringFlow: Flow<String> = context.dataStore.data.map { settings ->
-            settings[SESSION] ?: ""
-        }
-        val appviewProxyStringFlow: Flow<String> = context.dataStore.data.map { settings ->
-            settings[APPVIEW_PROXY] ?: ""
-        }
-
-        val pdsURL = pdsURLFlow.first()
-        val sessionDataString = sessionDataStringFlow.first()
-        val appviewProxy = appviewProxyStringFlow.first()
-
-
-        return !(pdsURL.isEmpty() || sessionDataString.isEmpty() || appviewProxy.isEmpty())
+        val prefs = context.dataStore.data.first()
+        val pdsURL = prefs[PDSHOST] ?: ""
+        val sessionDataString = prefs[SESSION] ?: ""
+        val appviewProxy = prefs[APPVIEW_PROXY] ?: ""
+        return pdsURL.isNotEmpty() && sessionDataString.isNotEmpty() && appviewProxy.isNotEmpty()
     }
 
     suspend fun login(
@@ -412,26 +420,7 @@ class BlueskyConn(val context: Context) {
         appviewProxy: String
     ): Result<Unit> {
         createMutex.lock()
-        val httpClient = HttpClient(OkHttp) {
-            defaultRequest {
-                url(pdsURL)
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 30000
-                connectTimeoutMillis = 30000
-                socketTimeoutMillis = 30000
-            }
-            install(HttpRequestRetry) {
-                maxRetries = 3
-                retryIf { _, response ->
-                    response.status.value in 500..599
-                }
-                retryOnExceptionIf { _, cause ->
-                    cause is java.io.IOException
-                }
-                exponentialDelay()
-            }
-        }
+        val httpClient = createRetryHttpClient(baseUrl = pdsURL)
 
         try {
             val client = XrpcBlueskyApi(httpClient)
@@ -477,61 +466,17 @@ class BlueskyConn(val context: Context) {
 
     private fun mkClient(
         pds: String,
-        appviewProxy: String,
         sessionData: SessionData,
-        labelers: List<String> = listOf()
+        labelers: List<String> = listOf(),
+        appviewProxy: String? = null,
     ): AuthenticatedXrpcBlueskyApi {
-        val hc = HttpClient(OkHttp) {
+        val hc = createRetryHttpClient {
             defaultRequest {
                 url(pds)
                 headers["atproto-accept-labelers"] = labelers.joinToString()
-                headers["atproto-proxy"] = appviewProxy
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 30000
-                connectTimeoutMillis = 30000
-                socketTimeoutMillis = 30000
-            }
-            install(HttpRequestRetry) {
-                maxRetries = 3
-                retryIf { _, response ->
-                    response.status.value in 500..599
+                if (appviewProxy != null) {
+                    headers["atproto-proxy"] = appviewProxy
                 }
-                retryOnExceptionIf { _, cause ->
-                    cause is java.io.IOException
-                }
-                exponentialDelay()
-            }
-        }
-
-        return AuthenticatedXrpcBlueskyApi(
-            hc,
-            BlueskyAuthPlugin.Tokens(sessionData.accessJwt, sessionData.refreshJwt)
-        )
-    }
-
-    private fun mkPdsClient(
-        pds: String,
-        sessionData: SessionData,
-    ): AuthenticatedXrpcBlueskyApi {
-        val hc = HttpClient(OkHttp) {
-            defaultRequest {
-                url(pds)
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 30000
-                connectTimeoutMillis = 30000
-                socketTimeoutMillis = 30000
-            }
-            install(HttpRequestRetry) {
-                maxRetries = 3
-                retryIf { _, response ->
-                    response.status.value in 500..599
-                }
-                retryOnExceptionIf { _, cause ->
-                    cause is java.io.IOException
-                }
-                exponentialDelay()
             }
         }
 
@@ -546,26 +491,7 @@ class BlueskyConn(val context: Context) {
         appviewProxy: String,
         token: SessionData,
     ): Result<Unit> {
-        val httpClient = HttpClient(OkHttp) {
-            defaultRequest {
-                url(pdsURL)
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 30000
-                connectTimeoutMillis = 30000
-                socketTimeoutMillis = 30000
-            }
-            install(HttpRequestRetry) {
-                maxRetries = 3
-                retryIf { _, response ->
-                    response.status.value in 500..599
-                }
-                retryOnExceptionIf { _, cause ->
-                    cause is java.io.IOException
-                }
-                exponentialDelay()
-            }
-        }
+        val httpClient = createRetryHttpClient(baseUrl = pdsURL)
 
         try {
             val gs = httpClient.get {
@@ -606,7 +532,7 @@ class BlueskyConn(val context: Context) {
 
             Log.d("BlueskyAuth", "Access token expired, attempting refresh")
 
-            val rs = httpClient.post {
+            val refreshHttpResponse = httpClient.post {
                 headers["Authorization"] = "Bearer " + token.refreshJwt
                 url {
                     protocol = URLProtocol.HTTPS
@@ -614,36 +540,36 @@ class BlueskyConn(val context: Context) {
                 }
             }
 
-            Log.d("BlueskyAuth", "refreshSession status: ${rs.status.value}")
+            Log.d("BlueskyAuth", "refreshSession status: ${refreshHttpResponse.status.value}")
 
-            when (rs.status) {
+            when (refreshHttpResponse.status) {
                 HttpStatusCode.OK -> {
-                    val body: String = rs.body()
-                    val rs: RefreshSessionResponse =
+                    val body: String = refreshHttpResponse.body()
+                    val refreshedSession: RefreshSessionResponse =
                         BlueskyJson.decodeFromString(
                             RefreshSessionResponse.serializer(),
                             body
                         )
 
-                    this.session = SessionData.fromRefreshSessionResponse(rs)
+                    this.session = SessionData.fromRefreshSessionResponse(refreshedSession)
                     storeSessionData(pdsURL, appviewProxy, this.session!!)
                     return Result.success(Unit)
                 }
 
                 else -> {
-                    val body: String = rs.body()
+                    val body: String = refreshHttpResponse.body()
 
                     val error: atpError =
                         BlueskyJson.decodeFromString(
                             atpError.serializer(),
                             body
                         )
-                    if (rs.status.value in 500..599) {
-                        return Result.failure(Exception("Server error during token refresh: ${rs.status}"))
+                    if (refreshHttpResponse.status.value in 500..599) {
+                        return Result.failure(Exception("Server error during token refresh: ${refreshHttpResponse.status}"))
                     }
                     clearInMemorySession()
                     cleanSessionData()
-                    return Result.failure(LoginException("Login refresh failed, status code ${rs.status}: ${error.message}"))
+                    return Result.failure(LoginException("Login refresh failed, status code ${refreshHttpResponse.status}: ${error.message}"))
                 }
             }
         } catch (e: Exception) {
@@ -695,11 +621,11 @@ class BlueskyConn(val context: Context) {
             this.pdsURL = pdsURL
             this.appviewProxy = appviewProxy
 
-            this.pdsClient = mkPdsClient(pdsURL, activeSession)
+            this.pdsClient = mkClient(pdsURL, activeSession)
             this.client = mkClient(
                 pdsURL,
-                appviewProxy,
                 activeSession,
+                appviewProxy = appviewProxy,
             )
 
             val labelerMap = this.subscribedLabelers().getOrDefault(emptyMap())
@@ -708,9 +634,9 @@ class BlueskyConn(val context: Context) {
             val labelers = labelerMap.keys.mapNotNull { it?.did }
             this.client = mkClient(
                 pdsURL,
-                appviewProxy,
                 activeSession,
-                labelers
+                labelers,
+                appviewProxy = appviewProxy,
             )
 
             Log.d("BlueskyAuth", "Clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}")
@@ -944,23 +870,7 @@ class BlueskyConn(val context: Context) {
 
 
     private suspend fun uploadBlobFromUrl(imageUrl: String): Blob? {
-        val httpClient = HttpClient(OkHttp) {
-            install(HttpTimeout) {
-                requestTimeoutMillis = 30000
-                connectTimeoutMillis = 30000
-                socketTimeoutMillis = 30000
-            }
-            install(HttpRequestRetry) {
-                maxRetries = 3
-                retryIf { _, response ->
-                    response.status.value in 500..599
-                }
-                retryOnExceptionIf { _, cause ->
-                    cause is java.io.IOException
-                }
-                exponentialDelay()
-            }
-        }
+        val httpClient = createRetryHttpClient()
         try {
             val response = httpClient.get(imageUrl)
             if (!response.status.isSuccess()) return null
@@ -981,7 +891,7 @@ class BlueskyConn(val context: Context) {
     )
 
     private suspend fun uploadImages(images: List<Uri>): Result<List<MediaBlob>> {
-        val maxImageSize = 950000 // ~950kb
+        val maxImageSize = MAX_IMAGE_SIZE_BYTES
 
         return runCatching {
             create().onFailure {
@@ -996,7 +906,7 @@ class BlueskyConn(val context: Context) {
                 context.contentResolver.openInputStream(it)?.use { inputStream ->
                     val compressedImage = run {
                         inputStream.mark(0)
-                        val c = compressor.compressImage(it, maxImageSize.toLong())
+                        val c = compressor.compressImage(it, maxImageSize)
                         return@run c
                     }
 
@@ -1047,7 +957,9 @@ class BlueskyConn(val context: Context) {
 
             val uploadedBlobs = mutableListOf<Blob>()
 
-            val did = Did("did:web:" + pdsURL!!.toUri().host!!)
+            val host = pdsURL?.toUri()?.host
+                ?: return Result.failure(Exception("PDS URL or host not available"))
+            val did = Did("did:web:$host")
 
             val uploadVideoTicket = pdsClient!!.getServiceAuth(
                 GetServiceAuthQueryParams(
@@ -1062,25 +974,11 @@ class BlueskyConn(val context: Context) {
                 is AtpResponse.Success<GetServiceAuthResponse> -> uploadVideoTicket.response.token
             }
 
-            val httpClient = HttpClient(OkHttp) {
-                defaultRequest {
-                    url("https://video.bsky.app")
-                }
-                install(HttpTimeout) {
-                    requestTimeoutMillis = 300000
-                    connectTimeoutMillis = 30000
-                    socketTimeoutMillis = 300000
-                }
-                install(HttpRequestRetry) {
-                    maxRetries = 3
-                    retryIf { _, response ->
-                        response.status.value in 500..599
-                    }
-                    retryOnExceptionIf { _, cause ->
-                        cause is java.io.IOException
-                    }
-                    exponentialDelay()
-                }
+            val httpClient = createRetryHttpClient(
+                baseUrl = "https://video.bsky.app",
+                requestTimeout = VIDEO_UPLOAD_TIMEOUT_MS,
+                socketTimeout = VIDEO_UPLOAD_TIMEOUT_MS,
+            ) {
                 install(ContentNegotiation) {
                     register(
                         ContentType.Any, KotlinxSerializationConverter(
@@ -1402,7 +1300,8 @@ class BlueskyConn(val context: Context) {
             return when (likeRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not like post: ${likeRes.error?.message}"))
                 is AtpResponse.Success<CreateRecordResponse> -> Result.success(
-                    RKey(likeRes.response.uri.atUri.toUri().lastPathSegment!!)
+                    RKey(likeRes.response.uri.atUri.toUri().lastPathSegment
+                        ?: return Result.failure(Exception("Missing path segment in like response URI")))
                 )
             }
         }
@@ -1544,7 +1443,8 @@ class BlueskyConn(val context: Context) {
             return when (followRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not follow: ${followRes.error?.message}"))
                 is AtpResponse.Success<CreateRecordResponse> -> Result.success(
-                    RKey(followRes.response.uri.atUri.toUri().lastPathSegment!!)
+                    RKey(followRes.response.uri.atUri.toUri().lastPathSegment
+                        ?: return Result.failure(Exception("Missing path segment in follow response URI")))
                 )
             }
         }
@@ -1649,7 +1549,7 @@ class BlueskyConn(val context: Context) {
 
             if (avatarUri != null) {
                 val compressor = Compressor(context)
-                val compressed = compressor.compressImage(avatarUri, 950000)
+                val compressed = compressor.compressImage(avatarUri, MAX_IMAGE_SIZE_BYTES)
                 val uploaded = pdsClient!!.uploadBlob(compressed.data)
                 avatarBlob = when (uploaded) {
                     is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading avatar: ${uploaded.error}"))
@@ -1659,7 +1559,7 @@ class BlueskyConn(val context: Context) {
 
             if (bannerUri != null) {
                 val compressor = Compressor(context)
-                val compressed = compressor.compressImage(bannerUri, 950000)
+                val compressed = compressor.compressImage(bannerUri, MAX_IMAGE_SIZE_BYTES)
                 val uploaded = pdsClient!!.uploadBlob(compressed.data)
                 bannerBlob = when (uploaded) {
                     is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading banner: ${uploaded.error}"))

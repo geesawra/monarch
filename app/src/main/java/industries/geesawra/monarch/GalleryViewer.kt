@@ -76,17 +76,5 @@ fun GalleryViewer(
 }
 
 suspend fun downloadImage(context: Context, imageUrl: HttpUrl) {
-    Toast.makeText(context, "Don't remember to implement download!!", Toast.LENGTH_LONG).show()
-//
-//    val result = context.imageLoader.execute(
-//        ImageRequest.Builder(context)
-//            .data(imageUrl)
-//            .build()
-//    )
-//    if (result is SuccessResult) {
-//        val cacheKey = result.diskCacheKey ?: error("image wasn't saved to disk")
-//        val diskCache = context.imageLoader.diskCache!!
-//        diskCache.openSnapshot(cacheKey)!!.use {
-//        }
-//    }
+    Toast.makeText(context, "Download not yet implemented", Toast.LENGTH_SHORT).show()
 }

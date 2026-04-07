@@ -118,24 +118,11 @@ fun NotificationsView(
         }
     }
 
-    val endOfListReached by remember {
-        derivedStateOf {
-            val layoutInfo = state.layoutInfo
-            val visibleItemsInfo = layoutInfo.visibleItemsInfo
-            if (layoutInfo.totalItemsCount == 0) {
-                false
-            } else {
-                val lastVisibleItem = visibleItemsInfo.lastOrNull()
-                lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
-            }
-        }
-    }
-
-    LaunchedEffect(endOfListReached) {
-        if (endOfListReached && viewModel.uiState.notifications.isNotEmpty()) {
-            viewModel.fetchNotifications()
-        }
-    }
+    OnEndOfListReached(
+        listState = state,
+        items = viewModel.uiState.notifications,
+        onEndReached = { viewModel.fetchNotifications() },
+    )
 }
 
 @ExperimentalTime
@@ -148,7 +135,7 @@ private fun RenderNotification(
     onProfileTap: ((Did) -> Unit)? = null,
     onShowThread: (SkeetData) -> Unit = {},
 ) {
-    val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
+    val avatarClipShape = settingsState.avatarClipShape
 
     when (notification) {
         is Notification.Follow -> {

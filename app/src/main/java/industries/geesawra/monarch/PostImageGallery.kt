@@ -32,6 +32,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 
+private const val MAX_DISPLAY_IMAGES = 4
+
 data class Image(
     val url: String,
     val fullSize: String = "",
@@ -60,7 +62,7 @@ fun PostImageGallery(
         }
     }
 
-    val imagesToDisplay = images.take(4)
+    val imagesToDisplay = images.take(MAX_DISPLAY_IMAGES)
 
     if (imagesToDisplay.isEmpty()) {
         return
