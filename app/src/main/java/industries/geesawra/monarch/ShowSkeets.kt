@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -158,6 +159,7 @@ fun ShowSkeets(
         state = state,
         userScrollEnabled = isScrollEnabled,
         modifier = modifier
+            .testTag("feed_list")
             .fillMaxSize()
             .padding(horizontal = feedHorizontalPadding()),
         verticalArrangement = if (isShowingThread) Arrangement.spacedBy(0.dp) else Arrangement.spacedBy(feedItemSpacing()),

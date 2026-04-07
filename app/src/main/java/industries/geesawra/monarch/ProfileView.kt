@@ -86,6 +86,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.ColorPainter
@@ -286,7 +287,7 @@ fun ProfileView(
                 )
             },
             floatingActionButton = {
-                if (profile != null && !timelineViewModel.isOwnProfile()) {
+                if (!LocalBaselineProfileMode.current && profile != null && !timelineViewModel.isOwnProfile()) {
                     FloatingActionButton(
                         onClick = {
                             inReplyTo.value = null
@@ -413,6 +414,7 @@ internal fun ProfileContent(
     LazyColumn(
         state = listState,
         modifier = modifier
+            .testTag("profile_list")
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

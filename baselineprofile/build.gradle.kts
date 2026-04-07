@@ -1,7 +1,8 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.test)
     alias(libs.plugins.baselineprofile)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -52,5 +53,19 @@ androidComponents {
             "targetAppId",
             v.testedApks.map { artifactsLoader.load(it)?.applicationId }
         )
+
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            val localProps = Properties()
+            localProps.load(localPropsFile.inputStream())
+            val handle: String? = localProps.getProperty("benchmark.handle")
+            val password: String? = localProps.getProperty("benchmark.password")
+            if (handle != null) {
+                v.instrumentationRunnerArguments.put("benchmarkHandle", handle)
+            }
+            if (password != null) {
+                v.instrumentationRunnerArguments.put("benchmarkPassword", password)
+            }
+        }
     }
 }

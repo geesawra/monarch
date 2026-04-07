@@ -795,7 +795,7 @@ private fun InnerTimelineView(
                     )
                 },
                 floatingActionButton = {
-                    when (currentDestination) {
+                    if (LocalBaselineProfileMode.current) {} else when (currentDestination) {
                         TabBarDestinations.TIMELINE -> {
                             if (narrowScreen) {
                                 SmallFloatingActionButton(
@@ -823,10 +823,6 @@ private fun InnerTimelineView(
                     }
                 },
             ) { values ->
-                LaunchedEffect(notificationsState.canScrollBackward) {
-                    TabBarDestinations.NOTIFICATIONS.badgeValue?.intValue = 0
-                }
-
                 val contentModifier = if (!settingsState.forceCompactLayout && !isExpandedScreen) {
                     Modifier.widthIn(max = 600.dp)
                 } else {

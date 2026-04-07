@@ -18,6 +18,7 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import app.bsky.actor.VerifiedStatus
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.SettingsState
+
+val LocalBaselineProfileMode = compositionLocalOf { false }
 
 val SettingsState.avatarClipShape: Shape
     get() = if (avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape

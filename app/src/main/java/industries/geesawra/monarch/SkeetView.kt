@@ -66,7 +66,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -278,7 +281,7 @@ private fun SkeetHeaderSection(
                 .clip(avatarShape)
                 .then(
                     if (onAvatarTap != null && skeet.did != null)
-                        Modifier.clickable { onAvatarTap(skeet.did!!) }
+                        Modifier.clickable { onAvatarTap(skeet.did) }
                     else Modifier
                 )
         )
@@ -321,7 +324,7 @@ private fun SkeetThreadLine(
                 .clip(avatarShape)
                 .then(
                     if (onAvatarTap != null && skeet.did != null)
-                        Modifier.clickable { onAvatarTap(skeet.did!!) }
+                        Modifier.clickable { onAvatarTap(skeet.did) }
                     else Modifier
                 )
         )
@@ -403,11 +406,14 @@ private fun SkeetContent(
             PostTextSize.Medium -> MaterialTheme.typography.bodyMedium
             PostTextSize.Large -> MaterialTheme.typography.bodyLarge
         }
+        val uriHandler = if (LocalBaselineProfileMode.current) NoOpUriHandler else LocalUriHandler.current
+        CompositionLocalProvider(LocalUriHandler provides uriHandler) {
         Text(
             text = skeet.annotatedContent(onMentionClick = onMentionClick),
             color = MaterialTheme.colorScheme.onSurface,
             style = textStyle,
         )
+        }
     }
 
     if (skeet.embed == null || disableEmbeds) {
@@ -737,13 +743,13 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
+                .then(if (LocalBaselineProfileMode.current) Modifier else Modifier.clickable {
                     val customTabsIntent = CustomTabsIntent.Builder()
                         .setShowTitle(true)
                         .setUrlBarHidingEnabled(true)
                         .build()
                     customTabsIntent.launchUrl(context, ev.uri.uri.toUri())
-                }
+                })
         ) {
             val thumbUrl = if (needsFetch) enrichedThumb else ev.thumb?.uri
             if (thumbUrl != null) {
@@ -1270,4 +1276,8 @@ private fun ContentWarningCard(
     } else {
         content()
     }
+}
+
+private object NoOpUriHandler : UriHandler {
+    override fun openUri(uri: String) {}
 }

@@ -2,7 +2,6 @@ plugins {
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization")
     id("com.google.gms.google-services")
@@ -38,7 +37,6 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
-            resValue("string", "app_name", "Monarch Debug")
         }
         release {
             isMinifyEnabled = true
@@ -49,7 +47,6 @@ android {
             signingConfig = if (providers.environmentVariable("KEYSTORE_PASSWORD").isPresent)
                 signingConfigs.getByName("release") else signingConfigs.getByName("debug")
             buildConfigField("String", "PUSH_SERVER_URL", "\"https://matrice.wallera.computer/subscribe\"")
-            resValue("string", "app_name", "Monarch")
         }
         create("profile") {
             initWith(getByName("release"))
@@ -57,7 +54,6 @@ android {
             applicationIdSuffix = ".debug"
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
-            resValue("string", "app_name", "Monarch Profile")
         }
     }
     compileOptions {
@@ -65,13 +61,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
         version = JavaVersion.VERSION_21.toString()
     }
-    kotlin {
-        jvmToolchain(21)
-    }
     buildFeatures {
         compose = true
         buildConfig = true
     }
+}
+
+kotlin {
+    jvmToolchain(21)
 }
 
 dependencies {

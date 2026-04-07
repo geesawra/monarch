@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -100,6 +101,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         currentIntent.value = intent
 
+        val baselineProfileMode = intent.getBooleanExtra("baseline_profile_mode", false)
+
         setContent {
             val firstLoadDone = remember { mutableStateOf(false) }
             val settingsViewModel = hiltViewModel<SettingsViewModel>()
@@ -111,6 +114,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.Dark -> true
             }
 
+            CompositionLocalProvider(LocalBaselineProfileMode provides baselineProfileMode) {
             MonarchTheme(
                 darkTheme = darkTheme,
                 dynamicColor = settings.dynamicColor,
@@ -408,6 +412,7 @@ class MainActivity : ComponentActivity() {
                         ni.removeExtra("notification_kind")
                     }
                 }
+            }
             }
         }
     }

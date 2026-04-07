@@ -48,10 +48,10 @@ fun PostImageGallery(
     images: List<Image>,
     onCrossClick: ((Int) -> Unit)? = null
 ) {
+    val baselineMode = LocalBaselineProfileMode.current
     val galleryVisible = remember { mutableStateOf<Int?>(null) }
 
-    galleryVisible.value?.let {
-        // Ensure the index is valid for the original images list
+    if (!baselineMode) galleryVisible.value?.let {
         if (it < images.size) {
             GalleryViewer(
                 imageUrls = images, // Pass the full list to the viewer

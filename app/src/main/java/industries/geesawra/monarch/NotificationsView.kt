@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,7 +42,7 @@ import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
-import kotlinx.coroutines.delay
+import androidx.compose.runtime.DisposableEffect
 import sh.christian.ozone.api.Did
 import kotlin.time.ExperimentalTime
 
@@ -58,16 +59,17 @@ fun NotificationsView(
     onProfileTap: ((Did) -> Unit)? = null,
     scaffoldPadding: PaddingValues
 ) {
-    LaunchedEffect(Unit) {
-        if (viewModel.uiState.unreadNotificationsAmt != 0) {
-            delay(5000)
-            viewModel.updateSeenNotifications()
+    DisposableEffect(Unit) {
+        onDispose {
+            if (viewModel.uiState.unreadNotificationsAmt != 0) {
+                viewModel.updateSeenNotifications()
+            }
         }
     }
 
     LazyColumn(
         state = state,
-        modifier = modifier,
+        modifier = modifier.testTag("notifications_list"),
         userScrollEnabled = isScrollEnabled,
         contentPadding = PaddingValues(
             top = scaffoldPadding.calculateTopPadding(),

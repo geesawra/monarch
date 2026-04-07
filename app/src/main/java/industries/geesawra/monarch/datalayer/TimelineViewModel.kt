@@ -667,7 +667,7 @@ class TimelineViewModel @AssistedInject constructor(
 
                 RepeatableNotification.Repost -> {
                     n.forEach { _, r ->
-                        result += Notification.Like(
+                        result += Notification.Repost(
                             data = r.copy(
                                 r.kind,
                                 r.post,
