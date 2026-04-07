@@ -932,9 +932,11 @@ class TimelineViewModel @AssistedInject constructor(
             val cursor = if (fresh) null else uiState.profileFollowersCursor
             bskyConn.getFollowers(did, cursor).onSuccess { res ->
                 val updated = if (fresh) res.followers else uiState.profileFollowers + res.followers
+                val name = res.subject.displayName ?: res.subject.handle.handle
                 uiState = uiState.copy(
                     profileFollowers = updated,
                     profileFollowersCursor = res.cursor,
+                    followersListName = name,
                 )
             }.onFailure {
                 uiState = when (it) {
