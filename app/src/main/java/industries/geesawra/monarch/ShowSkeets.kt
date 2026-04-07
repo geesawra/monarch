@@ -107,6 +107,21 @@ fun ShowSkeets(
     val filteredData = remember(data, threadContextCids, mutedWords, searchFilter) {
         val seenRootCids = mutableSetOf<Cid>()
         val now = Clock.System.now()
+        val mutedThreadRoots = if (isShowingThread || mutedWords.isEmpty()) emptySet()
+        else {
+            val roots = mutableSetOf<Cid>()
+            data.forEach { skeet ->
+                if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) return@forEach
+                val hasMute = isMutedByWord(skeet, mutedWords, now) ||
+                    skeet.root()?.let { isMutedByWord(it, mutedWords, now) } == true ||
+                    skeet.parent().first?.let { isMutedByWord(it, mutedWords, now) } == true
+                if (hasMute) {
+                    val rootCid = skeet.root()?.cid ?: skeet.cid
+                    roots.add(rootCid)
+                }
+            }
+            roots
+        }
         data.filter {
             !it.replyToNotFollowing && it.cid !in threadContextCids &&
             (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.BlockedPost) &&
@@ -119,7 +134,9 @@ fun ShowSkeets(
             seenRootCids.add(rootCid)
         }.filter {
             if (isShowingThread || mutedWords.isEmpty()) return@filter true
-            !isMutedByWord(it, mutedWords, now)
+            if (it.reason is FeedViewPostReasonUnion.ReasonRepost) return@filter !isMutedByWord(it, mutedWords, now)
+            val rootCid = it.root()?.cid ?: it.cid
+            rootCid !in mutedThreadRoots
         }.filter {
             if (searchFilter.isBlank()) return@filter true
             it.content.contains(searchFilter, ignoreCase = true) ||
