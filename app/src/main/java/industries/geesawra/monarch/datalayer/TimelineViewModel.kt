@@ -913,11 +913,12 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun openFollowersList(showFollowers: Boolean) {
-        val profile = uiState.profileUser ?: return
+    fun openFollowersList(did: Did, showFollowers: Boolean) {
+        val profile = uiState.profileUser
+        val name = if (profile?.did == did) profile.displayName ?: profile.handle.handle else did.did
         uiState = uiState.copy(
-            followersListDid = profile.did,
-            followersListName = profile.displayName ?: profile.handle.handle,
+            followersListDid = did,
+            followersListName = name,
             profileFollowers = listOf(),
             profileFollows = listOf(),
             profileFollowersCursor = null,

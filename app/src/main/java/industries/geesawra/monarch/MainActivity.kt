@@ -58,6 +58,8 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import kotlin.time.ExperimentalTime
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 
 @HiltAndroidApp
@@ -188,8 +190,7 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(ViewList.ShowThread.name)
                                 },
                                 onProfileTap = { did ->
-                                    timelineViewModel.openProfile(did)
-                                    navController.navigate(ViewList.Profile.name)
+                                    navController.navigate("Profile/${did.did}")
                                 },
                                 onSettingsTap = {
                                     navController.navigate(ViewList.Settings.name)
@@ -248,8 +249,7 @@ class MainActivity : ComponentActivity() {
                                         navController.popBackStack()
                                     },
                                     onProfileTap = { did ->
-                                        timelineViewModel.openProfile(did)
-                                        navController.navigate(ViewList.Profile.name)
+                                        navController.navigate("Profile/${did.did}")
                                     },
                                     onReplyTap = { skeetData, quotePost ->
                                         threadInReplyTo.value = skeetData
@@ -264,7 +264,14 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
-                        composable(route = ViewList.Profile.name) {
+                        composable(
+                            route = "Profile/{did}",
+                            arguments = listOf(navArgument("did") { type = NavType.StringType }),
+                        ) { backStackEntry ->
+                            val did = Did(backStackEntry.arguments!!.getString("did")!!)
+                            LaunchedEffect(did) {
+                                timelineViewModel.openProfile(did)
+                            }
                             ProfileView(
                                 timelineViewModel = timelineViewModel,
                                 settingsState = settings,
@@ -275,27 +282,38 @@ class MainActivity : ComponentActivity() {
                                 onThreadTap = {
                                     navController.navigate(ViewList.ShowThread.name)
                                 },
-                                onProfileTap = { did ->
-                                    timelineViewModel.openProfile(did)
-                                    navController.navigate(ViewList.Profile.name)
+                                onProfileTap = { profileDid ->
+                                    navController.navigate("Profile/${profileDid.did}")
                                 },
                                 onSettingsTap = {
                                     navController.navigate(ViewList.Settings.name)
                                 },
-                                onFollowersTap = {
-                                    navController.navigate(ViewList.FollowersList.name)
+                                onFollowersTap = { showFollowers ->
+                                    navController.navigate("FollowersList/${did.did}/$showFollowers")
                                 },
                             )
                         }
-                        composable(route = ViewList.FollowersList.name) {
+                        composable(
+                            route = "FollowersList/{did}/{showFollowers}",
+                            arguments = listOf(
+                                navArgument("did") { type = NavType.StringType },
+                                navArgument("showFollowers") { type = NavType.BoolType },
+                            ),
+                        ) { backStackEntry ->
+                            val did = Did(backStackEntry.arguments!!.getString("did")!!)
+                            val showFollowers = backStackEntry.arguments!!.getBoolean("showFollowers")
+                            LaunchedEffect(did) {
+                                timelineViewModel.openFollowersList(did, showFollowers)
+                                timelineViewModel.fetchFollowers(did, fresh = true)
+                                timelineViewModel.fetchFollows(did, fresh = true)
+                            }
                             FollowersListView(
                                 timelineViewModel = timelineViewModel,
                                 backButton = {
                                     navController.popBackStack()
                                 },
-                                onProfileTap = { did ->
-                                    timelineViewModel.openProfile(did)
-                                    navController.navigate(ViewList.Profile.name)
+                                onProfileTap = { profileDid ->
+                                    navController.navigate("Profile/${profileDid.did}")
                                 },
                             )
                         }
@@ -373,8 +391,7 @@ class MainActivity : ComponentActivity() {
                         when (kind) {
                             "app.bsky.graph.follow" -> {
                                 val did = notifAuthorDid ?: return@LaunchedEffect
-                                timelineViewModel.openProfile(Did(did))
-                                navController.navigate(ViewList.Profile.name)
+                                navController.navigate("Profile/$did")
                             }
                             "app.bsky.feed.like", "app.bsky.feed.repost", "app.bsky.feed.post", "app.bsky.feed.reply", "app.bsky.feed.mention", "app.bsky.feed.quote" -> {
                                 val uri = notifUri ?: return@LaunchedEffect

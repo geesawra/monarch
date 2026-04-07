@@ -65,10 +65,6 @@ fun FollowersListView(
     var selectedTab by rememberSaveable { mutableIntStateOf(if (timelineViewModel.uiState.showFollowersTab) 0 else 1) }
     var mutualsOnly by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        timelineViewModel.fetchFollowers(listDid, fresh = true)
-        timelineViewModel.fetchFollows(listDid, fresh = true)
-    }
 
     val followers = timelineViewModel.uiState.profileFollowers
     val follows = timelineViewModel.uiState.profileFollows
