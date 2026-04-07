@@ -481,6 +481,7 @@ fun GifViewer(
             PlayerView(ctx).apply {
                 this.player = player
                 useController = false
+                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
         },
         modifier = modifier,

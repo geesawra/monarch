@@ -223,44 +223,41 @@ class BlueskyConn(val context: Context) {
             }
         }
 
-        suspend fun pdsForHandle(handle: String): Result<String> {
+        suspend fun pdsForHandle(handleOrDid: String): Result<String> {
             return runCatching {
-                val api = XrpcBlueskyApi()
-
-                val rawId = api.resolveHandle(
-                    ResolveHandleQueryParams(
-                        handle = Handle(handle)
+                val did = if (handleOrDid.startsWith("did:")) {
+                    handleOrDid
+                } else {
+                    val api = XrpcBlueskyApi()
+                    val rawId = api.resolveHandle(
+                        ResolveHandleQueryParams(handle = Handle(handleOrDid))
                     )
-                )
-
-                val did = when (rawId) {
-                    is AtpResponse.Failure<*> -> {
-                        return Result.failure(Exception("Failed to resolve handle: ${rawId.error?.message}"))
-                    }
-
-                    is AtpResponse.Success<ResolveHandleResponse> -> {
-                        rawId.response.did.did
+                    when (rawId) {
+                        is AtpResponse.Failure<*> -> {
+                            return Result.failure(Exception("Failed to resolve handle: ${rawId.error?.message}"))
+                        }
+                        is AtpResponse.Success<ResolveHandleResponse> -> rawId.response.did.did
                     }
                 }
 
                 val httpClient = createRetryHttpClient()
 
-                val rawDoc = httpClient.get {
-                    url {
-                        protocol = URLProtocol.HTTPS
-                        host = "plc.directory"
-                        path(did)
+                val didDocUrl = when {
+                    did.startsWith("did:web:") -> {
+                        val domain = did.removePrefix("did:web:").replace(":", "/")
+                        "https://$domain/.well-known/did.json"
                     }
+                    else -> "https://plc.directory/$did"
                 }
 
+                val rawDoc = httpClient.get(didDocUrl)
                 httpClient.close()
 
                 if (rawDoc.status != HttpStatusCode.OK) {
-                    return Result.failure(Exception("PLC lookup HTTP status code ${rawDoc.status}"))
+                    return Result.failure(Exception("DID document lookup failed: HTTP ${rawDoc.status}"))
                 }
 
                 val body: String = rawDoc.body()
-
                 val solvedDoc: DIDDoc = BlueskyJson.decodeFromString(DIDDoc.serializer(), body)
 
                 for (ps in solvedDoc.service) {
@@ -269,7 +266,7 @@ class BlueskyConn(val context: Context) {
                     }
                 }
 
-                return Result.failure(Exception("No PDS service defined in the DID document associated with ${handle}"))
+                return Result.failure(Exception("No PDS service defined in the DID document associated with $handleOrDid"))
             }
         }
     }

@@ -70,7 +70,7 @@ fun LoginView(
             return@useDebounce
         }
 
-        if (!handle.isATHandle()) {
+        if (!handle.isATHandle() && !handle.isDID()) {
             return@useDebounce
         }
 
@@ -205,7 +205,7 @@ fun LoginView(
                     loggingIn.value = false
                 }
             },
-            enabled = handle.isATHandle() && password.isNotEmpty() && currentPDS.isNotEmpty() && !loggingIn.value,
+            enabled = (handle.isATHandle() || handle.isDID()) && password.isNotEmpty() && currentPDS.isNotEmpty() && !loggingIn.value,
             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         ) {
             Text("Login")
@@ -241,6 +241,8 @@ fun LoginView(
 fun String.isATHandle(): Boolean {
     return Handle.Regex.matches(this.removePrefix("@"))
 }
+
+fun String.isDID(): Boolean = startsWith("did:")
 
 @Composable
 fun <T> T.useDebounce(

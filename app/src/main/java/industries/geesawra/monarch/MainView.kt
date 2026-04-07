@@ -875,7 +875,7 @@ private fun InnerTimelineView(
                                 if (settingsState.swipeableFeeds) {
                                     Column(modifier = Modifier.fillMaxSize()) {
                                         SecondaryScrollableTabRow(
-                                            selectedTabIndex = pagerState.currentPage,
+                                            selectedTabIndex = pagerState.currentPage.coerceIn(0, (feedItems.size - 1).coerceAtLeast(0)),
                                             edgePadding = 8.dp,
                                             divider = {},
                                         ) {

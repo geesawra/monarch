@@ -38,6 +38,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.bsky.embed.RecordViewRecordEmbedUnion
+import app.bsky.embed.RecordViewRecordUnion
 import app.bsky.embed.RecordWithMediaViewMediaUnion
 import app.bsky.feed.PostViewEmbedUnion
 import coil3.compose.SubcomposeAsyncImage
@@ -50,33 +52,51 @@ sealed class MediaItem(val skeet: SkeetData) {
     class VideoMedia(val playlistUrl: String, val thumbnailUrl: String?, skeet: SkeetData) : MediaItem(skeet)
 }
 
+private fun extractMediaFromEmbed(embed: PostViewEmbedUnion?, skeet: SkeetData, items: MutableList<MediaItem>) {
+    when (embed) {
+        is PostViewEmbedUnion.ImagesView -> {
+            embed.value.images.forEach { img ->
+                items += MediaItem.ImageMedia(img.fullsize.uri, img.alt, skeet)
+            }
+        }
+        is PostViewEmbedUnion.VideoView -> {
+            items += MediaItem.VideoMedia(embed.value.playlist.uri, embed.value.thumbnail?.uri, skeet)
+        }
+        is PostViewEmbedUnion.RecordWithMediaView -> {
+            when (val media = embed.value.media) {
+                is RecordWithMediaViewMediaUnion.ImagesView -> {
+                    media.value.images.forEach { img ->
+                        items += MediaItem.ImageMedia(img.fullsize.uri, img.alt, skeet)
+                    }
+                }
+                is RecordWithMediaViewMediaUnion.VideoView -> {
+                    items += MediaItem.VideoMedia(media.value.playlist.uri, media.value.thumbnail?.uri, skeet)
+                }
+                else -> {}
+            }
+        }
+        is PostViewEmbedUnion.RecordView -> {
+            val record = embed.value.record
+            if (record is RecordViewRecordUnion.ViewRecord) {
+                record.value.embeds.forEach { innerEmbed ->
+                    val converted = when (innerEmbed) {
+                        is RecordViewRecordEmbedUnion.ImagesView -> PostViewEmbedUnion.ImagesView(innerEmbed.value)
+                        is RecordViewRecordEmbedUnion.VideoView -> PostViewEmbedUnion.VideoView(innerEmbed.value)
+                        is RecordViewRecordEmbedUnion.RecordWithMediaView -> PostViewEmbedUnion.RecordWithMediaView(innerEmbed.value)
+                        else -> null
+                    }
+                    if (converted != null) extractMediaFromEmbed(converted, skeet, items)
+                }
+            }
+        }
+        else -> {}
+    }
+}
+
 fun extractMedia(posts: List<SkeetData>): List<MediaItem> {
     val items = mutableListOf<MediaItem>()
     posts.forEach { skeet ->
-        when (val embed = skeet.embed) {
-            is PostViewEmbedUnion.ImagesView -> {
-                embed.value.images.forEach { img ->
-                    items += MediaItem.ImageMedia(img.fullsize.uri, img.alt, skeet)
-                }
-            }
-            is PostViewEmbedUnion.VideoView -> {
-                items += MediaItem.VideoMedia(embed.value.playlist.uri, embed.value.thumbnail?.uri, skeet)
-            }
-            is PostViewEmbedUnion.RecordWithMediaView -> {
-                when (val media = embed.value.media) {
-                    is RecordWithMediaViewMediaUnion.ImagesView -> {
-                        media.value.images.forEach { img ->
-                            items += MediaItem.ImageMedia(img.fullsize.uri, img.alt, skeet)
-                        }
-                    }
-                    is RecordWithMediaViewMediaUnion.VideoView -> {
-                        items += MediaItem.VideoMedia(media.value.playlist.uri, media.value.thumbnail?.uri, skeet)
-                    }
-                    else -> {}
-                }
-            }
-            else -> {}
-        }
+        extractMediaFromEmbed(skeet.embed, skeet, items)
     }
     return items
 }
