@@ -393,9 +393,32 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(notificationIntent, isAuthenticated) {
                         if (!isAuthenticated) return@LaunchedEffect
                         val ni = notificationIntent ?: return@LaunchedEffect
+
+                        val deepLinkUri = ni.data
+                        if (deepLinkUri != null) {
+                            val host = deepLinkUri.host
+                            if (host == "bsky.app" || host == "witchsky.app") {
+                                val segments = deepLinkUri.pathSegments
+                                if (segments.size >= 2 && segments[0] == "profile") {
+                                    val actor = segments[1]
+                                    if (segments.size >= 4 && segments[2] == "post") {
+                                        val rkey = segments[3]
+                                        val atUri = "at://$actor/app.bsky.feed.post/$rkey"
+                                        timelineViewModel.setThread(SkeetData(uri = AtUri(atUri)))
+                                        navController.navigate(ViewList.ShowThread.name)
+                                    } else {
+                                        navController.navigate("Profile/$actor")
+                                    }
+                                }
+                                ni.data = null
+                                return@LaunchedEffect
+                            }
+                        }
+
                         val kind = ni.getStringExtra("notification_kind") ?: return@LaunchedEffect
                         val notifUri = ni.getStringExtra("notification_uri")
                         val notifAuthorDid = ni.getStringExtra("notification_author_did")
+                        val notifId = ni.getIntExtra("notification_id", -1)
 
                         when (kind) {
                             "app.bsky.graph.follow" -> {
@@ -409,6 +432,10 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        if (notifId != -1) {
+                            val nm = context.getSystemService(android.app.NotificationManager::class.java)
+                            nm.cancel(notifId)
+                        }
                         ni.removeExtra("notification_kind")
                     }
                 }

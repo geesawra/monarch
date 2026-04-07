@@ -115,11 +115,13 @@ class MessagingService : FirebaseMessagingService() {
         val uri = message.data["uri"]
         val authorDid = message.data["authorDid"]
 
+        val notificationId = System.currentTimeMillis().toInt()
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             kind?.let { putExtra("notification_kind", it) }
             uri?.let { putExtra("notification_uri", it) }
             authorDid?.let { putExtra("notification_author_did", it) }
+            putExtra("notification_id", notificationId)
         }
         val pendingIntent = PendingIntent.getActivity(
             this, System.currentTimeMillis().toInt(), intent,
@@ -132,7 +134,6 @@ class MessagingService : FirebaseMessagingService() {
         val embedBitmap = embedImageUrl?.let { downloadBitmap(it) }
         val quotedImageBitmap = quotedEmbedImage?.let { downloadBitmap(it) }
 
-        val notificationId = System.currentTimeMillis().toInt()
         val notifPostUri = message.data["notifPostUri"]
         val recipientDid = message.data["recipientDid"]
 
