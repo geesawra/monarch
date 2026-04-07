@@ -11,29 +11,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * This test class generates a basic startup baseline profile for the target package.
- *
- * We recommend you start with this but add important user flows to the profile to improve their performance.
- * Refer to the [baseline profile documentation](https://d.android.com/topic/performance/baselineprofiles)
- * for more information.
- *
- * You can run the generator with the "Generate Baseline Profile" run configuration in Android Studio or
- * the equivalent `generateBaselineProfile` gradle task:
- * ```
- * ./gradlew :app:generateReleaseBaselineProfile
- * ```
- * The run configuration runs the Gradle task and applies filtering to run only the generators.
- *
- * Check [documentation](https://d.android.com/topic/performance/benchmarking/macrobenchmark-instrumentation-args)
- * for more information about available instrumentation arguments.
- *
- * After you run the generator, you can verify the improvements running the [StartupBenchmarks] benchmark.
- *
- * When using this class to generate a baseline profile, only API 33+ or rooted API 28+ are supported.
- *
- * The minimum required version of androidx.benchmark to generate a baseline profile is 1.2.0.
- **/
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class BaselineProfileGenerator {
@@ -43,40 +20,166 @@ class BaselineProfileGenerator {
 
     @Test
     fun generate() {
-        // The application id for the running build variant is read from the instrumentation arguments.
         rule.collect(
             packageName = InstrumentationRegistry.getArguments().getString("targetAppId")
                 ?: throw Exception("targetAppId not passed as instrumentation runner arg"),
-
-            // See: https://d.android.com/topic/performance/baselineprofiles/dex-layout-optimizations
             includeInStartupProfile = true
         ) {
-            // This block defines the app's critical user journey. Here we are interested in
-            // optimizing for app startup. But you can also navigate and scroll through your most important UI.
-
             pressHome()
             startActivityAndWait()
 
             device.wait(Until.hasObject(By.scrollable(true)), 15_000)
-            val list = device.findObject(By.scrollable(true)) ?: return@collect
 
-            repeat(5) {
-                list.scroll(Direction.DOWN, 80f)
+            scrollTimeline()
+            openAndScrollThread()
+            openAndScrollProfile()
+            switchToNotifications()
+            switchToSearch()
+        }
+    }
+
+    private fun MacroScope.scrollTimeline() {
+        val list = device.findObject(By.scrollable(true)) ?: return
+
+        repeat(5) {
+            list.scroll(Direction.DOWN, 80f)
+            device.waitForIdle()
+        }
+
+        repeat(3) {
+            list.fling(Direction.DOWN)
+            Thread.sleep(500)
+        }
+
+        device.waitForIdle()
+
+        repeat(3) {
+            list.fling(Direction.UP)
+            Thread.sleep(500)
+        }
+
+        device.waitForIdle()
+    }
+
+    private fun MacroScope.openAndScrollThread() {
+        device.wait(Until.hasObject(By.scrollable(true)), 5_000)
+        val list = device.findObject(By.scrollable(true)) ?: return
+
+        list.scroll(Direction.DOWN, 40f)
+        device.waitForIdle()
+
+        val post = device.findObject(By.desc("Avatar")) ?: return
+        post.click()
+        device.waitForIdle()
+
+        device.wait(Until.hasObject(By.text("Thread")), 5_000)
+
+        device.wait(Until.hasObject(By.scrollable(true)), 5_000)
+        val threadList = device.findObject(By.scrollable(true))
+        if (threadList != null) {
+            repeat(3) {
+                threadList.scroll(Direction.DOWN, 60f)
                 device.waitForIdle()
             }
 
-            repeat(5) {
-                list.fling(Direction.DOWN)
-                Thread.sleep(500)
+            repeat(2) {
+                threadList.scroll(Direction.UP, 60f)
+                device.waitForIdle()
             }
+        }
 
+        val backButton = device.findObject(By.desc("Go back"))
+        backButton?.click()
+        device.waitForIdle()
+        Thread.sleep(500)
+    }
+
+    private fun MacroScope.openAndScrollProfile() {
+        device.wait(Until.hasObject(By.desc("Profile avatar")), 5_000)
+        val avatar = device.findObject(By.desc("Profile avatar"))
+        if (avatar != null) {
+            avatar.click()
             device.waitForIdle()
 
+            device.wait(Until.hasObject(By.scrollable(true)), 5_000)
+            val profileList = device.findObject(By.scrollable(true))
+            if (profileList != null) {
+                repeat(3) {
+                    profileList.scroll(Direction.DOWN, 60f)
+                    device.waitForIdle()
+                }
 
-            repeat(3) {
-                list.fling(Direction.UP)
-                Thread.sleep(500)
+                repeat(2) {
+                    profileList.scroll(Direction.UP, 60f)
+                    device.waitForIdle()
+                }
+            }
+
+            val repliesTab = device.findObject(By.text("Replies"))
+            if (repliesTab != null) {
+                repliesTab.click()
+                device.waitForIdle()
+                Thread.sleep(1_000)
+
+                val repliesList = device.findObject(By.scrollable(true))
+                if (repliesList != null) {
+                    repeat(2) {
+                        repliesList.scroll(Direction.DOWN, 60f)
+                        device.waitForIdle()
+                    }
+                }
+            }
+
+            val mediaTab = device.findObject(By.text("Media"))
+            if (mediaTab != null) {
+                mediaTab.click()
+                device.waitForIdle()
+                Thread.sleep(1_000)
+            }
+
+            val backButton = device.findObject(By.desc("Go back"))
+            backButton?.click()
+            device.waitForIdle()
+            Thread.sleep(500)
+        }
+    }
+
+    private fun MacroScope.switchToNotifications() {
+        val notifTab = device.findObject(By.desc("Notifications"))
+        if (notifTab != null) {
+            notifTab.click()
+            device.waitForIdle()
+
+            device.wait(Until.hasObject(By.scrollable(true)), 5_000)
+            val notifList = device.findObject(By.scrollable(true))
+            if (notifList != null) {
+                repeat(3) {
+                    notifList.scroll(Direction.DOWN, 60f)
+                    device.waitForIdle()
+                }
+
+                repeat(2) {
+                    notifList.fling(Direction.UP)
+                    Thread.sleep(300)
+                }
             }
         }
     }
+
+    private fun MacroScope.switchToSearch() {
+        val searchTab = device.findObject(By.desc("Search"))
+        if (searchTab != null) {
+            searchTab.click()
+            device.waitForIdle()
+            Thread.sleep(500)
+        }
+
+        val timelineTab = device.findObject(By.desc("Timeline"))
+        if (timelineTab != null) {
+            timelineTab.click()
+            device.waitForIdle()
+        }
+    }
 }
+
+private typealias MacroScope = androidx.benchmark.macro.MacrobenchmarkScope
