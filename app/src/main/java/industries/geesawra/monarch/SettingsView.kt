@@ -286,9 +286,9 @@ fun SettingsView(
                     Column {
                         Text(
                             text = when (settings.replyFilterMode) {
-                                ReplyFilterMode.None -> "Show all replies"
-                                ReplyFilterMode.OnlyFilterDeepThreads -> "Hide deep thread noise"
-                                ReplyFilterMode.Strict -> "Only direct replies"
+                                ReplyFilterMode.None -> "All replies from the feed are shown, even from people you don't follow"
+                                ReplyFilterMode.OnlyFilterDeepThreads -> "Hides long back-and-forth threads between people you don't follow, but keeps direct replies visible"
+                                ReplyFilterMode.Strict -> "Only shows replies where both the author and the person they're replying to are people you follow"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -305,7 +305,7 @@ fun SettingsView(
                                 ) {
                                     Text(
                                         when (mode) {
-                                            ReplyFilterMode.None -> "None"
+                                            ReplyFilterMode.None -> "Off"
                                             ReplyFilterMode.OnlyFilterDeepThreads -> "Normal"
                                             ReplyFilterMode.Strict -> "Strict"
                                         }
