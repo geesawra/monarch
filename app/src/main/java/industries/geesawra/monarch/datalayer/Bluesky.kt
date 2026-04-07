@@ -274,6 +274,12 @@ class BlueskyConn(val context: Context) {
     var pdsURL: String? = null
     var appviewProxy: String? = null
 
+    private fun clearInMemorySession() {
+        session = null
+        client = null
+        pdsClient = null
+    }
+
     fun appviewName(): String {
         return when (appviewProxy) {
             "did:web:api.bsky.app#bsky_appview" -> "Bluesky"
@@ -586,11 +592,12 @@ class BlueskyConn(val context: Context) {
                             atpError.serializer(),
                             body
                         )
-                    if (error.error == "ExpiredToken") {
+                    if (error.error == "ExpiredToken" || error.error == "InvalidToken") {
                         // fall through to refresh
                     } else if (gs.status.value in 500..599) {
                         return Result.failure(Exception("Server error during session check: ${gs.status}"))
                     } else {
+                        clearInMemorySession()
                         cleanSessionData()
                         return Result.failure(LoginException("Session checking failed, status code ${gs.status}: ${error.message}"))
                     }
@@ -634,6 +641,7 @@ class BlueskyConn(val context: Context) {
                     if (rs.status.value in 500..599) {
                         return Result.failure(Exception("Server error during token refresh: ${rs.status}"))
                     }
+                    clearInMemorySession()
                     cleanSessionData()
                     return Result.failure(LoginException("Login refresh failed, status code ${rs.status}: ${error.message}"))
                 }
