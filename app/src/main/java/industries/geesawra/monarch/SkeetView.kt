@@ -98,10 +98,6 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.datalayer.toFloat
 import sh.christian.ozone.api.Did
-import io.sanghun.compose.video.RepeatMode
-import io.sanghun.compose.video.VideoPlayer
-import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
-import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.ExperimentalTime
 
@@ -554,37 +550,11 @@ fun VideoView(uri: Uri, thumbnailUri: String? = null, aspectRatio: Float? = null
             val isActive = if (activeVideoKey != null) isVisible && activeVideoKey.value == id else isVisible
 
             VideoPlayer(
-                mediaItems = listOf(
-                    VideoPlayerMediaItem.NetworkMediaItem(
-                        url = uri.toString(),
-                        mimeType = MimeTypes.APPLICATION_M3U8,
-                    )
-                ),
-                handleLifecycle = false,
-                autoPlay = true,
-                usePlayerController = true,
-                enablePip = false,
-                handleAudioFocus = true,
-                controllerConfig = VideoPlayerControllerConfig(
-                    showSpeedAndPitchOverlay = false,
-                    showSubtitleButton = false,
-                    showCurrentTimeAndTotalTime = true,
-                    showBufferingProgress = false,
-                    showForwardIncrementButton = true,
-                    showBackwardIncrementButton = true,
-                    showBackTrackButton = false,
-                    showNextTrackButton = false,
-                    showRepeatModeButton = true,
-                    controllerShowTimeMilliSeconds = 5_000,
-                    controllerAutoShow = true,
-                    showFullScreenButton = true,
-                ),
-                volume = 0.5f,
-                repeatMode = RepeatMode.NONE,
+                url = uri.toString(),
                 isVisible = isActive,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(sizeModifier)
+                    .then(sizeModifier),
             )
         } else {
             Box(
@@ -659,34 +629,8 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal, isVisible: 
                     else Modifier.heightIn(max = 300.dp)
                 )
         ) {
-            VideoPlayer(
-                mediaItems = listOf(
-                    VideoPlayerMediaItem.NetworkMediaItem(
-                        url = webmUrl,
-                        mimeType = MimeTypes.VIDEO_WEBM,
-                    )
-                ),
-                handleLifecycle = true,
-                autoPlay = true,
-                usePlayerController = false,
-                enablePip = false,
-                handleAudioFocus = false,
-                volume = 0f,
-                controllerConfig = VideoPlayerControllerConfig(
-                    showSpeedAndPitchOverlay = false,
-                    showSubtitleButton = false,
-                    showCurrentTimeAndTotalTime = false,
-                    showBufferingProgress = false,
-                    showForwardIncrementButton = false,
-                    showBackwardIncrementButton = false,
-                    showBackTrackButton = false,
-                    showNextTrackButton = false,
-                    showRepeatModeButton = false,
-                    controllerShowTimeMilliSeconds = 0,
-                    controllerAutoShow = false,
-                    showFullScreenButton = false,
-                ),
-                repeatMode = RepeatMode.ALL,
+            GifViewer(
+                url = webmUrl,
                 isVisible = isActive,
                 modifier = Modifier.matchParentSize(),
             )
