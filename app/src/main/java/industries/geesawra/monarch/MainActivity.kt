@@ -60,6 +60,8 @@ import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 
 @HiltAndroidApp
@@ -288,22 +290,25 @@ class MainActivity : ComponentActivity() {
                                 onSettingsTap = {
                                     navController.navigate(ViewList.Settings.name)
                                 },
-                                onFollowersTap = { showFollowers ->
-                                    navController.navigate("FollowersList/${did.did}/$showFollowers")
+                                onFollowersTap = { showFollowers, name ->
+                                    val encodedName = URLEncoder.encode(name, "UTF-8")
+                                    navController.navigate("FollowersList/${did.did}/$showFollowers/$encodedName")
                                 },
                             )
                         }
                         composable(
-                            route = "FollowersList/{did}/{showFollowers}",
+                            route = "FollowersList/{did}/{showFollowers}/{name}",
                             arguments = listOf(
                                 navArgument("did") { type = NavType.StringType },
                                 navArgument("showFollowers") { type = NavType.BoolType },
+                                navArgument("name") { type = NavType.StringType },
                             ),
                         ) { backStackEntry ->
                             val did = Did(backStackEntry.arguments!!.getString("did")!!)
                             val showFollowers = backStackEntry.arguments!!.getBoolean("showFollowers")
+                            val name = URLDecoder.decode(backStackEntry.arguments!!.getString("name")!!, "UTF-8")
                             LaunchedEffect(did) {
-                                timelineViewModel.openFollowersList(did, showFollowers)
+                                timelineViewModel.openFollowersList(did, showFollowers, name)
                                 timelineViewModel.fetchFollowers(did, fresh = true)
                                 timelineViewModel.fetchFollows(did, fresh = true)
                             }

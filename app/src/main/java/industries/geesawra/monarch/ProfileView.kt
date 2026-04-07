@@ -134,7 +134,7 @@ fun ProfileView(
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
     onSettingsTap: () -> Unit = {},
-    onFollowersTap: (showFollowers: Boolean) -> Unit = {},
+    onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listStates = profileNavTabs.associate { it.filter to rememberLazyListState() }
@@ -422,7 +422,7 @@ internal fun ProfileContent(
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
-    onFollowersTap: (showFollowers: Boolean) -> Unit = {},
+    onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
 ) {
     val posts = timelineViewModel.uiState.profilePosts
     val avatarClipShape = if (settingsState.avatarShape == AvatarShape.RoundedSquare) RoundedCornerShape(8.dp) else CircleShape
@@ -441,10 +441,10 @@ internal fun ProfileContent(
                 timelineViewModel = timelineViewModel,
                 avatarShape = avatarClipShape,
                 onFollowersTap = {
-                    onFollowersTap(true)
+                    onFollowersTap(true, profile.displayName ?: profile.handle.handle)
                 },
                 onFollowingTap = {
-                    onFollowersTap(false)
+                    onFollowersTap(false, profile.displayName ?: profile.handle.handle)
                 },
             )
         }
