@@ -46,7 +46,10 @@ import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -101,6 +104,7 @@ import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.VerifiedStatus
 import app.bsky.feed.GetAuthorFeedFilter
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material.icons.automirrored.filled.Article
@@ -145,6 +149,7 @@ fun ProfileView(
     val isLoading = timelineViewModel.uiState.isFetchingProfile && profile == null
     val wasEdited = remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var isMediaFeedMode by remember { mutableStateOf(false) }
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
@@ -287,17 +292,31 @@ fun ProfileView(
                 )
             },
             floatingActionButton = {
-                if (!LocalBaselineProfileMode.current && profile != null && !timelineViewModel.isOwnProfile()) {
-                    FloatingActionButton(
-                        onClick = {
-                            inReplyTo.value = null
-                            isQuotePost.value = false
-                            coroutineScope.launch {
-                                scaffoldState.bottomSheetState.expand()
+                if (!LocalBaselineProfileMode.current && profile != null) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        SmallFloatingActionButton(
+                            onClick = { isMediaFeedMode = true },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        ) {
+                            Icon(Icons.Default.ViewStream, "Media scroll")
+                        }
+
+                        if (!timelineViewModel.isOwnProfile()) {
+                            FloatingActionButton(
+                                onClick = {
+                                    inReplyTo.value = null
+                                    isQuotePost.value = false
+                                    coroutineScope.launch {
+                                        scaffoldState.bottomSheetState.expand()
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Filled.Create, "Post")
                             }
                         }
-                    ) {
-                        Icon(Icons.Filled.Create, "Post")
                     }
                 }
             },
@@ -343,27 +362,49 @@ fun ProfileView(
                 Modifier
             }
 
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Box(modifier = contentModifier) {
-                    ProfileContent(
-                        profile = profile,
-                        timelineViewModel = timelineViewModel,
-                        settingsState = settingsState,
-                        listState = listState,
-                        onThreadTap = onThreadTap,
-                        onProfileTap = onProfileTap,
-                        onReplyTap = { skeetData, quotePost ->
-                            inReplyTo.value = skeetData
-                            isQuotePost.value = quotePost
-                            coroutineScope.launch {
-                                scaffoldState.bottomSheetState.expand()
-                            }
-                        },
-                        onFollowersTap = onFollowersTap,
+            if (isMediaFeedMode) {
+                val previousFilter = remember { timelineViewModel.uiState.profileFeedFilter }
+                LaunchedEffect(Unit) {
+                    timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithMedia)
+                }
+                Dialog(
+                    onDismissRequest = {
+                        isMediaFeedMode = false
+                        timelineViewModel.setProfileFeedFilter(previousFilter)
+                    },
+                    properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+                ) {
+                    MediaFeedView(
+                        posts = timelineViewModel.uiState.profilePosts,
+                        isLoading = timelineViewModel.uiState.isFetchingProfileFeed,
+                        onLoadMore = { timelineViewModel.fetchProfileFeed() },
+                        modifier = Modifier.fillMaxSize(),
                     )
+                }
+            }
+            run {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Box(modifier = contentModifier) {
+                        ProfileContent(
+                            profile = profile,
+                            timelineViewModel = timelineViewModel,
+                            settingsState = settingsState,
+                            listState = listState,
+                            onThreadTap = onThreadTap,
+                            onProfileTap = onProfileTap,
+                            onReplyTap = { skeetData, quotePost ->
+                                inReplyTo.value = skeetData
+                                isQuotePost.value = quotePost
+                                coroutineScope.launch {
+                                    scaffoldState.bottomSheetState.expand()
+                                }
+                            },
+                            onFollowersTap = onFollowersTap,
+                        )
+                    }
                 }
             }
         }
@@ -914,6 +955,7 @@ private data class ProfileTab(
     val label: String,
     val icon: ImageVector,
     val filter: GetAuthorFeedFilter?,
+    val isMediaFeed: Boolean = false,
 )
 
 private val profileNavTabs = listOf(

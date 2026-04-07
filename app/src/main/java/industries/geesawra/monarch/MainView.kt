@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -134,6 +135,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -380,6 +383,24 @@ private fun InnerTimelineView(
             if (feed.uri != timelineViewModel.uiState.selectedFeed) {
                 timelineViewModel.selectFeed(feed.uri, feed.displayName, feed.avatar)
             }
+        }
+    }
+
+    var showMediaFeed by remember { mutableStateOf(false) }
+
+    if (showMediaFeed) {
+        val feedUri = feedItems.getOrNull(pagerState.settledPage)?.uri ?: "following"
+        val feedPosts = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
+        Dialog(
+            onDismissRequest = { showMediaFeed = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            MediaFeedView(
+                posts = feedPosts,
+                isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
+                onLoadMore = { timelineViewModel.fetchTimeline() },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 
@@ -797,23 +818,38 @@ private fun InnerTimelineView(
                 floatingActionButton = {
                     if (LocalBaselineProfileMode.current) {} else when (currentDestination) {
                         TabBarDestinations.TIMELINE -> {
-                            if (narrowScreen) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
                                 SmallFloatingActionButton(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        fobOnClick()
-                                    }
+                                        showMediaFeed = true
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 ) {
-                                    Icon(Icons.Filled.Create, "Post")
+                                    Icon(Icons.Default.ViewStream, "Media scroll")
                                 }
-                            } else {
-                                FloatingActionButton(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        fobOnClick()
+
+                                if (narrowScreen) {
+                                    SmallFloatingActionButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            fobOnClick()
+                                        }
+                                    ) {
+                                        Icon(Icons.Filled.Create, "Post")
                                     }
-                                ) {
-                                    Icon(Icons.Filled.Create, "Post")
+                                } else {
+                                    FloatingActionButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            fobOnClick()
+                                        }
+                                    ) {
+                                        Icon(Icons.Filled.Create, "Post")
+                                    }
                                 }
                             }
                         }

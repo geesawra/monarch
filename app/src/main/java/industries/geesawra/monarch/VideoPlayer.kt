@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -342,7 +342,7 @@ private fun VideoPlayerSurface(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    if (isMuted) Icons.Default.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                    if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                     contentDescription = if (isMuted) "Unmute" else "Mute",
                     tint = Color.White,
                     modifier = Modifier.size(20.dp),
@@ -417,7 +417,7 @@ private fun VideoPlayerSurface(
                         modifier = Modifier.size(36.dp),
                     ) {
                         Icon(
-                            if (isMuted) Icons.Default.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                             contentDescription = if (isMuted) "Unmute" else "Mute",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp),
@@ -470,6 +470,57 @@ fun GifViewer(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { player.release() }
+    }
+
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                this.player = player
+                useController = false
+            }
+        },
+        modifier = modifier,
+    )
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+fun MediaFeedVideoPlayer(
+    url: String,
+    isMuted: Boolean,
+    onToggleMute: () -> Unit,
+    modifier: Modifier = Modifier,
+    isVisible: Boolean = true,
+) {
+    val context = LocalContext.current
+
+    val player = remember {
+        ExoPlayer.Builder(context)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true,
+            )
+            .build().apply {
+                setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).build())
+                volume = if (isMuted) 0f else 1f
+                playWhenReady = true
+                prepare()
+            }
+    }
+
+    LaunchedEffect(isVisible) {
+        if (isVisible) player.play() else player.pause()
+    }
+
+    LaunchedEffect(isMuted) {
+        player.volume = if (isMuted) 0f else 1f
     }
 
     DisposableEffect(Unit) {
