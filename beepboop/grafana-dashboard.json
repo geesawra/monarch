@@ -176,6 +176,21 @@
           "legendFormat": "skipped"
         }
       ]
+    },
+    {
+      "title": "Adaptive Throttle Delay",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "beepboop_throttle_delay_ms",
+          "legendFormat": "delay"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,

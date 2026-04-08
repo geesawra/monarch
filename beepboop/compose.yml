@@ -1,5 +1,8 @@
 services:
   beepboop:
+    labels:
+      - wud.watch=true
+      - wud.watch.digest=true
     image: ghcr.io/geesawra/monarch/beepboop:latest
     ports:
       - "9999:9999"
@@ -15,13 +18,21 @@ services:
           memory: 1024M
 
   prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
+    image: prom/prometheus:v3.11.0
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     restart: unless-stopped
 
+  whatsupdocker:
+    image: getwud/wud
+    container_name: wud
+    environment:
+      - WUD_WATCHER_LOCAL_WATCHBYDEFAULT=false
+      - WUD_TRIGGER_DOCKER_LOCAL_PRUNE=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   prometheus-data:
+

@@ -16,7 +16,7 @@ type adaptiveThrottle struct {
 func newAdaptiveThrottle() *adaptiveThrottle {
 	return &adaptiveThrottle{
 		alpha:    0.3,
-		minDelay: 50 * time.Millisecond,
+		minDelay: 3 * time.Second,
 		maxDelay: 5 * time.Second,
 	}
 }
