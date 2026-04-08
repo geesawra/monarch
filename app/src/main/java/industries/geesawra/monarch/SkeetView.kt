@@ -72,6 +72,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -124,6 +125,7 @@ fun SkeetView(
     onShowThread: (SkeetData) -> Unit = {},
     onAvatarTap: ((Did) -> Unit)? = null,
     isVisible: Boolean = true,
+    overrideAvatarSize: Dp? = null,
 ) {
     if (skeet.blocked) {
         SkeetBlockedPost(nested)
@@ -182,7 +184,7 @@ fun SkeetView(
             )
         }
     } else {
-        val minSize = avatarSize()
+        val minSize = overrideAvatarSize ?: avatarSize()
         Row(
             modifier = modifier
                 .clip(MaterialTheme.shapes.medium)
@@ -195,6 +197,7 @@ fun SkeetView(
                 avatarShape = avatarShape,
                 inThread = inThread,
                 onAvatarTap = onAvatarTap,
+                overrideAvatarSize = overrideAvatarSize,
             )
 
             Column(
@@ -260,13 +263,6 @@ fun FocusedSkeetView(
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
     var contentRevealed by remember { mutableStateOf(warningLabel == null) }
 
-    val interactionState = viewModel?.postInteractionStore?.getState(
-        skeet.cid, PostInteraction.from(skeet)
-    )
-    val interaction = interactionState?.value
-    val likes = interaction?.likes ?: skeet.likes ?: 0
-    val reposts = interaction?.reposts ?: skeet.reposts ?: 0
-
     Column(
         modifier = modifier
             .padding(top = 8.dp, start = postHorizontalPadding(), end = postHorizontalPadding(), bottom = 0.dp)
@@ -296,50 +292,6 @@ fun FocusedSkeetView(
             showLabels = showLabels,
         )
 
-        HorizontalDivider(
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
-
-        skeet.createdAt?.let {
-            val javaInstant = JavaInstant.ofEpochSecond(it.epochSeconds, it.nanosecondsOfSecond.toLong())
-            val zdt = javaInstant.atZone(ZoneId.systemDefault())
-            val fmt = DateTimeFormatter.ofPattern("HH:mm · d MMM yyyy")
-            Text(
-                text = zdt.format(fmt),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-        }
-
-        if (likes > 0 || reposts > 0) {
-            Row(
-                modifier = Modifier.padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                if (reposts > 0) {
-                    Text(
-                        text = "$reposts reposts",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                if (likes > 0) {
-                    Text(
-                        text = "$likes likes",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider(
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
-
         TimelinePostActionsView(
             onReplyTap = onReplyTap,
             modifier = Modifier
@@ -348,11 +300,6 @@ fun FocusedSkeetView(
             timelineViewModel = viewModel,
             skeet = skeet,
             inThread = true,
-        )
-
-        HorizontalDivider(
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
 }
@@ -417,8 +364,9 @@ private fun SkeetThreadLine(
     avatarShape: Shape,
     inThread: Boolean,
     onAvatarTap: ((Did) -> Unit)?,
+    overrideAvatarSize: Dp? = null,
 ) {
-    val minSize = avatarSize()
+    val minSize = overrideAvatarSize ?: avatarSize()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier

@@ -509,7 +509,7 @@ private fun InnerTimelineView(
             val expandedOnSeeMoreTap: (SkeetData) -> Unit = { skeet ->
                 detailPaneContent = DetailPaneContent.Thread
                 detailRefreshing.value = true
-                timelineViewModel.setThread(skeet)
+                timelineViewModel.startThread(skeet)
                 timelineViewModel.getThread {
                     detailRefreshing.value = false
                 }

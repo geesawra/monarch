@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package industries.geesawra.monarch
 
 import androidx.compose.foundation.background
@@ -291,13 +293,11 @@ fun ShowSkeets(
                             avatarShape = avatarClipShape,
                             showLabels = settingsState.showLabels,
                             onAvatarTap = onProfileTap,
-                            onShowThread = { skeet ->
-                                if (onSeeMoreTap != null) {
-                                    viewModel.setThread(skeet)
-                                    onSeeMoreTap(skeet)
-                                }
+                            onShowThread = { tapped ->
+                                onSeeMoreTap?.invoke(tapped)
                             },
                             isVisible = isVisible,
+                            overrideAvatarSize = replyAvatarSize(),
                         )
                     }
                 }
@@ -337,7 +337,7 @@ fun ShowSkeets(
                                     onAvatarTap = onProfileTap,
                                     onShowThread = { skeet ->
                                         if (onSeeMoreTap != null) {
-                                            viewModel.setThread(skeet)
+                                            viewModel.startThread(skeet)
                                             onSeeMoreTap(skeet)
                                         }
                                     },
@@ -371,7 +371,7 @@ fun ShowSkeets(
                                             modifier = Modifier.padding(start = 12.dp),
                                             onClick = {
                                                 if (onSeeMoreTap != null) {
-                                                    viewModel.setThread(root)
+                                                    viewModel.startThread(root)
                                                     onSeeMoreTap(root)
                                                 }
                                             }
@@ -392,7 +392,7 @@ fun ShowSkeets(
                                     onAvatarTap = onProfileTap,
                                     onShowThread = { skeet ->
                                         if (onSeeMoreTap != null) {
-                                            viewModel.setThread(skeet)
+                                            viewModel.startThread(skeet)
                                             onSeeMoreTap(skeet)
                                         }
                                     },
@@ -411,12 +411,7 @@ fun ShowSkeets(
                             avatarShape = avatarClipShape,
                             showLabels = settingsState.showLabels,
                             onAvatarTap = onProfileTap,
-                            onShowThread = { s ->
-                                if (onSeeMoreTap != null) {
-                                    viewModel.setThread(s)
-                                    onSeeMoreTap(s)
-                                }
-                            },
+                            onShowThread = {},
                             isVisible = isVisible,
                         )
                     } else {
@@ -429,13 +424,14 @@ fun ShowSkeets(
                             avatarShape = avatarClipShape,
                             showLabels = settingsState.showLabels,
                             onAvatarTap = onProfileTap,
-                            onShowThread = { skeet ->
+                            onShowThread = { tapped ->
                                 if (onSeeMoreTap != null) {
-                                    viewModel.setThread(skeet)
-                                    onSeeMoreTap(skeet)
+                                    if (!isShowingThread) viewModel.startThread(tapped)
+                                    onSeeMoreTap(tapped)
                                 }
                             },
                             isVisible = isVisible,
+                            overrideAvatarSize = if (isShowingThread && !skeet.isFocused) replyAvatarSize() else null,
                         )
                     }
                 }

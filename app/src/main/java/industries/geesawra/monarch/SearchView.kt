@@ -227,7 +227,7 @@ private fun SearchPostsResults(
                     skeet = skeet,
                     onAvatarTap = onProfileTap,
                     onShowThread = { s ->
-                        viewModel.setThread(s)
+                        viewModel.startThread(s)
                         onThreadTap(s)
                     },
                 )

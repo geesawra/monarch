@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.CompositionLocalProvider
@@ -219,9 +220,8 @@ class MainActivity : ComponentActivity() {
                         composable(route = ViewList.ShowThread.name) {
                             val threadCoroutineScope = rememberCoroutineScope()
                             val threadScaffoldState = rememberBottomSheetScaffoldState(
-                                bottomSheetState = rememberStandardBottomSheetState(
-                                    skipHiddenState = false,
-                                    initialValue = SheetValue.Hidden,
+                                bottomSheetState = rememberModalBottomSheetState(
+                                    skipPartiallyExpanded = true,
                                 )
                             )
                             val threadInReplyTo = remember { mutableStateOf<SkeetData?>(null) }
@@ -252,6 +252,7 @@ class MainActivity : ComponentActivity() {
                                     settingsState = settings,
                                     coroutineScope = threadCoroutineScope,
                                     backButton = {
+                                        timelineViewModel.popThread()
                                         navController.popBackStack()
                                     },
                                     onProfileTap = { did ->
@@ -404,7 +405,7 @@ class MainActivity : ComponentActivity() {
                                     if (segments.size >= 4 && segments[2] == "post") {
                                         val rkey = segments[3]
                                         val atUri = "at://$actor/app.bsky.feed.post/$rkey"
-                                        timelineViewModel.setThread(SkeetData(uri = AtUri(atUri)))
+                                        timelineViewModel.startThread(SkeetData(uri = AtUri(atUri)))
                                         navController.navigate(ViewList.ShowThread.name)
                                     } else {
                                         navController.navigate("Profile/$actor")
@@ -427,7 +428,7 @@ class MainActivity : ComponentActivity() {
                             }
                             "app.bsky.feed.like", "app.bsky.feed.repost", "app.bsky.feed.post", "app.bsky.feed.reply", "app.bsky.feed.mention", "app.bsky.feed.quote" -> {
                                 val uri = notifUri ?: return@LaunchedEffect
-                                timelineViewModel.setThread(SkeetData(uri = AtUri(uri)))
+                                timelineViewModel.startThread(SkeetData(uri = AtUri(uri)))
                                 navController.navigate(ViewList.ShowThread.name)
                             }
                         }

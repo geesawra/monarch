@@ -494,7 +494,7 @@ internal fun ProfileContent(
                     showLabels = settingsState.showLabels,
                     onAvatarTap = onProfileTap,
                     onShowThread = { s ->
-                        timelineViewModel.setThread(s)
+                        timelineViewModel.startThread(s)
                         onThreadTap(s)
                     }
                 )

@@ -16,6 +16,7 @@ import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.ViewerState
+import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.GetAuthorFeedFilter
 import app.bsky.feed.SearchPostsSort
 import app.bsky.embed.RecordView
@@ -59,6 +60,12 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 
+enum class VideoUploadStatus(val label: String) {
+    Compressing("Compressing..."),
+    Uploading("Uploading..."),
+    Processing("Processing..."),
+}
+
 data class TimelineUiState(
     val user: ProfileViewDetailed? = null,
     val selectedFeed: String = "following",
@@ -79,8 +86,7 @@ data class TimelineUiState(
     val unreadNotificationsAmt: Int = 0,
     val seenNotificationsAt: Instant? = null,
 
-    val currentlyShownThread: ThreadPost = ThreadPost(),
-    val isContinueThread: Boolean = false,
+    val threadStack: List<ThreadPost> = listOf(),
 
     val mutedWords: List<MutedWord> = listOf(),
 
@@ -113,7 +119,12 @@ data class TimelineUiState(
     val searchPostsSort: SearchPostsSort = SearchPostsSort.Latest,
     val searchAuthorFilter: String? = null,
     val isSearching: Boolean = false,
-)
+
+    val videoUploadStatus: VideoUploadStatus? = null,
+    val videoUploadProgress: Long? = null,
+) {
+    val currentlyShownThread: ThreadPost get() = threadStack.lastOrNull() ?: ThreadPost()
+}
 
 object NotificationBadge {
     val count = kotlinx.coroutines.flow.MutableStateFlow(0)
@@ -319,14 +330,14 @@ class TimelineViewModel @AssistedInject constructor(
                 val feedKey = uiState.selectedFeed
                 val existingFeedSkeets = uiState.feedSkeets[feedKey] ?: listOf()
                 val newSkeets = if (fresh) {
-                    response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { it.cid }
+                    response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
                 } else {
-                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { it.cid }
+                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
                 }
                 val newFeedSkeets = if (fresh) {
                     newSkeets
                 } else {
-                    (existingFeedSkeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { it.cid }
+                    (existingFeedSkeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
                 }
 
                 uiState = uiState.copy(
@@ -719,7 +730,11 @@ class TimelineViewModel @AssistedInject constructor(
             facets,
             linkPreview = linkPreview,
             threadgateRules = threadgateRules,
+            onVideoStatus = { status, progress ->
+                uiState = uiState.copy(videoUploadStatus = status, videoUploadProgress = progress)
+            },
         )
+        uiState = uiState.copy(videoUploadStatus = null, videoUploadProgress = null)
         result.onSuccess { uri ->
             if (uiState.selectedFeed == "following") {
                 kotlinx.coroutines.delay(500)
@@ -832,15 +847,18 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun setThread(tappedElement: SkeetData) {
-        uiState = uiState.copy(currentlyShownThread = ThreadPost(post = tappedElement))
+    fun startThread(tappedElement: SkeetData) {
+        uiState = uiState.copy(threadStack = listOf(ThreadPost(post = tappedElement)))
     }
 
-    fun continueThread(skeet: SkeetData) {
-        uiState = uiState.copy(
-            currentlyShownThread = ThreadPost(post = skeet),
-            isContinueThread = true,
-        )
+    fun setThread(tappedElement: SkeetData) {
+        uiState = uiState.copy(threadStack = uiState.threadStack + ThreadPost(post = tappedElement))
+    }
+
+    fun popThread() {
+        if (uiState.threadStack.size > 1) {
+            uiState = uiState.copy(threadStack = uiState.threadStack.dropLast(1))
+        }
     }
 
     fun fetchMutedWords() {
@@ -1009,8 +1027,7 @@ class TimelineViewModel @AssistedInject constructor(
             }.onSuccess {
                 val asd = readThread(it.thread)
                 uiState = uiState.copy(
-                    currentlyShownThread = asd,
-                    isContinueThread = false,
+                    threadStack = uiState.threadStack.dropLast(1) + asd,
                 )
                 asd.flatten().forEach { postInteractionStore.seed(it) }
                 then()
@@ -1058,10 +1075,10 @@ class TimelineViewModel @AssistedInject constructor(
             }.onSuccess { timeline ->
                 val newPosts = timeline.feed.map {
                     SkeetData.fromFeedViewPost(it, bskyConn.session?.did)
-                }.distinctBy { it.cid }
+                }.distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
 
                 uiState = uiState.copy(
-                    profilePosts = if (fresh) newPosts else (uiState.profilePosts + newPosts).distinctBy { it.cid },
+                    profilePosts = if (fresh) newPosts else (uiState.profilePosts + newPosts).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid },
                     profileFeedCursor = timeline.cursor,
                     isFetchingProfileFeed = false,
                 )

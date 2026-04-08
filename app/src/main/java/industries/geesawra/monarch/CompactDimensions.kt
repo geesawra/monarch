@@ -34,7 +34,18 @@ fun postHorizontalPadding(): Dp = when {
 fun nestingIndent(): Int = if (isNarrowScreen()) 10 else 16
 
 @Composable
-fun avatarSize(): Dp = if (isNarrowScreen()) 32.dp else 40.dp
+fun avatarSize(): Dp = when {
+    isNarrowScreen() -> 32.dp
+    isExpandedScreen() -> 48.dp
+    else -> 40.dp
+}
+
+@Composable
+fun replyAvatarSize(): Dp = when {
+    isNarrowScreen() -> 24.dp
+    isExpandedScreen() -> 32.dp
+    else -> 28.dp
+}
 
 @Composable
 fun avatarTextGap(): Dp = if (isNarrowScreen()) 8.dp else 12.dp

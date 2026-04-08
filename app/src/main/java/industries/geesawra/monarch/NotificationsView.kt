@@ -113,7 +113,7 @@ fun NotificationsView(
                             onProfileTap = onProfileTap,
                             onShowThread = { skeet ->
                                 if (onSeeMoreTap != null) {
-                                    viewModel.setThread(skeet)
+                                    viewModel.startThread(skeet)
                                     onSeeMoreTap(skeet)
                                 }
                             }

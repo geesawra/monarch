@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -496,6 +497,9 @@ fun MediaFeedVideoPlayer(
     onToggleMute: () -> Unit,
     modifier: Modifier = Modifier,
     isVisible: Boolean = true,
+    onProgressUpdate: (sliderPosition: Float) -> Unit = {},
+    onPlayerReady: (seekTo: (Float) -> Unit) -> Unit = {},
+    onTap: () -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -511,9 +515,31 @@ fun MediaFeedVideoPlayer(
             .build().apply {
                 setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).build())
                 volume = if (isMuted) 0f else 1f
+                repeatMode = Player.REPEAT_MODE_ONE
                 playWhenReady = true
                 prepare()
             }
+    }
+
+    LaunchedEffect(player) {
+        onPlayerReady { fraction ->
+            val duration = player.duration
+            if (duration > 0) {
+                player.seekTo((fraction * duration).toLong())
+            }
+        }
+    }
+
+    LaunchedEffect(player, isVisible) {
+        while (true) {
+            if (isVisible) {
+                val duration = player.duration.coerceAtLeast(0)
+                if (duration > 0) {
+                    onProgressUpdate(player.currentPosition.toFloat() / duration.toFloat())
+                }
+            }
+            delay(200)
+        }
     }
 
     LaunchedEffect(isVisible) {
@@ -528,11 +554,16 @@ fun MediaFeedVideoPlayer(
         onDispose { player.release() }
     }
 
+    @OptIn(UnstableApi::class)
+    val resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+
     AndroidView(
         factory = { ctx ->
             PlayerView(ctx).apply {
                 this.player = player
                 useController = false
+                this.resizeMode = resizeMode
+                setOnClickListener { onTap() }
             }
         },
         modifier = modifier,

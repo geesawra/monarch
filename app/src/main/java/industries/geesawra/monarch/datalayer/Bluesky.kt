@@ -89,6 +89,7 @@ import industries.geesawra.monarch.did
 import industries.geesawra.monarch.rkey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
@@ -706,6 +707,7 @@ class BlueskyConn(val context: Context) {
         facets: List<Facet> = listOf(),
         linkPreview: LinkPreviewData? = null,
         threadgateRules: List<ThreadgateAllowUnion>? = null,
+        onVideoStatus: (VideoUploadStatus, Long?) -> Unit = { _, _ -> },
     ): Result<AtUri> {
         return runCatching {
             create().onFailure {
@@ -736,7 +738,7 @@ class BlueskyConn(val context: Context) {
                 }
 
                 if (video != null) {
-                    val blob = uploadVideo(video).getOrThrow()
+                    val blob = uploadVideo(video, onVideoStatus).getOrThrow()
                     postEmbed = PostEmbedUnion.Video(
                         value = Video(
                             video = blob.blob,
@@ -927,14 +929,17 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    private suspend fun uploadVideo(video: Uri): Result<MediaBlob> {
+    private suspend fun uploadVideo(video: Uri, onStatus: (VideoUploadStatus, Long?) -> Unit): Result<MediaBlob> {
         return runCatching {
             create().onFailure {
                 return Result.failure(it)
             }
 
+            onStatus(VideoUploadStatus.Compressing, null)
+            val compressedUri = Compressor(context).compressVideo(video) ?: video
+
             val retriever = MediaMetadataRetriever()
-            retriever.setDataSource(context, video)
+            retriever.setDataSource(context, compressedUri)
             val width =
                 retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
                     ?.toIntOrNull() ?: 0
@@ -994,7 +999,8 @@ class BlueskyConn(val context: Context) {
                 BlueskyAuthPlugin.Tokens(serviceAuth, serviceAuth)
             )
 
-            val uploadRes = context.contentResolver.openInputStream(video)?.use { inputStream ->
+            onStatus(VideoUploadStatus.Uploading, null)
+            val uploadRes = context.contentResolver.openInputStream(compressedUri)?.use { inputStream ->
                 val byteArray = inputStream.readBytes()
 
                 val rs = httpClient.post {
@@ -1015,13 +1021,14 @@ class BlueskyConn(val context: Context) {
 
 
                 when (rs.status) {
-                    HttpStatusCode.OK -> {
-                        return@use rs.body<UploadVideoResponse>().jobStatus
-                    }
-
-                    HttpStatusCode.Conflict -> {
-                        // already uploaded once
-                        return@use rs.body<JobStatus>()
+                    HttpStatusCode.OK, HttpStatusCode.Conflict -> {
+                        val bodyText = rs.bodyAsText()
+                        val json = Json { ignoreUnknownKeys = true }
+                        try {
+                            return@use json.decodeFromString<UploadVideoResponse>(bodyText).jobStatus
+                        } catch (_: Exception) {
+                            return@use json.decodeFromString<JobStatus>(bodyText)
+                        }
                     }
 
                     else -> {
@@ -1031,6 +1038,7 @@ class BlueskyConn(val context: Context) {
                 }
             }
 
+            onStatus(VideoUploadStatus.Processing, null)
             while (true) {
                 try {
                     val response =
@@ -1047,13 +1055,15 @@ class BlueskyConn(val context: Context) {
                         is AtpResponse.Success<GetJobStatusResponse> -> response.response.jobStatus
                     }
 
+                    onStatus(VideoUploadStatus.Processing, resp.progress)
+
                     if (resp.blob != null) {
                         uploadedBlobs.add(resp.blob!!)
                         break
                     }
 
                     when (resp.state) {
-                        State.JOBSTATECOMPLETED -> {} // ignore, as we check blobk anyway
+                        State.JOBSTATECOMPLETED -> {}
                         State.JOBSTATEFAILED -> {
                             httpClient.close()
                             return Result.failure(Exception("Video processing failed, ${resp.error}: ${resp.message}"))

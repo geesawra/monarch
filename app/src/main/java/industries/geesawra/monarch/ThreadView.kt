@@ -18,6 +18,7 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -78,9 +79,22 @@ fun ThreadView(
                 )
             },
         ) { padding ->
-            val parentHeight = if (timelineViewModel.uiState.isContinueThread) 0L else 80L
+            val thread = timelineViewModel.uiState.currentlyShownThread
+            val tappedPostUri = remember { thread.post.uri }
+            val threadData = remember(thread) { thread.flatten() }
+            val focusIdx = remember(threadData) {
+                threadData.indexOfFirst { it.isFocused }.coerceAtLeast(0)
+            }
+            val listState = remember(focusIdx) {
+                LazyListState(firstVisibleItemIndex = focusIdx)
+            }
+
             LaunchedEffect(Unit) {
-                timelineViewModel.getThread(parentHeight = parentHeight) {
+                if (thread.replies.isEmpty()) {
+                    timelineViewModel.getThread {
+                        isRefreshing.value = false
+                    }
+                } else {
                     isRefreshing.value = false
                 }
             }
@@ -99,15 +113,18 @@ fun ThreadView(
                     ShowSkeets(
                         viewModel = timelineViewModel,
                         isScrollEnabled = true,
-                        data = timelineViewModel.uiState.currentlyShownThread.flatten(),
+                        state = listState,
+                        data = threadData,
                         shouldFetchMoreData = false,
                         isShowingThread = true,
                         settingsState = settingsState,
                         onProfileTap = onProfileTap,
                         onReplyTap = onReplyTap,
-                        onSeeMoreTap = { skeet ->
-                            timelineViewModel.continueThread(skeet)
-                            onThreadTap()
+                        onSeeMoreTap = { tapped ->
+                            if (tapped.uri != tappedPostUri) {
+                                timelineViewModel.setThread(tapped)
+                                onThreadTap()
+                            }
                         },
                     )
                 }

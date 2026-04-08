@@ -296,7 +296,7 @@ fun ComposeView(
     // Outer Box: Handles IME padding and general content padding for the whole sheet content
     Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .nestedScroll(sheetScrollConnection)
             .windowInsetsPadding(WindowInsets.ime.add(WindowInsets.navigationBars))
             .verticalScroll(scrollState)
@@ -523,6 +523,14 @@ fun ComposeView(
                     )
                 }
 
+                if (mediaSelected.value.isNotEmpty()) {
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+
                 inReplyTo.value?.let {
                     OutlinedCard(
                         modifier = Modifier.padding(8.dp)
@@ -686,7 +694,23 @@ fun ActionRow(
             )
         }
         if (uploadingPost.value) {
-            CircularWavyProgressIndicator()
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularWavyProgressIndicator()
+                timelineViewModel.uiState.videoUploadStatus?.let { status ->
+                    val progress = timelineViewModel.uiState.videoUploadProgress
+                    val text = if (progress != null && progress > 0) {
+                        "${status.label} ${progress}%"
+                    } else {
+                        status.label
+                    }
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
         } else {
             Button(
                 onClick = {
@@ -1012,7 +1036,16 @@ private fun MediaSelectionSection(
                     onCrossClick = { onVideoRemove() },
                     onMediaClick = { }
                 ) {
-                    VideoView(uri = mediaSelected.first())
+                    AsyncImage(
+                        model = mediaSelected.first(),
+                        contentDescription = "Selected video",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp),
+                        contentScale = ContentScale.Crop,
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    )
                 }
             }
         }

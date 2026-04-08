@@ -2,13 +2,25 @@ package industries.geesawra.monarch
 
 import android.app.Activity
 import android.view.View
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.draw.clip
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +32,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -98,7 +112,12 @@ fun extractMedia(posts: List<SkeetData>): List<MediaItem> {
     posts.forEach { skeet ->
         extractMediaFromEmbed(skeet.embed, skeet, items)
     }
-    return items
+    return items.distinctBy {
+        when (it) {
+            is MediaItem.ImageMedia -> it.url
+            is MediaItem.VideoMedia -> it.playlistUrl
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -165,6 +184,12 @@ fun MediaFeedView(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
+                var videoProgress by remember { mutableStateOf(0f) }
+                var isSeeking by remember { mutableStateOf(false) }
+                var seekTo by remember { mutableStateOf<((Float) -> Unit)?>(null) }
+                var isPlaying by remember { mutableStateOf(true) }
+                var showPauseIcon by remember { mutableStateOf(false) }
+
                 when (item) {
                     is MediaItem.ImageMedia -> {
                         SubcomposeAsyncImage(
@@ -187,42 +212,132 @@ fun MediaFeedView(
                             url = item.playlistUrl,
                             isMuted = isMuted,
                             onToggleMute = { isMuted = !isMuted },
-                            isVisible = isActive,
+                            isVisible = isActive && isPlaying,
                             modifier = Modifier.fillMaxWidth(),
+                            onProgressUpdate = { if (!isSeeking) videoProgress = it },
+                            onPlayerReady = { seekTo = it },
+                            onTap = {
+                                isPlaying = !isPlaying
+                                showPauseIcon = true
+                            },
                         )
+
+                        LaunchedEffect(showPauseIcon) {
+                            if (showPauseIcon) {
+                                delay(800)
+                                showPauseIcon = false
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = showPauseIcon,
+                            enter = fadeIn(),
+                            exit = fadeOut(),
+                            modifier = Modifier.align(Alignment.Center),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    if (isPlaying) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(36.dp),
+                                )
+                            }
+                        }
                     }
                 }
 
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                            )
-                        )
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .padding(bottom = 48.dp),
+                        .fillMaxWidth(),
                 ) {
-                    if (item.skeet.authorName != null) {
-                        Text(
-                            text = item.skeet.authorName,
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                                )
+                            )
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .padding(bottom = if (item is MediaItem.VideoMedia) 0.dp else 48.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (item.skeet.authorAvatarURL != null) {
+                                SubcomposeAsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(item.skeet.authorAvatarURL)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.2f)),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            if (item.skeet.authorName != null) {
+                                Text(
+                                    text = item.skeet.authorName,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        if (item.skeet.content.isNotBlank()) {
+                            Text(
+                                text = item.skeet.content,
+                                color = Color.White.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
-                    if (item.skeet.content.isNotBlank()) {
-                        Text(
-                            text = item.skeet.content,
-                            color = Color.White.copy(alpha = 0.9f),
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 4.dp),
+
+                    if (item is MediaItem.VideoMedia) {
+                        Slider(
+                            value = videoProgress,
+                            onValueChange = {
+                                isSeeking = true
+                                videoProgress = it
+                            },
+                            onValueChangeFinished = {
+                                seekTo?.invoke(videoProgress)
+                                isSeeking = false
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            thumb = {
+                                SliderDefaults.Thumb(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    modifier = Modifier.size(12.dp),
+                                    colors = SliderDefaults.colors(thumbColor = Color.White),
+                                )
+                            },
+                            track = { sliderState ->
+                                SliderDefaults.Track(
+                                    sliderState = sliderState,
+                                    modifier = Modifier.height(2.dp),
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = Color.White,
+                                        inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+                                    ),
+                                )
+                            },
                         )
                     }
                 }
