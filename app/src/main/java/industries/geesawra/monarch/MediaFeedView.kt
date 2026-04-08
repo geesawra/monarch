@@ -59,7 +59,9 @@ import app.bsky.feed.PostViewEmbedUnion
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import androidx.compose.foundation.clickable
 import industries.geesawra.monarch.datalayer.SkeetData
+import sh.christian.ozone.api.Did
 
 sealed class MediaItem(val skeet: SkeetData) {
     class ImageMedia(val url: String, val alt: String, skeet: SkeetData) : MediaItem(skeet)
@@ -112,12 +114,7 @@ fun extractMedia(posts: List<SkeetData>): List<MediaItem> {
     posts.forEach { skeet ->
         extractMediaFromEmbed(skeet.embed, skeet, items)
     }
-    return items.distinctBy {
-        when (it) {
-            is MediaItem.ImageMedia -> it.url
-            is MediaItem.VideoMedia -> it.playlistUrl
-        }
-    }
+    return items
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -126,6 +123,7 @@ fun MediaFeedView(
     posts: List<SkeetData>,
     isLoading: Boolean = false,
     onLoadMore: () -> Unit = {},
+    onProfileTap: ((Did) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -268,7 +266,12 @@ fun MediaFeedView(
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                             .padding(bottom = if (item is MediaItem.VideoMedia) 0.dp else 48.dp),
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = if (onProfileTap != null && item.skeet.did != null) {
+                                Modifier.clickable { onProfileTap(item.skeet.did) }
+                            } else Modifier,
+                        ) {
                             if (item.skeet.authorAvatarURL != null) {
                                 SubcomposeAsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)

@@ -150,6 +150,7 @@ fun ProfileView(
     val wasEdited = remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isMediaFeedMode by remember { mutableStateOf(false) }
+    var mediaFeedSnapshot by remember { mutableStateOf<List<SkeetData>?>(null) }
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
@@ -298,7 +299,10 @@ fun ProfileView(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         SmallFloatingActionButton(
-                            onClick = { isMediaFeedMode = true },
+                            onClick = {
+                                mediaFeedSnapshot = timelineViewModel.uiState.profilePosts
+                                isMediaFeedMode = true
+                            },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         ) {
                             Icon(Icons.Default.ViewStream, "Media scroll")
@@ -363,21 +367,21 @@ fun ProfileView(
             }
 
             if (isMediaFeedMode) {
-                val previousFilter = remember { timelineViewModel.uiState.profileFeedFilter }
-                LaunchedEffect(Unit) {
-                    timelineViewModel.setProfileFeedFilter(GetAuthorFeedFilter.PostsWithMedia)
+                val posts = mediaFeedSnapshot!! + timelineViewModel.uiState.profilePosts.filter { post ->
+                    mediaFeedSnapshot!!.none { it.cid == post.cid }
                 }
                 Dialog(
-                    onDismissRequest = {
-                        isMediaFeedMode = false
-                        timelineViewModel.setProfileFeedFilter(previousFilter)
-                    },
+                    onDismissRequest = { isMediaFeedMode = false },
                     properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
                 ) {
                     MediaFeedView(
-                        posts = timelineViewModel.uiState.profilePosts,
+                        posts = posts,
                         isLoading = timelineViewModel.uiState.isFetchingProfileFeed,
                         onLoadMore = { timelineViewModel.fetchProfileFeed() },
+                        onProfileTap = { did ->
+                            isMediaFeedMode = false
+                            onProfileTap(did)
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

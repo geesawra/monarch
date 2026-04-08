@@ -386,19 +386,21 @@ private fun InnerTimelineView(
         }
     }
 
-    var showMediaFeed by remember { mutableStateOf(false) }
+    var mediaFeedPosts by remember { mutableStateOf<List<SkeetData>?>(null) }
 
-    if (showMediaFeed) {
-        val feedUri = feedItems.getOrNull(pagerState.settledPage)?.uri ?: "following"
-        val feedPosts = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
+    if (mediaFeedPosts != null) {
         Dialog(
-            onDismissRequest = { showMediaFeed = false },
+            onDismissRequest = { mediaFeedPosts = null },
             properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         ) {
             MediaFeedView(
-                posts = feedPosts,
+                posts = mediaFeedPosts!!,
                 isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
                 onLoadMore = { timelineViewModel.fetchTimeline() },
+                onProfileTap = { did ->
+                    mediaFeedPosts = null
+                    onProfileTap(did)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -825,7 +827,8 @@ private fun InnerTimelineView(
                                 SmallFloatingActionButton(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        showMediaFeed = true
+                                        val feedUri = feedItems.getOrNull(pagerState.settledPage)?.uri ?: "following"
+                                        mediaFeedPosts = timelineViewModel.uiState.feedSkeets[feedUri] ?: timelineViewModel.uiState.skeets
                                     },
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 ) {
