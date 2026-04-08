@@ -77,6 +77,7 @@ func testEventHandler(t *testing.T, mock *mockLexClient, tk *tokens) *eventHandl
 		atc:          mock,
 		t:            tk,
 		m:            testMetrics(t),
+		throttle:     newAdaptiveThrottle(),
 		profileCache: newProfileCache(mock),
 		recordCache:  newRecordCache(mock),
 	}

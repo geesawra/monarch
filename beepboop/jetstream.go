@@ -106,6 +106,7 @@ func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender,
 		atc:          atc,
 		t:            t,
 		m:            m,
+		throttle:     newAdaptiveThrottle(),
 		profileCache: newProfileCache(atc),
 		recordCache:  newRecordCache(atc),
 	}
@@ -167,6 +168,8 @@ func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender,
 		m.eventDuration.Record(ctx, time.Since(start).Milliseconds(), attrCollection(e.Commit.Collection))
 
 		for _, message := range messages {
+			eh.throttle.wait()
+			m.throttleDelayMs.Record(ctx, eh.throttle.currentEMA())
 			l.Debugw("sending notification", "kind", message.Data["kind"], "destination", message.Data["authorDid"])
 
 			_, err = msg.Send(ctx, message)
@@ -209,12 +212,14 @@ type eventHandler struct {
 	atc          lexutil.LexClient
 	t            *tokens
 	m            *metrics
+	throttle     *adaptiveThrottle
 	profileCache *ttlcache.Cache[string, *bsky.ActorDefs_ProfileViewDetailed]
 	recordCache  *ttlcache.Cache[string, *bsky.FeedPost]
 }
 
 func (eh *eventHandler) getProfile(ctx context.Context, did string) (*bsky.ActorDefs_ProfileViewDetailed, error) {
 	cached := eh.profileCache.Has(did)
+	start := time.Now()
 	item := eh.profileCache.Get(did)
 	if item == nil {
 		eh.m.cacheMisses.Add(ctx, 1, attrCache("profile"))
@@ -224,12 +229,14 @@ func (eh *eventHandler) getProfile(ctx context.Context, did string) (*bsky.Actor
 		eh.m.cacheHits.Add(ctx, 1, attrCache("profile"))
 	} else {
 		eh.m.cacheMisses.Add(ctx, 1, attrCache("profile"))
+		eh.throttle.recordLatency(time.Since(start))
 	}
 	return item.Value(), nil
 }
 
 func (eh *eventHandler) getRecord(ctx context.Context, uri string) (*bsky.FeedPost, error) {
 	cached := eh.recordCache.Has(uri)
+	start := time.Now()
 	item := eh.recordCache.Get(uri)
 	if item == nil {
 		eh.m.cacheMisses.Add(ctx, 1, attrCache("record"))
@@ -239,6 +246,7 @@ func (eh *eventHandler) getRecord(ctx context.Context, uri string) (*bsky.FeedPo
 		eh.m.cacheHits.Add(ctx, 1, attrCache("record"))
 	} else {
 		eh.m.cacheMisses.Add(ctx, 1, attrCache("record"))
+		eh.throttle.recordLatency(time.Since(start))
 	}
 	return item.Value(), nil
 }

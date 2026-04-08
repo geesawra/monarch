@@ -15,6 +15,7 @@ type metrics struct {
 	cacheMisses         metric.Int64Counter
 	eventDuration       metric.Int64Histogram
 	tokensRegistered    metric.Int64UpDownCounter
+	throttleDelayMs     metric.Float64Gauge
 }
 
 func newMetrics() (*metrics, error) {
@@ -72,6 +73,12 @@ func newMetrics() (*metrics, error) {
 
 	m.tokensRegistered, err = meter.Int64UpDownCounter("beepboop.tokens.registered",
 		metric.WithDescription("Current number of registered FCM tokens"))
+	if err != nil {
+		return nil, err
+	}
+
+	m.throttleDelayMs, err = meter.Float64Gauge("beepboop.throttle.delay_ms",
+		metric.WithDescription("Current adaptive throttle delay in milliseconds"))
 	if err != nil {
 		return nil, err
 	}
