@@ -183,13 +183,15 @@ fun ShowSkeets(
             val isGroupStart = if (isShowingThread && !hasConnectors) {
                 val prev = filteredData.getOrNull(idx - 1)
                 prev == null || prev.threadConnectors.isNotEmpty() ||
-                    (prev.nestingLevel == 0 && !skeet.isSameAuthorContinuation && idx > 0)
+                    (prev.nestingLevel == 0 && !skeet.isSameAuthorContinuation && idx > 0) ||
+                    skeet.isFocused || prev.isFocused
             } else false
 
             val isGroupEnd = if (isShowingThread && !hasConnectors) {
                 val next = filteredData.getOrNull(idx + 1)
                 next == null || next.threadConnectors.isNotEmpty() ||
-                    (next.nestingLevel == 0 && !next.isSameAuthorContinuation)
+                    (next.nestingLevel == 0 && !next.isSameAuthorContinuation) ||
+                    skeet.isFocused || next.isFocused
             } else false
 
             val threadCardShape = if (isShowingThread && !hasConnectors) {
@@ -400,23 +402,42 @@ fun ShowSkeets(
                         }
                     }
 
-                    SkeetView(
-                        viewModel = viewModel,
-                        skeet = skeet,
-                        onReplyTap = onReplyTap,
-                        showInReplyTo = if (isShowingThread) false else (skeet.root() == null && skeet.parent().first == null),
-                        postTextSize = settingsState.postTextSize,
-                        avatarShape = avatarClipShape,
-                        showLabels = settingsState.showLabels,
-                        onAvatarTap = onProfileTap,
-                        onShowThread = { skeet ->
-                            if (onSeeMoreTap != null) {
-                                viewModel.setThread(skeet)
-                                onSeeMoreTap(skeet)
-                            }
-                        },
-                        isVisible = isVisible,
-                    )
+                    if (isShowingThread && skeet.isFocused) {
+                        FocusedSkeetView(
+                            viewModel = viewModel,
+                            skeet = skeet,
+                            onReplyTap = onReplyTap,
+                            postTextSize = settingsState.postTextSize,
+                            avatarShape = avatarClipShape,
+                            showLabels = settingsState.showLabels,
+                            onAvatarTap = onProfileTap,
+                            onShowThread = { s ->
+                                if (onSeeMoreTap != null) {
+                                    viewModel.setThread(s)
+                                    onSeeMoreTap(s)
+                                }
+                            },
+                            isVisible = isVisible,
+                        )
+                    } else {
+                        SkeetView(
+                            viewModel = viewModel,
+                            skeet = skeet,
+                            onReplyTap = onReplyTap,
+                            showInReplyTo = if (isShowingThread) false else (skeet.root() == null && skeet.parent().first == null),
+                            postTextSize = settingsState.postTextSize,
+                            avatarShape = avatarClipShape,
+                            showLabels = settingsState.showLabels,
+                            onAvatarTap = onProfileTap,
+                            onShowThread = { skeet ->
+                                if (onSeeMoreTap != null) {
+                                    viewModel.setThread(skeet)
+                                    onSeeMoreTap(skeet)
+                                }
+                            },
+                            isVisible = isVisible,
+                        )
+                    }
                 }
             }
 

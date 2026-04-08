@@ -31,8 +31,6 @@ RUN yes | sdkmanager --licenses > /dev/null 2>&1 && \
     "platform-tools"
 
 WORKDIR /app
-COPY . .
 
-RUN chmod +x ./gradlew
-
-RUN ./gradlew assembleDebug --no-daemon
+ENTRYPOINT ["./gradlew"]
+CMD ["assembleDebug"]

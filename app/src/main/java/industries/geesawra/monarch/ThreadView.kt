@@ -72,7 +72,7 @@ fun ThreadView(
                         }
                     },
                     title = {
-                        Text("Thread")
+                        Text("Post")
                     },
                     scrollBehavior = scrollBehavior,
                 )

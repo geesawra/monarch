@@ -99,6 +99,10 @@ import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.datalayer.toFloat
 import sh.christian.ozone.api.Did
 import nl.jacobras.humanreadable.HumanReadable
+import industries.geesawra.monarch.datalayer.PostInteraction
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.Instant as JavaInstant
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -236,6 +240,120 @@ fun SkeetView(
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FocusedSkeetView(
+    modifier: Modifier = Modifier,
+    viewModel: TimelineViewModel? = null,
+    onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    skeet: SkeetData,
+    postTextSize: PostTextSize = PostTextSize.Medium,
+    avatarShape: Shape = CircleShape,
+    showLabels: Boolean = true,
+    onShowThread: (SkeetData) -> Unit = {},
+    onAvatarTap: ((Did) -> Unit)? = null,
+    isVisible: Boolean = true,
+) {
+    val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
+    var contentRevealed by remember { mutableStateOf(warningLabel == null) }
+
+    val interactionState = viewModel?.postInteractionStore?.getState(
+        skeet.cid, PostInteraction.from(skeet)
+    )
+    val interaction = interactionState?.value
+    val likes = interaction?.likes ?: skeet.likes ?: 0
+    val reposts = interaction?.reposts ?: skeet.reposts ?: 0
+
+    Column(
+        modifier = modifier
+            .padding(top = 8.dp, start = postHorizontalPadding(), end = postHorizontalPadding(), bottom = 0.dp)
+    ) {
+        SkeetHeaderSection(
+            skeet = skeet,
+            avatarShape = avatarShape,
+            showLabels = showLabels,
+            viewModel = viewModel,
+            onAvatarTap = onAvatarTap,
+        )
+
+        SkeetContentSection(
+            skeet = skeet,
+            nested = false,
+            disableEmbeds = false,
+            warningLabel = warningLabel,
+            contentRevealed = contentRevealed,
+            onToggleContent = { contentRevealed = !contentRevealed },
+            showActions = false,
+            onShowThread = onShowThread,
+            viewModel = viewModel,
+            onMentionClick = onAvatarTap,
+            postTextSize = postTextSize,
+            avatarShape = avatarShape,
+            isVisible = isVisible,
+            showLabels = showLabels,
+        )
+
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+
+        skeet.createdAt?.let {
+            val javaInstant = JavaInstant.ofEpochSecond(it.epochSeconds, it.nanosecondsOfSecond.toLong())
+            val zdt = javaInstant.atZone(ZoneId.systemDefault())
+            val fmt = DateTimeFormatter.ofPattern("HH:mm · d MMM yyyy")
+            Text(
+                text = zdt.format(fmt),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        }
+
+        if (likes > 0 || reposts > 0) {
+            Row(
+                modifier = Modifier.padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (reposts > 0) {
+                    Text(
+                        text = "$reposts reposts",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                if (likes > 0) {
+                    Text(
+                        text = "$likes likes",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+
+        TimelinePostActionsView(
+            onReplyTap = onReplyTap,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            timelineViewModel = viewModel,
+            skeet = skeet,
+            inThread = true,
+        )
+
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
     }
 }
 

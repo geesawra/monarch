@@ -103,6 +103,7 @@ data class SkeetData(
     val isSameAuthorContinuation: Boolean = false,
     val threadConnectors: List<ThreadConnector> = listOf(),
     val hasMoreReplies: Boolean = false,
+    val isFocused: Boolean = false,
     val likes: Long? = null,
     val reposts: Long? = null,
     val replies: Long? = null,
@@ -787,6 +788,10 @@ data class ThreadPost(
     fun flatten(): List<SkeetData> {
         val out = mutableListOf<SkeetData>()
         flattenInner(out, activeConnectors = mutableListOf(), parentDid = null, effectiveLevel = 0)
+        val focusIdx = out.indexOfLast { it.nestingLevel == 0 && it.threadConnectors.isEmpty() }
+        if (focusIdx >= 0) {
+            out[focusIdx] = out[focusIdx].copy(isFocused = true)
+        }
         return out
     }
 
