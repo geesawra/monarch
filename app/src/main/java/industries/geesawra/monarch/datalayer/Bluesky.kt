@@ -120,6 +120,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import io.ktor.http.Url
+import kotlinx.coroutines.flow.MutableStateFlow
+import sh.christian.ozone.BlueskyApi
 import sh.christian.ozone.BlueskyJson
 import sh.christian.ozone.XrpcBlueskyApi
 import sh.christian.ozone.api.AtUri
@@ -225,6 +228,15 @@ class BlueskyConn(val context: Context) {
                         cause is java.io.IOException
                     }
                     exponentialDelay()
+                    // Strip auth headers between retries so BlueskyAuthPlugin regenerates a
+                    // fresh DPoP proof (new jti) for each attempt. Without this, ktor replays
+                    // the original headers including the now-used DPoP proof, and the server
+                    // rejects the retry as "DPoP proof replayed". Harmless for unauth'd
+                    // clients (no Authorization/DPoP headers to strip in the first place).
+                    modifyRequest { request ->
+                        request.headers.remove(io.ktor.http.HttpHeaders.Authorization)
+                        request.headers.remove("DPoP")
+                    }
                 }
                 configure()
             }
@@ -290,13 +302,23 @@ class BlueskyConn(val context: Context) {
         val service: List<Service>
     )
 
-    var client: AuthenticatedXrpcBlueskyApi? = null      // appview queries (has atproto-proxy)
-    var pdsClient: AuthenticatedXrpcBlueskyApi? = null   // PDS procedures (no atproto-proxy)
+    var client: BlueskyApi? = null      // appview queries (has atproto-proxy)
+    var pdsClient: BlueskyApi? = null   // PDS procedures (no atproto-proxy)
     var session: SessionData? = null
     var oauthToken: OAuthToken? = null
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
     var appviewProxy: String? = null
+
+    // Shared auth state across `pdsClient` and `client`. Both clients' BlueskyAuthPlugin
+    // instances reference the SAME MutableStateFlow, so when one client's plugin refreshes
+    // the OAuth tokens or rotates the DPoP nonce, the other picks up the update on its next
+    // request. This is the fix for the "Invalid refresh token" error that previously
+    // appeared when the two clients tried to refresh independently with the same old
+    // refresh token.
+    private var sharedAuthTokens: MutableStateFlow<BlueskyAuthPlugin.Tokens?>? = null
+    private var sharedOAuthApi: OAuthApi? = null
+    private var sharedOAuthHttpClient: HttpClient? = null
 
     // Long-lived scope for the OAuth-token refresh watcher. Survives client rebuilds via
     // SupervisorJob so a single watcher failure doesn't cancel the others.
@@ -310,6 +332,10 @@ class BlueskyConn(val context: Context) {
         pdsClient = null
         tokenWatcherJob?.cancel()
         tokenWatcherJob = null
+        sharedAuthTokens = null
+        sharedOAuthApi = null
+        sharedOAuthHttpClient?.close()
+        sharedOAuthHttpClient = null
     }
 
     fun appviewName(): String {
@@ -386,8 +412,10 @@ class BlueskyConn(val context: Context) {
      * the OAuth login completion path (where the caller has just exchanged the auth code) and by
      * account switching (where the OAuth token comes from an already-stored account record).
      *
-     * Builds both the appview client and the PDS-direct client, sets `session` and `oauthToken`,
-     * and starts the token-refresh watcher so subsequent SDK-driven refreshes get re-persisted.
+     * Seeds a shared [MutableStateFlow] of auth tokens and a shared [OAuthApi], then builds both
+     * the appview client and the PDS-direct client against that shared state. Sets `session` and
+     * `oauthToken`, and starts the token-refresh watcher so subsequent SDK-driven refreshes get
+     * re-persisted to DataStore.
      */
     suspend fun initializeInMemory(
         pdsURL: String,
@@ -404,8 +432,27 @@ class BlueskyConn(val context: Context) {
             did = oauthToken.subject,
             active = true,
         )
-        this.pdsClient = mkClient(pdsURL, oauthToken)
-        this.client = mkClient(pdsURL, oauthToken, appviewProxy = appviewProxy)
+
+        // Seed the shared auth state. Both pdsClient and client will install a
+        // BlueskyAuthPlugin that reads from this same flow, so a refresh from either side
+        // propagates immediately to the other.
+        val initialTokens = BlueskyAuthPlugin.Tokens.Dpop(
+            auth = oauthToken.accessToken,
+            refresh = oauthToken.refreshToken,
+            pdsUrl = Url(pdsURL),
+            keyPair = oauthToken.keyPair,
+            clientId = oauthToken.clientId,
+            nonce = oauthToken.nonce,
+        )
+        this.sharedAuthTokens = MutableStateFlow<BlueskyAuthPlugin.Tokens?>(initialTokens)
+        this.sharedOAuthHttpClient = createRetryHttpClient(baseUrl = pdsURL)
+        this.sharedOAuthApi = OAuthApi(
+            httpClient = this.sharedOAuthHttpClient!!,
+            challengeSelector = { OAuthCodeChallengeMethod.S256 },
+        )
+
+        this.pdsClient = mkClient(pdsURL)
+        this.client = mkClient(pdsURL, appviewProxy = appviewProxy)
         launchTokenWatcher()
     }
 
@@ -494,6 +541,17 @@ class BlueskyConn(val context: Context) {
                 challengeSelector = { OAuthCodeChallengeMethod.S256 },
             )
 
+            // Throwaway one-shot OAuth client for the initial profile lookup. Doesn't share
+            // auth state with anything — it's used exactly once to resolve the handle and
+            // then closed. Long-lived clients with shared auth state get built later in
+            // initializeInMemory.
+            val tempHc = createRetryHttpClient {
+                defaultRequest {
+                    url(pdsURL)
+                    headers["atproto-proxy"] = appviewProxy
+                }
+            }
+
             try {
                 val token = oauthApi.requestToken(
                     oauthClient = OAuthClient(
@@ -505,10 +563,8 @@ class BlueskyConn(val context: Context) {
                     code = code,
                 )
 
-                // Resolve the user's profile to get the handle/displayName/avatar that we need
-                // for StoredAccount. We build a temporary OAuth client just for this — the
-                // long-lived clients get built later in initializeInMemory().
-                val tempClient = mkClient(pdsURL, token, appviewProxy = appviewProxy)
+                val tempClient = AuthenticatedXrpcBlueskyApi(httpClient = tempHc)
+                    .also { it.activateOAuth(token) }
                 val profileResp = tempClient.getProfile(GetProfileQueryParams(actor = token.subject))
                 val profile = when (profileResp) {
                     is AtpResponse.Success<GetProfileResponse> -> profileResp.response
@@ -534,6 +590,7 @@ class BlueskyConn(val context: Context) {
                 )
             } finally {
                 httpClient.close()
+                tempHc.close()
             }
         }.getOrElse { Result.failure(it) }
     }
@@ -550,17 +607,27 @@ class BlueskyConn(val context: Context) {
     }
 
     /**
-     * Build an OAuth-authenticated `AuthenticatedXrpcBlueskyApi`. The SDK's `BlueskyAuthPlugin`
-     * handles DPoP signing, nonce rotation, and token refresh transparently once `activateOAuth`
-     * is called. Caller is responsible for registering a token-refresh watcher if it wants the
-     * refreshed credentials persisted.
+     * Build an OAuth-authenticated `BlueskyApi`. Installs `BlueskyAuthPlugin` manually with the
+     * shared `sharedAuthTokens` state flow and `sharedOAuthApi`, so all clients built via this
+     * method read and write the SAME auth state. This is critical for correctness: both the
+     * pdsClient and the client must see refreshed tokens from each other, otherwise one of
+     * them will try to use a rotated (invalidated) refresh token and the server will kill
+     * the session.
+     *
+     * Requires `sharedAuthTokens` and `sharedOAuthApi` to have been set up by
+     * [initializeInMemory] prior to this call — asserts non-null.
      */
     private fun mkClient(
         pds: String,
-        token: OAuthToken,
         labelers: List<String> = listOf(),
         appviewProxy: String? = null,
-    ): AuthenticatedXrpcBlueskyApi {
+    ): BlueskyApi {
+        val tokens = requireNotNull(sharedAuthTokens) {
+            "mkClient called without sharedAuthTokens set — initializeInMemory must run first"
+        }
+        val oauthApi = requireNotNull(sharedOAuthApi) {
+            "mkClient called without sharedOAuthApi set — initializeInMemory must run first"
+        }
         val hc = createRetryHttpClient {
             defaultRequest {
                 url(pds)
@@ -569,33 +636,37 @@ class BlueskyConn(val context: Context) {
                     headers["atproto-proxy"] = appviewProxy
                 }
             }
+            install(BlueskyAuthPlugin) {
+                this.authTokens = tokens
+                this.oauthApi = oauthApi
+            }
         }
-
-        val api = AuthenticatedXrpcBlueskyApi(httpClient = hc)
-        api.activateOAuth(token)
-        return api
+        return XrpcBlueskyApi(hc)
     }
 
     /**
-     * Watch the active client's `authTokens` StateFlow. Whenever the SDK refreshes the
-     * DPoP-bound access/refresh tokens (which happens transparently inside the auth plugin
-     * when the server returns ExpiredToken or use_dpop_nonce), we copy the change back into
-     * `this.oauthToken` and re-persist it via [Context.updateStoredAccountOAuthToken] so the
-     * next process restart picks up the latest credentials instead of trying the stale ones.
+     * Watch the shared auth-tokens StateFlow. Whenever the SDK refreshes the DPoP-bound
+     * access/refresh tokens (which happens transparently inside the auth plugin when the
+     * server returns ExpiredToken or use_dpop_nonce), we mirror the change into
+     * `this.oauthToken` and, if the access/refresh credentials themselves rotated, re-persist
+     * to DataStore so the next process restart picks up the latest credentials.
+     *
+     * DPoP nonce rotations happen on every response and would flood DataStore with writes if
+     * we persisted each one — they're intentionally skipped for persistence but still mirrored
+     * in the in-memory `oauthToken` so subsequent client rebuilds see the latest nonce.
      */
     private fun launchTokenWatcher() {
         tokenWatcherJob?.cancel()
-        val activeClient = client ?: return
+        val tokensFlow = sharedAuthTokens ?: return
         tokenWatcherJob = connScope.launch {
-            activeClient.authTokens.collect { tokens ->
+            tokensFlow.collect { tokens ->
                 if (tokens !is BlueskyAuthPlugin.Tokens.Dpop) return@collect
                 val previous = oauthToken ?: return@collect
-                if (previous.accessToken == tokens.auth &&
-                    previous.refreshToken == tokens.refresh &&
-                    previous.nonce == tokens.nonce
-                ) {
-                    return@collect
-                }
+                val accessChanged = previous.accessToken != tokens.auth
+                val refreshChanged = previous.refreshToken != tokens.refresh
+                val nonceChanged = previous.nonce != tokens.nonce
+                if (!accessChanged && !refreshChanged && !nonceChanged) return@collect
+
                 val updated = previous.copy(
                     accessToken = tokens.auth,
                     refreshToken = tokens.refresh,
@@ -603,11 +674,14 @@ class BlueskyConn(val context: Context) {
                     keyPair = tokens.keyPair,
                 )
                 this@BlueskyConn.oauthToken = updated
-                runCatching {
-                    val updatedJson = BlueskyJson.encodeToString(OAuthToken.serializer(), updated)
-                    context.updateStoredAccountOAuthToken(previous.subject.did, updatedJson)
-                }.onFailure {
-                    Log.w("BlueskyAuth", "Failed to persist refreshed OAuth token: ${it.message}")
+
+                if (accessChanged || refreshChanged) {
+                    runCatching {
+                        val updatedJson = BlueskyJson.encodeToString(OAuthToken.serializer(), updated)
+                        context.updateStoredAccountOAuthToken(previous.subject.did, updatedJson)
+                    }.onFailure {
+                        Log.w("BlueskyAuth", "Failed to persist refreshed OAuth token: ${it.message}")
+                    }
                 }
             }
         }
@@ -639,14 +713,14 @@ class BlueskyConn(val context: Context) {
             )
 
             // Hydrate the labeler cache and rebuild `client` with the labelers header so future
-            // appview queries respect the user's subscribed labelers.
+            // appview queries respect the user's subscribed labelers. The rebuilt client still
+            // shares `sharedAuthTokens` with `pdsClient` because `mkClient` installs the plugin
+            // with the connection-level shared state, so no watcher re-arming is needed.
             val labelerMap = this.subscribedLabelers().getOrDefault(emptyMap())
             buildLabelCache(labelerMap)
             labelCacheFetchCount = 0
             val labelers = labelerMap.keys.mapNotNull { it?.did }
-            this.client = mkClient(account.pdsHost, token, labelers, appviewProxy = account.appviewProxy)
-            // Re-arm the watcher on the new client instance.
-            launchTokenWatcher()
+            this.client = mkClient(account.pdsHost, labelers, appviewProxy = account.appviewProxy)
 
             Log.d("BlueskyAuth", "Clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}, handle=${account.handle}")
             return Result.success(Unit)
