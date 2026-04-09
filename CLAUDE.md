@@ -11,19 +11,21 @@
 
 The worktree may not have `local.properties` — copy it from the main repo root if the build fails with "SDK location not found".
 
-### Ozone prerequisite (first build + after ozone edits)
+### Ozone prerequisite (first build + after OZONE_REF bump)
 
-Monarch consumes `sh.christian.ozone:*:0.3.3-local`, a version that **only exists in your local `~/.m2`**. It is not on Maven Central. Before the first build (and after any edit to the ozone submodule at `libs/ozone`), run:
+Monarch depends on `sh.christian.ozone:*:0.3.3-local`, a version that **only exists after you run `scripts/publish-ozone-local.sh`**. It is not on Maven Central. Before the first build (and after bumping `OZONE_REF` at the top of the script), run:
 
 ```bash
 scripts/publish-ozone-local.sh
 ```
 
-This generates a throwaway GPG key (first run only, cached at `~/.local/share/monarch/ozone-publish-key/`), then publishes the four ozone modules Monarch needs (`:bluesky`, `:oauth`, `:api-gen-runtime`, `:api-gen-runtime-internal`) as `0.3.3-local` to mavenLocal. Uses JDK 21 by default — override with `JAVA_HOME=/path/to/jdk21`.
+The script clones ozone to `~/.cache/monarch-ozone-src/` (outside the repo), checks out the pinned `OZONE_REF`, generates a throwaway GPG key on first run (cached at `~/.local/share/monarch/ozone-publish-key/`), publishes the four modules Monarch needs (`:bluesky`, `:oauth`, `:api-gen-runtime`, `:api-gen-runtime-internal`) as `0.3.3-local`, and stages the resulting Maven layout into `libs/ozone-artifacts/`. That directory is `.gitignored` and registered as a `maven {}` repo (filtered to the `sh.christian.ozone` group) in `settings.gradle.kts`, so Gradle resolves ozone locally without touching `~/.m2`.
 
-If you skip this step, Gradle will fail to resolve `sh.christian.ozone:bluesky:0.3.3-local` and the build will error out immediately. That's intentional — an earlier iteration used `0.3.3` (which exists on Maven Central) and quietly picked up the upstream artifact whose API doesn't match Monarch's source. The `-local` suffix is the loud-failure guard.
+Uses JDK 21 by default — override with `JAVA_HOME=/path/to/jdk21`.
 
-The submodule lives at `libs/ozone/` and is pinned ahead of the tagged `0.3.3` release, so the published coordinate shares the version number but the API has drifted — which is why the suffix matters.
+If you skip this step, Gradle will fail loudly on `sh.christian.ozone:bluesky:0.3.3-local` instead of silently picking up the upstream Maven Central `0.3.3` artifact, whose API doesn't match Monarch's source. That loud failure is intentional — the `-local` suffix is the guard against API drift between the pinned ozone ref and whatever is published to Maven Central under `0.3.3`.
+
+To move to a newer ozone commit or a fork, edit `OZONE_REPO` / `OZONE_REF` at the top of the script and rerun it. The clone at `~/.cache/monarch-ozone-src/` is reused and fast-forwarded on subsequent runs.
 
 ## Architecture
 

@@ -18,3 +18,4 @@ beepboop/tokens
 app/google-services.json
 .vscode
 .idea/deploymentTargetSelector.xml
+libs/ozone-artifacts

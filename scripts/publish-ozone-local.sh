@@ -1,47 +1,44 @@
 #!/usr/bin/env bash
 #
-# Publish the ozone submodule's JVM-targeted artifacts to ~/.m2 so Monarch
-# can consume a locally-edited ozone without waiting for upstream releases.
+# Build ozone from source and stage its JVM artifacts inside Monarch so the
+# Android build can consume a locally-compiled ozone without a git submodule
+# and without touching ~/.m2.
 #
-# Why this script exists:
-#   - The ozone submodule at libs/ozone is a Kotlin Multiplatform project.
-#   - Its Maven publications are gated behind a signAllPublications() call in
-#     its ozone-publish convention plugin (libs/ozone/build-logic/.../PublishingPlugin.kt),
-#     so a bare `publishToMavenLocal` fails with "no configured signatory".
-#   - Its build expects JDK 17 (CI) but works on 21 too; 25 breaks Gradle 8.14.
-#   - Monarch only needs the JVM variant, so publishing iOS/JS/Native targets
-#     is wasted work and also triggers the same signing failure.
+# How it works:
+#   1. Clones (or fast-forwards) ozone into ~/.cache/monarch-ozone-src/.
+#   2. Checks out the pinned OZONE_REF below.
+#   3. Generates a throwaway unprotected GPG key (first run only, cached at
+#      ~/.local/share/monarch/ozone-publish-key/) -- ozone's ozone-publish
+#      convention plugin unconditionally calls signAllPublications().
+#   4. Publishes the four modules Monarch needs as ${LOCAL_VERSION} into
+#      ~/.m2 via publishJvmPublicationToMavenLocal +
+#      publishKotlinMultiplatformPublicationToMavenLocal, overriding
+#      POM_VERSION with -P so the submodule's gradle.properties stays clean.
+#   5. Copies just the ${LOCAL_VERSION} subtrees out of ~/.m2 into
+#      libs/ozone-artifacts/ so Monarch's settings.gradle.kts -- which
+#      declares a maven {} repo at that path -- can resolve them.
 #
-# What this script does:
-#   1. Generates a throwaway unprotected GPG key (first run only, cached).
-#   2. Publishes the `jvm` + `kotlinMultiplatform` publications for the four
-#      ozone modules Monarch's :bluesky transitively pulls in:
-#        :bluesky, :oauth, :api-gen-runtime, :api-gen-runtime-internal
-#      using the throwaway key as signingInMemoryKey.
-#   3. Overrides POM_VERSION to 0.3.3-local via -P so the published coordinate
-#      is sh.christian.ozone:*:0.3.3-local. Matches Monarch's libs.versions.toml
-#      `ozone = "0.3.3-local"`. No such version exists on Maven Central, so if
-#      this script hasn't been run, Monarch's Gradle resolution fails loudly
-#      instead of silently downloading the upstream 0.3.3 artifact (which has
-#      a different API than the submodule HEAD).
-#   4. Uses JDK 21 from /usr/lib/jvm/java-21-openjdk (override with JAVA_HOME).
+# libs/ozone-artifacts/ is .gitignored, so running this script is required
+# after a fresh clone and after any OZONE_REF bump. Monarch's
+# libs.versions.toml pins `ozone = "0.3.3-local"`; no version on Maven
+# Central matches that, so skipping this step produces a loud Gradle
+# resolution failure instead of a silently wrong build against upstream.
 #
-# After running this, Monarch's settings.gradle.kts -- which has mavenLocal()
-# scoped to the sh.christian.ozone group -- will resolve ozone from ~/.m2.
-#
-# Usage:
-#   scripts/publish-ozone-local.sh             # uses /usr/lib/jvm/java-21-openjdk
-#   JAVA_HOME=/path/to/jdk21 scripts/publish-ozone-local.sh
-#
-# Heads up: the pinned submodule commit can diverge from the tagged 0.3.3
-# release on Maven Central. If Monarch fails to compile after switching,
-# it's almost certainly API drift, not a publish-loop bug -- compare against
-# the commit at libs/ozone or roll the submodule back.
+# Tune the three variables below to point at a different fork or commit.
 
 set -euo pipefail
 
+# --- configuration ---------------------------------------------------------
+
+OZONE_REPO="https://github.com/christiandeange/ozone.git"
+OZONE_REF="d312c10"   # v0.3.3-80-gd312c10
+LOCAL_VERSION="0.3.3-local"
+
+# --- paths -----------------------------------------------------------------
+
 MONARCH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OZONE_DIR="$MONARCH_ROOT/libs/ozone"
+OZONE_SRC="$HOME/.cache/monarch-ozone-src"
+ARTIFACTS_DIR="$MONARCH_ROOT/libs/ozone-artifacts"
 KEY_DIR="$HOME/.local/share/monarch/ozone-publish-key"
 KEY_FILE="$KEY_DIR/throwaway-key.asc"
 KEY_GNUPGHOME="$KEY_DIR/gnupg"
@@ -49,14 +46,10 @@ KEY_GNUPGHOME="$KEY_DIR/gnupg"
 : "${JAVA_HOME:=/usr/lib/jvm/java-21-openjdk}"
 export JAVA_HOME
 
-if [[ ! -d "$OZONE_DIR" ]]; then
-  echo "ozone submodule not found at $OZONE_DIR" >&2
-  echo "did you forget to 'git submodule update --init'?" >&2
-  exit 1
-fi
+# --- throwaway GPG key (first run only) ------------------------------------
 
 if [[ ! -f "$KEY_FILE" ]]; then
-  echo "==> generating throwaway GPG key for local ozone publishing"
+  echo "==> generating throwaway GPG key for ozone signing"
   mkdir -p "$KEY_GNUPGHOME"
   chmod 700 "$KEY_GNUPGHOME"
   batch_file="$(mktemp)"
@@ -79,7 +72,21 @@ fi
 
 ARMORED_KEY="$(cat "$KEY_FILE")"
 
-cd "$OZONE_DIR"
+# --- fetch ozone source ----------------------------------------------------
+
+if [[ ! -d "$OZONE_SRC/.git" ]]; then
+  echo "==> cloning $OZONE_REPO to $OZONE_SRC"
+  mkdir -p "$(dirname "$OZONE_SRC")"
+  git clone --quiet "$OZONE_REPO" "$OZONE_SRC"
+fi
+
+echo "==> fetching and checking out $OZONE_REF"
+git -C "$OZONE_SRC" fetch --quiet --all --tags
+git -C "$OZONE_SRC" checkout --quiet --detach "$OZONE_REF"
+
+# --- publish ---------------------------------------------------------------
+
+cd "$OZONE_SRC"
 
 MODULES=(
   :bluesky
@@ -94,12 +101,23 @@ for m in "${MODULES[@]}"; do
   TASKS+=("$m:publishKotlinMultiplatformPublicationToMavenLocal")
 done
 
-LOCAL_VERSION="0.3.3-local"
-
-echo "==> publishing ozone modules as $LOCAL_VERSION to mavenLocal (JAVA_HOME=$JAVA_HOME)"
+echo "==> publishing ozone $LOCAL_VERSION to mavenLocal (JAVA_HOME=$JAVA_HOME)"
 ./gradlew "${TASKS[@]}" \
   -PPOM_VERSION="$LOCAL_VERSION" \
   -PsigningInMemoryKey="$ARMORED_KEY" \
   -PsigningInMemoryKeyPassword=""
 
-echo "==> done. Monarch will now pick up sh.christian.ozone:*:$LOCAL_VERSION from ~/.m2"
+# --- stage into Monarch ----------------------------------------------------
+
+echo "==> staging $LOCAL_VERSION artifacts into $ARTIFACTS_DIR"
+mkdir -p "$ARTIFACTS_DIR"
+
+while IFS= read -r src; do
+  rel="${src#$HOME/.m2/repository/}"
+  dest="$ARTIFACTS_DIR/$rel"
+  mkdir -p "$(dirname "$dest")"
+  rm -rf "$dest"
+  cp -r "$src" "$dest"
+done < <(find "$HOME/.m2/repository/sh/christian/ozone" -type d -name "$LOCAL_VERSION")
+
+echo "==> done. Monarch will resolve sh.christian.ozone:*:$LOCAL_VERSION from libs/ozone-artifacts/"
