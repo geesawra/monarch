@@ -9,7 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.bsky.actor.ActorTarget
+import app.bsky.actor.MutedWordActorTarget
 import app.bsky.actor.MutedWord
 import app.bsky.actor.MutedWordTarget
 import app.bsky.actor.ProfileView
@@ -34,7 +34,7 @@ import app.bsky.feed.ThreadgateAllowUnion
 import app.bsky.feed.ThreadViewPostParentUnion
 import app.bsky.feed.ThreadViewPostReplieUnion
 import app.bsky.graph.Follow
-import app.bsky.notification.ListNotificationsReason
+import app.bsky.notification.ListNotificationsNotificationReason
 import app.bsky.richtext.Facet
 import com.atproto.repo.StrongRef
 import dagger.assisted.Assisted
@@ -44,7 +44,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.datetime.toStdlibInstant
 import kotlinx.serialization.json.Json
 import industries.geesawra.monarch.rkey
 import sh.christian.ozone.api.AtUri
@@ -430,17 +429,17 @@ class TimelineViewModel @AssistedInject constructor(
     ): Map<AtUri, Pair<SkeetData, Post>> {
         val postsToFetch = rawNotifs.notifications.flatMap {
             when (it.reason) {
-                ListNotificationsReason.Like -> {
+                ListNotificationsNotificationReason.Like -> {
                     val l: Like = it.record.decodeAs()
                     listOf(l.subject.uri)
                 }
 
-                ListNotificationsReason.Repost -> {
+                ListNotificationsNotificationReason.Repost -> {
                     val l: Repost = it.record.decodeAs()
                     listOf(l.subject.uri)
                 }
 
-                ListNotificationsReason.Quote -> {
+                ListNotificationsNotificationReason.Quote -> {
                     val l: Post = it.record.decodeAs()
                     val e = l.embed
                     val quotedUri = when (e) {
@@ -451,8 +450,8 @@ class TimelineViewModel @AssistedInject constructor(
                     listOfNotNull(it.uri, quotedUri)
                 }
 
-                ListNotificationsReason.Mention -> listOf(it.uri)
-                ListNotificationsReason.Reply -> listOf(it.uri)
+                ListNotificationsNotificationReason.Mention -> listOf(it.uri)
+                ListNotificationsNotificationReason.Reply -> listOf(it.uri)
 
                 else -> emptyList()
             }
@@ -474,12 +473,12 @@ class TimelineViewModel @AssistedInject constructor(
         val repeatable = mutableListOf<Notification>()
         val notifs = rawNotifs.notifications.mapNotNull {
             when (it.reason) {
-                ListNotificationsReason.Follow -> {
+                ListNotificationsNotificationReason.Follow -> {
                     val l: Follow = it.record.decodeAs()
-                    Notification.Follow(it.author, l.createdAt.toStdlibInstant(), !it.isRead)
+                    Notification.Follow(it.author, l.createdAt, !it.isRead)
                 }
 
-                ListNotificationsReason.Like -> {
+                ListNotificationsNotificationReason.Like -> {
                     val l: Like = it.record.decodeAs()
                     val lp = posts[l.subject.uri] ?: return@mapNotNull null
 
@@ -487,27 +486,27 @@ class TimelineViewModel @AssistedInject constructor(
                         l.subject,
                         lp.first,
                         it.author,
-                        l.createdAt.toStdlibInstant(),
+                        l.createdAt,
                         !it.isRead
                     )
 
                     null
                 }
 
-                ListNotificationsReason.Mention -> {
+                ListNotificationsNotificationReason.Mention -> {
                     val p: Post = it.record.decodeAs()
                     val hydrated = posts[it.uri]?.first
                     Notification.Mention(
                         Pair(it.cid, it.uri),
                         p,
                         it.author,
-                        p.createdAt.toStdlibInstant(),
+                        p.createdAt,
                         !it.isRead,
                         hydrated,
                     )
                 }
 
-                ListNotificationsReason.Quote -> {
+                ListNotificationsNotificationReason.Quote -> {
                     val p: Post = it.record.decodeAs()
                     val quotedUrl = when (p.embed) {
                         is PostEmbedUnion.Record -> {
@@ -560,33 +559,33 @@ class TimelineViewModel @AssistedInject constructor(
                             )
                         ),
                         it.author,
-                        p.createdAt.toStdlibInstant(),
+                        p.createdAt,
                         !it.isRead,
                         posts[it.uri]?.first,
                     )
                 }
 
-                ListNotificationsReason.Reply -> {
+                ListNotificationsNotificationReason.Reply -> {
                     val p: Post = it.record.decodeAs()
                     val hydrated = posts[it.uri]?.first
                     Notification.Reply(
                         Pair(it.cid, it.uri),
                         p,
                         it.author,
-                        p.createdAt.toStdlibInstant(),
+                        p.createdAt,
                         !it.isRead,
                         hydrated,
                     )
                 }
 
-                ListNotificationsReason.Repost -> {
+                ListNotificationsNotificationReason.Repost -> {
                     val p: Repost = it.record.decodeAs()
                     val rpp = posts[p.subject.uri] ?: return@mapNotNull null
                     repeatable += Notification.RawRepost(
                         p.subject,
                         rpp.first,
                         it.author,
-                        p.createdAt.toStdlibInstant(),
+                        p.createdAt,
                         !it.isRead
                     )
 
@@ -869,7 +868,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun addMutedWord(value: String, targets: List<MutedWordTarget>, actorTarget: ActorTarget) {
+    fun addMutedWord(value: String, targets: List<MutedWordTarget>, actorTarget: MutedWordActorTarget) {
         viewModelScope.launch {
             val newWord = MutedWord(
                 value = value,
@@ -974,10 +973,10 @@ class TimelineViewModel @AssistedInject constructor(
         val currentPostSkeetData =
             SkeetData.fromPostView(threadUnion.value.post, threadUnion.value.post.author)
 
-        val hasMoreReplies = threadUnion.value.replies.isEmpty() &&
+        val hasMoreReplies = threadUnion.value.replies.orEmpty().isEmpty() &&
             (currentPostSkeetData.replies ?: 0) > 0
 
-        val replies = threadUnion.value.replies.map { replyUnion ->
+        val replies = threadUnion.value.replies.orEmpty().map { replyUnion ->
             readThread(
                 threadUnion = when (replyUnion) {
                     is ThreadViewPostReplieUnion.BlockedPost -> GetPostThreadResponseThreadUnion.BlockedPost(

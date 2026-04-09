@@ -52,7 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.bsky.actor.ProfileView
-import app.bsky.actor.VerifiedStatus
+import app.bsky.actor.VerificationStateVerifiedStatus
 import app.bsky.feed.SearchPostsSort
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -364,7 +364,7 @@ private fun ActorCard(
                         modifier = Modifier.weight(1f, fill = false),
                     )
 
-                    val isVerified = isVerifiedStatus(actor.verification?.verifiedStatus)
+                    val isVerified = isVerificationStateVerifiedStatus(actor.verification?.verifiedStatus)
                     if (isVerified) {
                         Icon(
                             imageVector = Icons.Default.Verified,

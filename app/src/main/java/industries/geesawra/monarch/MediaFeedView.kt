@@ -94,7 +94,7 @@ private fun extractMediaFromEmbed(embed: PostViewEmbedUnion?, skeet: SkeetData, 
         is PostViewEmbedUnion.RecordView -> {
             val record = embed.value.record
             if (record is RecordViewRecordUnion.ViewRecord) {
-                record.value.embeds.forEach { innerEmbed ->
+                record.value.embeds?.forEach { innerEmbed ->
                     val converted = when (innerEmbed) {
                         is RecordViewRecordEmbedUnion.ImagesView -> PostViewEmbedUnion.ImagesView(innerEmbed.value)
                         is RecordViewRecordEmbedUnion.VideoView -> PostViewEmbedUnion.VideoView(innerEmbed.value)

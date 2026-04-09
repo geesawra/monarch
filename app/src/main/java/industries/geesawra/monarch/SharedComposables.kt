@@ -26,7 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import app.bsky.actor.VerifiedStatus
+import app.bsky.actor.VerificationStateVerifiedStatus
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.SettingsState
 
@@ -103,5 +103,5 @@ fun monarchTopAppBarColors(): TopAppBarColors =
         actionIconContentColor = MaterialTheme.colorScheme.onSurface,
     )
 
-fun isVerifiedStatus(status: VerifiedStatus?): Boolean =
-    status is VerifiedStatus.Valid
+fun isVerificationStateVerifiedStatus(status: VerificationStateVerifiedStatus?): Boolean =
+    status is VerificationStateVerifiedStatus.Valid

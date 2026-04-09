@@ -101,7 +101,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.bsky.actor.ProfileViewDetailed
-import app.bsky.actor.VerifiedStatus
+import app.bsky.actor.VerificationStateVerifiedStatus
 import app.bsky.feed.GetAuthorFeedFilter
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SmallFloatingActionButton
@@ -616,7 +616,7 @@ internal fun ProfileHeader(
                     modifier = Modifier.weight(1f, fill = false),
                 )
 
-                val isVerified = isVerifiedStatus(profile.verification?.verifiedStatus)
+                val isVerified = isVerificationStateVerifiedStatus(profile.verification?.verifiedStatus)
                 if (isVerified) {
                     Icon(
                         imageVector = Icons.Default.Verified,
@@ -626,7 +626,7 @@ internal fun ProfileHeader(
                     )
                 }
 
-                val isBot = profile.labels.any { it.`val` == "bot" }
+                val isBot = profile.labels.orEmpty().any { it.`val` == "bot" }
                 if (isBot) {
                     Icon(
                         imageVector = Icons.Filled.SmartToy,

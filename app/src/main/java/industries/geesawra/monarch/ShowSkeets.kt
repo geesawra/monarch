@@ -56,7 +56,7 @@ import app.bsky.feed.ReplyRefParentUnion
 import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
 import io.github.fornewid.placeholder.material3.fade
 import io.github.fornewid.placeholder.material3.placeholder
-import app.bsky.actor.ActorTarget
+import app.bsky.actor.MutedWordActorTarget
 import app.bsky.actor.MutedWord
 import app.bsky.actor.MutedWordTarget
 import industries.geesawra.monarch.datalayer.AvatarShape
@@ -65,8 +65,8 @@ import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.ThreadConnector
 import industries.geesawra.monarch.datalayer.ThreadConnectorType
-import kotlinx.datetime.Instant
-import kotlinx.datetime.Clock
+import kotlin.time.Instant
+import kotlin.time.Clock
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.Did
@@ -595,7 +595,7 @@ private fun isMutedByWord(skeet: SkeetData, mutedWords: List<MutedWord>, now: In
     return mutedWords.any { word ->
         val expiresAt = word.expiresAt
         if (expiresAt != null && expiresAt < now) return@any false
-        if (word.actorTarget is ActorTarget.ExcludeFollowing && skeet.following) return@any false
+        if (word.actorTarget is MutedWordActorTarget.ExcludeFollowing && skeet.following) return@any false
         val valueLower = word.value.lowercase()
         val matchesContent = word.targets.contains(MutedWordTarget.Content) &&
             contentLower.containsWordBoundary(valueLower)

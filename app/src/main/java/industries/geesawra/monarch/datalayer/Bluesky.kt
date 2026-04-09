@@ -19,7 +19,7 @@ import app.bsky.actor.MutedWordsPref
 import app.bsky.actor.PreferencesUnion
 import app.bsky.actor.Profile
 import app.bsky.actor.PutPreferencesRequest
-import app.bsky.actor.Type as SavedFeedType
+import app.bsky.actor.SavedFeedType
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.SearchActorsQueryParams
@@ -72,7 +72,7 @@ import app.bsky.richtext.Facet
 import app.bsky.video.GetJobStatusQueryParams
 import app.bsky.video.GetJobStatusResponse
 import app.bsky.video.JobStatus
-import app.bsky.video.State
+import app.bsky.video.JobStatusState
 import app.bsky.video.UploadVideoResponse
 import com.atproto.identity.ResolveHandleQueryParams
 import com.atproto.identity.ResolveHandleResponse
@@ -116,7 +116,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.datetime.toDeprecatedInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.christian.ozone.BlueskyJson
@@ -349,7 +348,7 @@ class BlueskyConn(val context: Context) {
         for ((did, detailed) in labelers) {
             if (did == null || detailed == null) continue
             detailed.value.creator.avatar?.let { avatars[did.did] = it.uri }
-            for (defn in detailed.value.policies.labelValueDefinitions) {
+            for (defn in detailed.value.policies.labelValueDefinitions.orEmpty()) {
                 val locale = defn.locales.firstOrNull() ?: continue
                 val key = "${did.did}:${defn.identifier}"
                 names[key] = locale.name
@@ -795,7 +794,7 @@ class BlueskyConn(val context: Context) {
             val r = BlueskyJson.encodeAsJsonContent(
                 Post(
                     text = content,
-                    createdAt = Clock.System.now().toDeprecatedInstant(),
+                    createdAt = Clock.System.now(),
                     embed = postEmbed,
                     reply = replyRef,
                     facets = facets,
@@ -826,7 +825,7 @@ class BlueskyConn(val context: Context) {
             Threadgate(
                 post = postUri,
                 allow = rules,
-                createdAt = Clock.System.now().toDeprecatedInstant(),
+                createdAt = Clock.System.now(),
             )
         )
         pdsClient!!.createRecord(
@@ -1085,12 +1084,12 @@ class BlueskyConn(val context: Context) {
                     }
 
                     when (resp.state) {
-                        State.JOBSTATECOMPLETED -> {}
-                        State.JOBSTATEFAILED -> {
+                        JobStatusState.JOBSTATECOMPLETED -> {}
+                        JobStatusState.JOBSTATEFAILED -> {
                             httpClient.close()
                             return Result.failure(Exception("Video processing failed, ${resp.error}: ${resp.message}"))
                         }
-                        is State.Unknown -> delay(1000)
+                        is JobStatusState.Unknown -> delay(1000)
                     }
                 } catch (e: Exception) {
                     httpClient.close()
@@ -1115,7 +1114,7 @@ class BlueskyConn(val context: Context) {
             create().onFailure {
                 return Result.failure(it)
             }
-            val prefs = pdsClient!!.getPreferences().requireResponse()
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val savedFeeds = prefs.preferences.firstOrNull {
                 it is PreferencesUnion.SavedFeedsPrefV2
             } as? PreferencesUnion.SavedFeedsPrefV2
@@ -1162,7 +1161,7 @@ class BlueskyConn(val context: Context) {
 
     suspend fun subscribedLabelers(): Result<Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>> {
         return runCatching {
-            val prefs = pdsClient!!.getPreferences().requireResponse()
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val labelersPref = prefs.preferences.firstOrNull {
                 it is PreferencesUnion.LabelersPref
             } as? PreferencesUnion.LabelersPref
@@ -1204,7 +1203,7 @@ class BlueskyConn(val context: Context) {
             create().onFailure {
                 return Result.failure(it)
             }
-            val prefs = pdsClient!!.getPreferences().requireResponse()
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val mutedWordsPref = prefs.preferences.firstOrNull {
                 it is PreferencesUnion.MutedWordsPref
             } as? PreferencesUnion.MutedWordsPref
@@ -1218,7 +1217,7 @@ class BlueskyConn(val context: Context) {
             create().onFailure {
                 return Result.failure(it)
             }
-            val prefs = pdsClient!!.getPreferences().requireResponse()
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val updatedPrefs = prefs.preferences.toMutableList()
             val existingIndex = updatedPrefs.indexOfFirst { it is PreferencesUnion.MutedWordsPref }
             val newPref = PreferencesUnion.MutedWordsPref(MutedWordsPref(items = words))
@@ -1259,7 +1258,7 @@ class BlueskyConn(val context: Context) {
 
             val ret = pdsClient!!.updateSeen(
                 UpdateSeenRequest(
-                    seenAt = Clock.System.now().toDeprecatedInstant(),
+                    seenAt = Clock.System.now(),
                 )
             )
 
@@ -1331,7 +1330,7 @@ class BlueskyConn(val context: Context) {
             val like = BlueskyJson.encodeAsJsonContent(
                 Like(
                     subject = StrongRef(uri, cid),
-                    createdAt = Clock.System.now().toDeprecatedInstant(),
+                    createdAt = Clock.System.now(),
                 )
             )
 
@@ -1363,7 +1362,7 @@ class BlueskyConn(val context: Context) {
             val like = BlueskyJson.encodeAsJsonContent(
                 Repost(
                     subject = StrongRef(uri, cid),
-                    createdAt = Clock.System.now().toDeprecatedInstant(),
+                    createdAt = Clock.System.now(),
                 )
             )
 
@@ -1475,7 +1474,7 @@ class BlueskyConn(val context: Context) {
             val follow = BlueskyJson.encodeAsJsonContent(
                 app.bsky.graph.Follow(
                     subject = did,
-                    createdAt = Clock.System.now().toDeprecatedInstant(),
+                    createdAt = Clock.System.now(),
                 )
             )
 

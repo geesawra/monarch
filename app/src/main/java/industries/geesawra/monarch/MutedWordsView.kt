@@ -40,7 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.bsky.actor.ActorTarget
+import app.bsky.actor.MutedWordActorTarget
 import app.bsky.actor.MutedWordTarget
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 
@@ -147,7 +147,7 @@ fun MutedWordsView(
                             timelineViewModel.addMutedWord(
                                 value = newWord.trim(),
                                 targets = targets,
-                                actorTarget = if (actorTargetAll) ActorTarget.All else ActorTarget.ExcludeFollowing,
+                                actorTarget = if (actorTargetAll) MutedWordActorTarget.All else MutedWordActorTarget.ExcludeFollowing,
                             )
                             newWord = ""
                         },
@@ -179,7 +179,7 @@ fun MutedWordsView(
                         val parts = mutableListOf<String>()
                         if (word.targets.contains(MutedWordTarget.Content)) parts.add("text")
                         if (word.targets.contains(MutedWordTarget.Tag)) parts.add("tags")
-                        val target = if (word.actorTarget is ActorTarget.ExcludeFollowing) "non-followed" else "everyone"
+                        val target = if (word.actorTarget is MutedWordActorTarget.ExcludeFollowing) "non-followed" else "everyone"
                         Text("${parts.joinToString(" & ")} from $target")
                     },
                     trailingContent = {

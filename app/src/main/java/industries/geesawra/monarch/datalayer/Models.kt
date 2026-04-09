@@ -13,7 +13,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import app.bsky.actor.ProfileView
 import app.bsky.actor.ProfileViewBasic
-import app.bsky.actor.VerifiedStatus
+import app.bsky.actor.VerificationStateVerifiedStatus
 import app.bsky.embed.AspectRatio
 import app.bsky.embed.ExternalView
 import app.bsky.embed.ExternalViewExternal
@@ -37,7 +37,6 @@ import app.bsky.richtext.Facet
 import app.bsky.richtext.FacetFeatureUnion
 import com.atproto.label.Label
 import com.atproto.repo.StrongRef
-import kotlinx.datetime.toStdlibInstant
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
@@ -231,18 +230,18 @@ data class SkeetData(
                 authorAvatarURL = post.post.author.avatar?.uri,
                 authorName = post.post.author.displayName,
                 authorHandle = post.post.author.handle,
-                authorLabels = post.post.author.labels,
-                postLabels = post.post.labels,
+                authorLabels = post.post.author.labels.orEmpty(),
+                postLabels = post.post.labels.orEmpty(),
                 threadgate = post.post.threadgate
                     ?: (post.reply?.root as? ReplyRefRootUnion.PostView)?.value?.threadgate
                     ?: (post.reply?.parent as? ReplyRefParentUnion.PostView)?.value?.threadgate,
-                verified = post.post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
+                verified = post.post.author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
                 content = content.text,
                 embed = post.post.embed,
                 reason = reason,
                 reply = reply,
-                facets = content.facets,
-                createdAt = content.createdAt.toStdlibInstant(),
+                facets = content.facets.orEmpty(),
+                createdAt = content.createdAt,
                 following = following,
                 follower = post.post.author.viewer?.followedBy != null,
                 did = did,
@@ -336,14 +335,14 @@ data class SkeetData(
                 authorAvatarURL = post.author.avatar?.uri,
                 authorName = post.author.displayName,
                 authorHandle = post.author.handle,
-                authorLabels = post.author.labels,
-                postLabels = post.labels,
+                authorLabels = post.author.labels.orEmpty(),
+                postLabels = post.labels.orEmpty(),
                 threadgate = post.threadgate,
-                verified = post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
+                verified = post.author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
                 content = content.text,
-                facets = content.facets,
+                facets = content.facets.orEmpty(),
                 embed = post.embed,
-                createdAt = content.createdAt.toStdlibInstant(),
+                createdAt = content.createdAt,
                 following = author.viewer?.following != null,
                 follower = author.viewer?.followedBy != null,
                 did = author.did,
@@ -417,13 +416,13 @@ data class SkeetData(
                 authorAvatarURL = author.avatar?.uri,
                 authorName = author.displayName,
                 authorHandle = author.handle,
-                authorLabels = author.labels,
-                verified = author.verification?.verifiedStatus == VerifiedStatus.Valid,
+                authorLabels = author.labels.orEmpty(),
+                verified = author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
                 did = author.did,
                 content = post.text,
                 embed = transformEmbed(post.embed, author.did, parent.first),
-                createdAt = post.createdAt.toStdlibInstant(),
-                facets = post.facets,
+                createdAt = post.createdAt,
+                facets = post.facets.orEmpty(),
             )
         }
 
@@ -434,12 +433,12 @@ data class SkeetData(
                 authorAvatarURL = author.avatar?.uri,
                 authorName = author.displayName,
                 authorHandle = author.handle,
-                authorLabels = author.labels,
-                verified = author.verification?.verifiedStatus == VerifiedStatus.Valid,
+                authorLabels = author.labels.orEmpty(),
+                verified = author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
                 content = post.text,
                 embed = transformEmbed(post.embed, author.did, parent.first),
-                createdAt = post.createdAt.toStdlibInstant(),
-                facets = post.facets,
+                createdAt = post.createdAt,
+                facets = post.facets.orEmpty(),
                 did = author.did,
             )
         }
@@ -457,7 +456,7 @@ data class SkeetData(
         fun fromRecordView(post: RecordViewRecord): SkeetData {
             val content: Post = (post.value.decodeAs())
 
-            val maybeEmbed = post.embeds.firstOrNull()
+            val maybeEmbed = post.embeds?.firstOrNull()
             val embed = when (maybeEmbed) {
                 is RecordViewRecordEmbedUnion.ExternalView -> PostViewEmbedUnion.ExternalView(
                     maybeEmbed.value
@@ -485,14 +484,14 @@ data class SkeetData(
                 authorAvatarURL = post.author.avatar?.uri,
                 authorName = post.author.displayName,
                 authorHandle = post.author.handle,
-                authorLabels = post.author.labels,
-                verified = post.author.verification?.verifiedStatus == VerifiedStatus.Valid,
+                authorLabels = post.author.labels.orEmpty(),
+                verified = post.author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
                 content = content.text,
                 embed = embed,
                 reason = null,
                 reply = null,
-                createdAt = content.createdAt.toStdlibInstant(),
-                facets = content.facets,
+                createdAt = content.createdAt,
+                facets = content.facets.orEmpty(),
                 did = post.author.did,
             )
         }
