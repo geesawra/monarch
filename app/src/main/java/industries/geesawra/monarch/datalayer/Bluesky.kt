@@ -32,6 +32,8 @@ import app.bsky.embed.ExternalExternal
 import app.bsky.embed.Images
 import app.bsky.embed.ImagesImage
 import app.bsky.embed.Record
+import app.bsky.embed.RecordWithMedia
+import app.bsky.embed.RecordWithMediaMediaUnion
 import app.bsky.embed.Video
 import app.bsky.feed.FeedViewPost
 import app.bsky.feed.GeneratorView
@@ -719,60 +721,75 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(it)
             }
 
-            var postEmbed: PostEmbedUnion? = null
+            var mediaUnion: RecordWithMediaMediaUnion? = null
 
-            if (quotePostRef != null) { // TODO: handle image/video plus quote
-                postEmbed = PostEmbedUnion.Record(
+            if (images != null) {
+                val blobs = uploadImages(images).getOrThrow()
+                mediaUnion = RecordWithMediaMediaUnion.Images(
+                    value = Images(
+                        images = blobs.map {
+                            ImagesImage(
+                                image = it.blob,
+                                alt = "",
+                                aspectRatio = AspectRatio(it.width, it.height)
+                            )
+                        }
+                    )
+                )
+            }
+
+            if (video != null) {
+                val blob = uploadVideo(video, onVideoStatus).getOrThrow()
+                mediaUnion = RecordWithMediaMediaUnion.Video(
+                    value = Video(
+                        video = blob.blob,
+                        alt = "",
+                        aspectRatio = AspectRatio(blob.width, blob.height)
+                    )
+                )
+            }
+
+            if (mediaUnion == null && linkPreview != null) {
+                var thumbBlob: Blob? = null
+                if (linkPreview.imageUrl != null) {
+                    try {
+                        thumbBlob = uploadBlobFromUrl(linkPreview.imageUrl)
+                    } catch (_: Exception) {
+                        // Thumbnail upload failed, proceed without it
+                    }
+                }
+                mediaUnion = RecordWithMediaMediaUnion.External(
+                    value = External(
+                        external = ExternalExternal(
+                            uri = sh.christian.ozone.api.Uri(linkPreview.url),
+                            title = linkPreview.title ?: "",
+                            description = linkPreview.description ?: "",
+                            thumb = thumbBlob,
+                        )
+                    )
+                )
+            }
+
+            val postEmbed: PostEmbedUnion? = when {
+                quotePostRef != null && mediaUnion != null -> PostEmbedUnion.RecordWithMedia(
+                    value = RecordWithMedia(
+                        record = Record(quotePostRef),
+                        media = mediaUnion,
+                    )
+                )
+                quotePostRef != null -> PostEmbedUnion.Record(
                     value = Record(quotePostRef)
                 )
-            } else {
-
-                if (images != null) {
-                    val blobs = uploadImages(images).getOrThrow()
-                    postEmbed = PostEmbedUnion.Images(
-                        value = Images(
-                            images = blobs.map {
-                                ImagesImage(
-                                    image = it.blob,
-                                    alt = "",
-                                    aspectRatio = AspectRatio(it.width, it.height)
-                                )
-                            }
-                        )
-                    )
-                }
-
-                if (video != null) {
-                    val blob = uploadVideo(video, onVideoStatus).getOrThrow()
-                    postEmbed = PostEmbedUnion.Video(
-                        value = Video(
-                            video = blob.blob,
-                            alt = "",
-                            aspectRatio = AspectRatio(blob.width, blob.height)
-                        )
-                    )
-                }
-
-                if (postEmbed == null && linkPreview != null) {
-                    var thumbBlob: Blob? = null
-                    if (linkPreview.imageUrl != null) {
-                        try {
-                            thumbBlob = uploadBlobFromUrl(linkPreview.imageUrl)
-                        } catch (_: Exception) {
-                            // Thumbnail upload failed, proceed without it
-                        }
-                    }
-                    postEmbed = PostEmbedUnion.External(
-                        value = External(
-                            external = ExternalExternal(
-                                uri = sh.christian.ozone.api.Uri(linkPreview.url),
-                                title = linkPreview.title ?: "",
-                                description = linkPreview.description ?: "",
-                                thumb = thumbBlob,
-                            )
-                        )
-                    )
-                }
+                mediaUnion is RecordWithMediaMediaUnion.Images -> PostEmbedUnion.Images(
+                    value = mediaUnion.value
+                )
+                mediaUnion is RecordWithMediaMediaUnion.Video -> PostEmbedUnion.Video(
+                    value = mediaUnion.value
+                )
+                mediaUnion is RecordWithMediaMediaUnion.External -> PostEmbedUnion.External(
+                    value = mediaUnion.value
+                )
+                else -> null
             }
 
             val r = BlueskyJson.encodeAsJsonContent(

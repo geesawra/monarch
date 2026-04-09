@@ -523,13 +523,11 @@ fun ComposeView(
                     )
                 }
 
-                if (mediaSelected.value.isNotEmpty()) {
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.padding(vertical = 8.dp),
-                    )
-                }
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
 
                 inReplyTo.value?.let {
                     OutlinedCard(
