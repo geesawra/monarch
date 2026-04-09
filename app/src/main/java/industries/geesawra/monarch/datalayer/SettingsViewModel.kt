@@ -56,6 +56,7 @@ data class SettingsState(
     val showLabels: Boolean = true,
     val showPronounsInPosts: Boolean = false,
     val defaultFeed: DefaultFeed = DefaultFeed(),
+    val defaultAppviewProxy: String = BLUESKY_APPVIEW_DID,
     val forceCompactLayout: Boolean = false,
     val swipeableFeeds: Boolean = true,
     val autoLikeOnReply: Boolean = false,
@@ -63,6 +64,14 @@ data class SettingsState(
     val pushNotificationsEnabled: Boolean = false,
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
     val loaded: Boolean = false,
+)
+
+const val BLUESKY_APPVIEW_DID = "did:web:api.bsky.app#bsky_appview"
+const val BLACKSKY_APPVIEW_DID = "did:web:api.blacksky.community#bsky_appview"
+
+val APPVIEW_PROXY_OPTIONS = listOf(
+    "Bluesky" to BLUESKY_APPVIEW_DID,
+    "Blacksky" to BLACKSKY_APPVIEW_DID,
 )
 
 @HiltViewModel
@@ -79,6 +88,7 @@ class SettingsViewModel @Inject constructor(
         private val REPLY_FILTER_MODE = stringPreferencesKey("reply_filter_mode")
         private val SHOW_LABELS = stringPreferencesKey("show_labels")
         private val SHOW_PRONOUNS_IN_POSTS = stringPreferencesKey("show_pronouns_in_posts")
+        private val DEFAULT_APPVIEW_PROXY = stringPreferencesKey("default_appview_proxy")
         private val DEFAULT_FEED_URI = stringPreferencesKey("default_feed_uri")
         private val DEFAULT_FEED_NAME = stringPreferencesKey("default_feed_name")
         private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
@@ -106,6 +116,7 @@ class SettingsViewModel @Inject constructor(
                     replyFilterMode = prefs[REPLY_FILTER_MODE]?.let { runCatching { ReplyFilterMode.valueOf(it) }.getOrNull() } ?: ReplyFilterMode.OnlyFilterDeepThreads,
                     showLabels = prefs[SHOW_LABELS]?.toBooleanStrictOrNull() ?: !narrowScreen,
                     showPronounsInPosts = prefs[SHOW_PRONOUNS_IN_POSTS]?.toBooleanStrictOrNull() ?: false,
+                    defaultAppviewProxy = prefs[DEFAULT_APPVIEW_PROXY] ?: BLUESKY_APPVIEW_DID,
                     defaultFeed = DefaultFeed(
                         uri = prefs[DEFAULT_FEED_URI] ?: "following",
                         displayName = prefs[DEFAULT_FEED_NAME] ?: "Following",
@@ -170,6 +181,12 @@ class SettingsViewModel @Inject constructor(
     fun setShowPronounsInPosts(show: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[SHOW_PRONOUNS_IN_POSTS] = show.toString() }
+        }
+    }
+
+    fun setDefaultAppviewProxy(did: String) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[DEFAULT_APPVIEW_PROXY] = did }
         }
     }
 

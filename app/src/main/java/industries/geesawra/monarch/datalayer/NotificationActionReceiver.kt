@@ -14,7 +14,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import sh.christian.ozone.BlueskyJson
 import sh.christian.ozone.api.AtUri
+import sh.christian.ozone.api.Handle
+import sh.christian.ozone.oauth.OAuthToken
 
 class NotificationActionReceiver : BroadcastReceiver() {
 
@@ -49,10 +52,15 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     )
                     val account = entryPoint.accountManager().getAccount(recipientDid)
                     if (account != null) {
+                        val token = BlueskyJson.decodeFromString(
+                            OAuthToken.serializer(),
+                            account.oauthTokenJson,
+                        )
                         conn.initializeInMemory(
-                            account.pdsHost,
-                            account.appviewProxy,
-                            SessionData.decodeFromJson(account.sessionJson)
+                            pdsURL = account.pdsHost,
+                            appviewProxy = account.appviewProxy,
+                            oauthToken = token,
+                            handle = Handle(account.handle),
                         )
                     }
                 }

@@ -176,10 +176,11 @@ class MainActivity : ComponentActivity() {
                         currentIntent.value = null
                         return@LaunchedEffect
                     }
-                    conn.oauthCompleteLogin(code, state).onSuccess {
-                        timelineViewModel.onNewLogin()
-                        navController.navigate(ViewList.Main.name) {
-                            popUpTo(ViewList.Login.name) { inclusive = true }
+                    conn.oauthCompleteLogin(code, state).onSuccess { account ->
+                        timelineViewModel.completeOAuthLogin(account) {
+                            navController.navigate(ViewList.Main.name) {
+                                popUpTo(ViewList.Login.name) { inclusive = true }
+                            }
                         }
                     }.onFailure { err ->
                         android.widget.Toast.makeText(

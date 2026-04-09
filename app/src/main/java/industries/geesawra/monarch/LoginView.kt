@@ -11,18 +11,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -36,14 +26,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import industries.geesawra.monarch.datalayer.BlueskyConn
+import industries.geesawra.monarch.datalayer.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -56,13 +45,11 @@ fun LoginView(
     blueskyConn: BlueskyConn? = null,
     navigate: () -> Unit
 ) {
-    var password by remember { mutableStateOf("") }
-    var isPasswordFocused by remember { mutableStateOf(false) }
-    var passwordVisible by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     val bc = blueskyConn ?: BlueskyConn(ctx)
-    val appPasswordRegex = "[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}".toRegex()
+    val settingsViewModel = hiltViewModel<SettingsViewModel>()
+    val settings = settingsViewModel.settingsState
     var currentPDS by remember { mutableStateOf("") }
     var lookingUpPDS by remember { mutableStateOf(false) }
     val handleTextFieldError = remember { mutableStateOf(false) }
@@ -122,104 +109,12 @@ fun LoginView(
                 capitalization = KeyboardCapitalization.None,
             )
         )
-        TextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                capitalization = KeyboardCapitalization.None
-            ),
-            trailingIcon = {
-                val image = if (passwordVisible)
-                    Icons.Filled.Visibility
-                else Icons.Filled.VisibilityOff
-                val description = if (passwordVisible) "Hide password" else "Show password"
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(imageVector = image, description)
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-                .onFocusChanged { focusState -> isPasswordFocused = focusState.isFocused }
-        )
-
-
-        val proxies = listOf(
-            "Bluesky Appview" to "did:web:api.bsky.app#bsky_appview",
-            "Blacksky Appview" to "did:web:api.blacksky.community#bsky_appview"
-        )
-
-        val expanded = remember { mutableStateOf(false) }
-        val selectedProxyPretty = remember { mutableStateOf(proxies.first().first) }
-        val selectedProxy = remember { mutableStateOf(proxies.first().second) }
-
-
-        ExposedDropdownMenuBox(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            expanded = expanded.value,
-            onExpandedChange = {
-                expanded.value = !expanded.value
-            }
-        ) {
-            TextField(
-                value = selectedProxyPretty.value,
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
-                modifier = Modifier
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
-                    .fillMaxWidth()
-            )
-
-            ExposedDropdownMenu(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                expanded = expanded.value,
-                onDismissRequest = { expanded.value = false }
-            ) {
-                proxies.forEach { item ->
-                    DropdownMenuItem(
-                        text = { Text(text = item.first) },
-                        onClick = {
-                            selectedProxyPretty.value = item.first
-                            selectedProxy.value = item.second
-                            expanded.value = false
-                        }
-                    )
-                }
-            }
-        }
 
         Button(
             onClick = {
                 scope.launch {
                     loggingIn.value = true
-                    bc.login(currentPDS, handle, password, selectedProxy.value).onSuccess {
-                        navigate()
-                    }.onFailure {
-                        Log.e("LoginView", "Login failed", it)
-                        Toast.makeText(ctx, it.message ?: "Unknown login error", Toast.LENGTH_LONG)
-                            .show()
-                    }
-                    loggingIn.value = false
-                }
-            },
-            enabled = (handle.isATHandle() || handle.isDID()) && password.isNotEmpty() && currentPDS.isNotEmpty() && !loggingIn.value,
-            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-        ) {
-            Text("Login")
-        }
-
-        FilledTonalButton(
-            onClick = {
-                scope.launch {
-                    loggingIn.value = true
-                    bc.oauthBeginLogin(handle, selectedProxy.value).onSuccess { authUrl ->
+                    bc.oauthBeginLogin(handle, settings.defaultAppviewProxy).onSuccess { authUrl ->
                         val intent = CustomTabsIntent.Builder()
                             .setShowTitle(true)
                             .build()
@@ -237,9 +132,9 @@ fun LoginView(
                 }
             },
             enabled = (handle.isATHandle() || handle.isDID()) && currentPDS.isNotEmpty() && !loggingIn.value,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
         ) {
-            Text("Sign in with Bluesky (OAuth)")
+            Text("Login")
         }
 
         var pdsString = "I'll look up your PDS automatically :^)"
@@ -258,14 +153,6 @@ fun LoginView(
             text = pdsString,
             style = MaterialTheme.typography.labelMedium
         )
-
-        if (password.isNotEmpty() && !password.matches(appPasswordRegex) && !isPasswordFocused) {
-            Text(
-                text = "Hint: Consider using an app password (e.g., xxxx-xxxx-xxxx-xxxx).",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
     }
 }
 

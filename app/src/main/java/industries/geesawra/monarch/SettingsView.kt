@@ -70,6 +70,7 @@ import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.PushNotificationManager
 import industries.geesawra.monarch.datalayer.ReplyFilterMode
 import industries.geesawra.monarch.datalayer.SettingsViewModel
+import industries.geesawra.monarch.datalayer.APPVIEW_PROXY_OPTIONS
 import industries.geesawra.monarch.datalayer.AppTheme
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -336,6 +337,33 @@ fun SettingsView(
                         checked = settings.showPronounsInPosts,
                         onCheckedChange = { settingsViewModel.setShowPronounsInPosts(it) }
                     )
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Default appview") },
+                supportingContent = { Text("Used when adding a new account") },
+                trailingContent = {
+                    var expanded by remember { mutableStateOf(false) }
+                    val currentLabel = APPVIEW_PROXY_OPTIONS
+                        .firstOrNull { it.second == settings.defaultAppviewProxy }
+                        ?.first ?: "Bluesky"
+                    Box {
+                        TextButton(onClick = { expanded = true }) {
+                            Text(currentLabel)
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            APPVIEW_PROXY_OPTIONS.forEach { (label, did) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        settingsViewModel.setDefaultAppviewProxy(did)
+                                        expanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
                 },
             )
 

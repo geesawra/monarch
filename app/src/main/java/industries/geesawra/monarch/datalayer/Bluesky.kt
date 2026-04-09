@@ -83,11 +83,8 @@ import com.atproto.repo.GetRecordQueryParams
 import com.atproto.repo.GetRecordResponse
 import com.atproto.repo.StrongRef
 import com.atproto.repo.UploadBlobResponse
-import com.atproto.server.CreateSessionRequest
-import com.atproto.server.CreateSessionResponse
 import com.atproto.server.GetServiceAuthQueryParams
 import com.atproto.server.GetServiceAuthResponse
-import com.atproto.server.RefreshSessionResponse
 import industries.geesawra.monarch.collection
 import industries.geesawra.monarch.did
 import industries.geesawra.monarch.rkey
@@ -108,6 +105,10 @@ import io.ktor.http.isSuccess
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
 import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -115,6 +116,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -142,10 +144,6 @@ import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 
 enum class AuthData {
-    PDSHost,
-    SessionData,
-    AppViewProxy,
-    OAuthToken,
     OAuthInFlightState,
     OAuthInFlightVerifier,
     OAuthInFlightNonce,
@@ -156,44 +154,15 @@ enum class AuthData {
 
 class LoginException(message: String?) : Exception(message)
 
-@Serializable // Added annotation
+/**
+ * In-memory "who am I" record for the active session. Credentials live separately in
+ * `BlueskyConn.oauthToken` (an `OAuthToken`); this struct only carries identity.
+ */
 data class SessionData(
-    val accessJwt: String,
-    val refreshJwt: String,
     val handle: Handle,
     val did: Did,
     val active: Boolean? = null,
-) {
-    fun encodeToJson(): String {
-        return BlueskyJson.encodeToString(serializer(), this)
-    }
-
-    companion object {
-        fun decodeFromJson(jsonString: String): SessionData {
-            return BlueskyJson.decodeFromString(serializer(), jsonString)
-        }
-
-        fun fromCreateSessionResponse(session: CreateSessionResponse): SessionData {
-            return SessionData(
-                accessJwt = session.accessJwt,
-                refreshJwt = session.refreshJwt,
-                handle = session.handle,
-                did = session.did,
-                active = session.active,
-            )
-        }
-
-        fun fromRefreshSessionResponse(session: RefreshSessionResponse): SessionData {
-            return SessionData(
-                accessJwt = session.accessJwt,
-                refreshJwt = session.refreshJwt,
-                handle = session.handle,
-                did = session.did,
-                active = session.active,
-            )
-        }
-    }
-}
+)
 
 data class Timeline(
     val cursor: String? = null,
@@ -206,11 +175,9 @@ class BlueskyConn(val context: Context) {
         const val VIDEO_UPLOAD_TIMEOUT_MS = 300_000L
         const val DEFAULT_TIMEOUT_MS = 30_000L
 
+        // Transient OAuth-flow state lives here. The active session itself (credentials, handle,
+        // PDS, appview) is stored in AccountManager — see datalayer/AccountManager.kt.
         private val Context.dataStore by preferencesDataStore("bluesky")
-        private val SESSION = stringPreferencesKey(AuthData.SessionData.name)
-        private val PDSHOST = stringPreferencesKey(AuthData.PDSHost.name)
-        private val APPVIEW_PROXY = stringPreferencesKey(AuthData.AppViewProxy.name)
-        private val OAUTH_TOKEN = stringPreferencesKey(AuthData.OAuthToken.name)
         private val OAUTH_IN_FLIGHT_STATE = stringPreferencesKey(AuthData.OAuthInFlightState.name)
         private val OAUTH_IN_FLIGHT_VERIFIER = stringPreferencesKey(AuthData.OAuthInFlightVerifier.name)
         private val OAUTH_IN_FLIGHT_NONCE = stringPreferencesKey(AuthData.OAuthInFlightNonce.name)
@@ -326,14 +293,23 @@ class BlueskyConn(val context: Context) {
     var client: AuthenticatedXrpcBlueskyApi? = null      // appview queries (has atproto-proxy)
     var pdsClient: AuthenticatedXrpcBlueskyApi? = null   // PDS procedures (no atproto-proxy)
     var session: SessionData? = null
+    var oauthToken: OAuthToken? = null
     var createMutex: Mutex = Mutex()
     var pdsURL: String? = null
     var appviewProxy: String? = null
 
+    // Long-lived scope for the OAuth-token refresh watcher. Survives client rebuilds via
+    // SupervisorJob so a single watcher failure doesn't cancel the others.
+    private val connScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var tokenWatcherJob: Job? = null
+
     private fun clearInMemorySession() {
         session = null
+        oauthToken = null
         client = null
         pdsClient = null
+        tokenWatcherJob?.cancel()
+        tokenWatcherJob = null
     }
 
     fun appviewName(): String {
@@ -393,109 +369,48 @@ class BlueskyConn(val context: Context) {
         labelerAvatars = avatars
     }
 
-    suspend fun storeSessionData(pdsURL: String, appviewProxy: String, session: SessionData) {
-        context.dataStore.edit { settings ->
-            settings[SESSION] = session.encodeToJson()
-            settings[PDSHOST] = pdsURL
-            settings[APPVIEW_PROXY] = appviewProxy
-        }
-    }
-
     suspend fun logout() {
-        cleanSessionData()
-        client = null
-        pdsClient = null
-        session = null
+        clearInMemorySession()
         pdsURL = null
         appviewProxy = null
     }
 
     fun resetClients() {
-        client = null
-        pdsClient = null
-        session = null
+        clearInMemorySession()
         pdsURL = null
+        appviewProxy = null
     }
 
-    suspend fun initializeInMemory(pdsURL: String, appviewProxy: String, sessionData: SessionData) {
+    /**
+     * Wire up an in-memory authenticated session from an already-resolved OAuth token. Used by
+     * the OAuth login completion path (where the caller has just exchanged the auth code) and by
+     * account switching (where the OAuth token comes from an already-stored account record).
+     *
+     * Builds both the appview client and the PDS-direct client, sets `session` and `oauthToken`,
+     * and starts the token-refresh watcher so subsequent SDK-driven refreshes get re-persisted.
+     */
+    suspend fun initializeInMemory(
+        pdsURL: String,
+        appviewProxy: String,
+        oauthToken: OAuthToken,
+        handle: Handle,
+    ) {
         resetClients()
-        refreshIfNeeded(pdsURL, appviewProxy, sessionData)
         this.pdsURL = pdsURL
         this.appviewProxy = appviewProxy
-        this.pdsClient = mkClient(pdsURL, this.session!!)
-        this.client = mkClient(pdsURL, this.session!!, appviewProxy = appviewProxy)
-    }
-
-    suspend fun changeAppview(newAppviewProxy: String) {
-        this.appviewProxy = newAppviewProxy
-        context.dataStore.edit { settings ->
-            settings[APPVIEW_PROXY] = newAppviewProxy
-        }
-        this.client = null
-    }
-
-    suspend fun cleanSessionData() {
-        context.dataStore.edit { settings ->
-            settings.remove(SESSION)
-            settings.remove(PDSHOST)
-            settings.remove(APPVIEW_PROXY)
-            settings.remove(OAUTH_TOKEN)
-        }
+        this.oauthToken = oauthToken
+        this.session = SessionData(
+            handle = handle,
+            did = oauthToken.subject,
+            active = true,
+        )
+        this.pdsClient = mkClient(pdsURL, oauthToken)
+        this.client = mkClient(pdsURL, oauthToken, appviewProxy = appviewProxy)
+        launchTokenWatcher()
     }
 
     suspend fun hasSession(): Boolean {
-        val prefs = context.dataStore.data.first()
-        val pdsURL = prefs[PDSHOST] ?: ""
-        val appviewProxy = prefs[APPVIEW_PROXY] ?: ""
-        val sessionDataString = prefs[SESSION] ?: ""
-        val oauthTokenString = prefs[OAUTH_TOKEN] ?: ""
-        if (pdsURL.isEmpty() || appviewProxy.isEmpty()) return false
-        return sessionDataString.isNotEmpty() || oauthTokenString.isNotEmpty()
-    }
-
-    suspend fun login(
-        pdsURL: String,
-        handle: String,
-        password: String,
-        appviewProxy: String
-    ): Result<Unit> {
-        createMutex.lock()
-        val httpClient = createRetryHttpClient(baseUrl = pdsURL)
-
-        try {
-            val client = XrpcBlueskyApi(httpClient)
-
-            val s = client.createSession(CreateSessionRequest(handle, password))
-            val sessionResponse: CreateSessionResponse = when (s) {
-                is AtpResponse.Failure<*> -> {
-                    return Result.failure(
-                        Exception(
-                            "Failed to create session: ${
-                                s.error?.message?.toLowerCase(
-                                    Locale.current
-                                )
-                            }"
-                        )
-                    )
-                }
-
-                is AtpResponse.Success<CreateSessionResponse> -> s.response
-            }
-
-            storeSessionData(
-                pdsURL,
-                appviewProxy,
-                SessionData.fromCreateSessionResponse(sessionResponse)
-            )
-            session = null
-            this.client = null
-            this.pdsClient = null
-
-            return Result.success(Unit)
-        } finally {
-            httpClient.close()
-            createMutex.unlock()
-        }
+        return context.readActiveStoredAccount() != null
     }
 
     /**
@@ -546,15 +461,15 @@ class BlueskyConn(val context: Context) {
 
     /**
      * Complete an OAuth login. Called by the deep-link handler when the auth server redirects
-     * back with `?code=&state=`. Verifies state matches, exchanges the code for an OAuthToken,
-     * persists the token, and clears the in-flight state. The next call to `create()` will
-     * pick up the new token, build OAuth-authenticated clients, and resolve the user's handle
-     * via getProfile (since OAuth tokens only carry a DID).
+     * back with `?code=&state=`. Verifies state, exchanges the code for an OAuthToken, builds a
+     * one-shot OAuth client to fetch the user's profile, and returns a fully-populated
+     * [StoredAccount] for the caller to persist via [AccountManager.addAccount]. The in-flight
+     * OAuth state is cleared either way; on failure the caller stays on the login screen.
      */
     suspend fun oauthCompleteLogin(
         code: String,
         state: String,
-    ): Result<Unit> {
+    ): Result<StoredAccount> {
         return runCatching {
             val prefs = context.dataStore.data.first()
             val expectedState = prefs[OAUTH_IN_FLIGHT_STATE]
@@ -567,7 +482,6 @@ class BlueskyConn(val context: Context) {
                 ?: return Result.failure(Exception("Missing OAuth PDS URL"))
             val appviewProxy = prefs[OAUTH_IN_FLIGHT_APPVIEW_PROXY]
                 ?: return Result.failure(Exception("Missing OAuth appview proxy"))
-            val handleHint = prefs[OAUTH_IN_FLIGHT_HANDLE]
 
             if (state != expectedState) {
                 clearInFlightOAuthState()
@@ -591,22 +505,33 @@ class BlueskyConn(val context: Context) {
                     code = code,
                 )
 
-                context.dataStore.edit { settings ->
-                    settings[OAUTH_TOKEN] = BlueskyJson.encodeToString(OAuthToken.serializer(), token)
-                    settings[PDSHOST] = pdsURL
-                    settings[APPVIEW_PROXY] = appviewProxy
-                    settings.remove(SESSION)
-                    settings.remove(OAUTH_IN_FLIGHT_STATE)
-                    settings.remove(OAUTH_IN_FLIGHT_VERIFIER)
-                    settings.remove(OAUTH_IN_FLIGHT_NONCE)
-                    settings.remove(OAUTH_IN_FLIGHT_HANDLE)
-                    settings.remove(OAUTH_IN_FLIGHT_PDS_URL)
-                    settings.remove(OAUTH_IN_FLIGHT_APPVIEW_PROXY)
+                // Resolve the user's profile to get the handle/displayName/avatar that we need
+                // for StoredAccount. We build a temporary OAuth client just for this — the
+                // long-lived clients get built later in initializeInMemory().
+                val tempClient = mkClient(pdsURL, token, appviewProxy = appviewProxy)
+                val profileResp = tempClient.getProfile(GetProfileQueryParams(actor = token.subject))
+                val profile = when (profileResp) {
+                    is AtpResponse.Success<GetProfileResponse> -> profileResp.response
+                    is AtpResponse.Failure<*> -> {
+                        clearInFlightOAuthState()
+                        return Result.failure(LoginException("Failed to resolve OAuth profile: ${profileResp.error?.message}"))
+                    }
                 }
 
-                clearInMemorySession()
-                Log.d("BlueskyAuth", "OAuth login complete for ${handleHint ?: token.subject}")
-                Result.success(Unit)
+                clearInFlightOAuthState()
+
+                Log.d("BlueskyAuth", "OAuth login complete for ${profile.handle}")
+                Result.success(
+                    StoredAccount(
+                        did = token.subject.did,
+                        handle = profile.handle.handle,
+                        displayName = profile.displayName,
+                        avatarUrl = profile.avatar?.uri,
+                        pdsHost = pdsURL,
+                        appviewProxy = appviewProxy,
+                        oauthTokenJson = BlueskyJson.encodeToString(OAuthToken.serializer(), token),
+                    )
+                )
             } finally {
                 httpClient.close()
             }
@@ -624,7 +549,13 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    private fun mkOAuthClient(
+    /**
+     * Build an OAuth-authenticated `AuthenticatedXrpcBlueskyApi`. The SDK's `BlueskyAuthPlugin`
+     * handles DPoP signing, nonce rotation, and token refresh transparently once `activateOAuth`
+     * is called. Caller is responsible for registering a token-refresh watcher if it wants the
+     * refreshed credentials persisted.
+     */
+    private fun mkClient(
         pds: String,
         token: OAuthToken,
         labelers: List<String> = listOf(),
@@ -645,124 +576,40 @@ class BlueskyConn(val context: Context) {
         return api
     }
 
-    @Serializable
-    private data class atpError(
-        val error: String?,
-        val message: String?,
-    )
-
-    private fun mkClient(
-        pds: String,
-        sessionData: SessionData,
-        labelers: List<String> = listOf(),
-        appviewProxy: String? = null,
-    ): AuthenticatedXrpcBlueskyApi {
-        val hc = createRetryHttpClient {
-            defaultRequest {
-                url(pds)
-                headers["atproto-accept-labelers"] = labelers.joinToString()
-                if (appviewProxy != null) {
-                    headers["atproto-proxy"] = appviewProxy
+    /**
+     * Watch the active client's `authTokens` StateFlow. Whenever the SDK refreshes the
+     * DPoP-bound access/refresh tokens (which happens transparently inside the auth plugin
+     * when the server returns ExpiredToken or use_dpop_nonce), we copy the change back into
+     * `this.oauthToken` and re-persist it via [Context.updateStoredAccountOAuthToken] so the
+     * next process restart picks up the latest credentials instead of trying the stale ones.
+     */
+    private fun launchTokenWatcher() {
+        tokenWatcherJob?.cancel()
+        val activeClient = client ?: return
+        tokenWatcherJob = connScope.launch {
+            activeClient.authTokens.collect { tokens ->
+                if (tokens !is BlueskyAuthPlugin.Tokens.Dpop) return@collect
+                val previous = oauthToken ?: return@collect
+                if (previous.accessToken == tokens.auth &&
+                    previous.refreshToken == tokens.refresh &&
+                    previous.nonce == tokens.nonce
+                ) {
+                    return@collect
+                }
+                val updated = previous.copy(
+                    accessToken = tokens.auth,
+                    refreshToken = tokens.refresh,
+                    nonce = tokens.nonce,
+                    keyPair = tokens.keyPair,
+                )
+                this@BlueskyConn.oauthToken = updated
+                runCatching {
+                    val updatedJson = BlueskyJson.encodeToString(OAuthToken.serializer(), updated)
+                    context.updateStoredAccountOAuthToken(previous.subject.did, updatedJson)
+                }.onFailure {
+                    Log.w("BlueskyAuth", "Failed to persist refreshed OAuth token: ${it.message}")
                 }
             }
-        }
-
-        return AuthenticatedXrpcBlueskyApi(
-            hc,
-            BlueskyAuthPlugin.Tokens(sessionData.accessJwt, sessionData.refreshJwt)
-        )
-    }
-
-    private suspend fun refreshIfNeeded(
-        pdsURL: String,
-        appviewProxy: String,
-        token: SessionData,
-    ): Result<Unit> {
-        val httpClient = createRetryHttpClient(baseUrl = pdsURL)
-
-        try {
-            val gs = httpClient.get {
-                headers["Authorization"] = "Bearer " + token.accessJwt
-                url {
-                    protocol = URLProtocol.HTTPS
-                    path("/xrpc/com.atproto.server.getSession")
-                }
-            }
-
-            Log.d("BlueskyAuth", "getSession status: ${gs.status.value}")
-
-            when (gs.status) {
-                HttpStatusCode.OK -> {
-                    this.session = token
-                    return Result.success(Unit)
-                }
-
-                else -> {
-                    val body: String = gs.body()
-
-                    val error: atpError =
-                        BlueskyJson.decodeFromString(
-                            atpError.serializer(),
-                            body
-                        )
-                    if (error.error == "ExpiredToken" || error.error == "InvalidToken") {
-                        // fall through to refresh
-                    } else if (gs.status.value in 500..599) {
-                        return Result.failure(Exception("Server error during session check: ${gs.status}"))
-                    } else {
-                        clearInMemorySession()
-                        cleanSessionData()
-                        return Result.failure(LoginException("Session checking failed, status code ${gs.status}: ${error.message}"))
-                    }
-                }
-            }
-
-            Log.d("BlueskyAuth", "Access token expired, attempting refresh")
-
-            val refreshHttpResponse = httpClient.post {
-                headers["Authorization"] = "Bearer " + token.refreshJwt
-                url {
-                    protocol = URLProtocol.HTTPS
-                    path("/xrpc/com.atproto.server.refreshSession")
-                }
-            }
-
-            Log.d("BlueskyAuth", "refreshSession status: ${refreshHttpResponse.status.value}")
-
-            when (refreshHttpResponse.status) {
-                HttpStatusCode.OK -> {
-                    val body: String = refreshHttpResponse.body()
-                    val refreshedSession: RefreshSessionResponse =
-                        BlueskyJson.decodeFromString(
-                            RefreshSessionResponse.serializer(),
-                            body
-                        )
-
-                    this.session = SessionData.fromRefreshSessionResponse(refreshedSession)
-                    storeSessionData(pdsURL, appviewProxy, this.session!!)
-                    return Result.success(Unit)
-                }
-
-                else -> {
-                    val body: String = refreshHttpResponse.body()
-
-                    val error: atpError =
-                        BlueskyJson.decodeFromString(
-                            atpError.serializer(),
-                            body
-                        )
-                    if (refreshHttpResponse.status.value in 500..599) {
-                        return Result.failure(Exception("Server error during token refresh: ${refreshHttpResponse.status}"))
-                    }
-                    clearInMemorySession()
-                    cleanSessionData()
-                    return Result.failure(LoginException("Login refresh failed, status code ${refreshHttpResponse.status}: ${error.message}"))
-                }
-            }
-        } catch (e: Exception) {
-            return Result.failure(e)
-        } finally {
-            httpClient.close()
         }
     }
 
@@ -775,96 +622,33 @@ class BlueskyConn(val context: Context) {
             }
 
             Log.d("Bluesky", "create called without session or client")
-            val prefs = context.dataStore.data.first()
-            val pdsURL = prefs[PDSHOST] ?: ""
-            val sessionDataString = prefs[SESSION] ?: ""
-            val oauthTokenString = prefs[OAUTH_TOKEN] ?: ""
-            val appviewProxy = prefs[APPVIEW_PROXY] ?: ""
+            val account = context.readActiveStoredAccount()
+                ?: return Result.failure(Exception("No active account"))
 
-            Log.d("BlueskyAuth", "DataStore keys present: PDSHOST=${pdsURL.isNotEmpty()}, SESSION=${sessionDataString.isNotEmpty()}, OAUTH_TOKEN=${oauthTokenString.isNotEmpty()}, APPVIEW_PROXY=${appviewProxy.isNotEmpty()}")
-
-            if (pdsURL.isEmpty() || appviewProxy.isEmpty()) {
-                return Result.failure(Exception("No session data found"))
+            val token = runCatching {
+                BlueskyJson.decodeFromString(OAuthToken.serializer(), account.oauthTokenJson)
+            }.getOrElse {
+                return Result.failure(LoginException("Failed to deserialize OAuth token: ${it.message}"))
             }
 
-            if (oauthTokenString.isNotEmpty()) {
-                // OAuth path: deserialize the persisted OAuthToken and wire AuthenticatedXrpcBlueskyApi
-                // via activateOAuth(). The plugin handles DPoP signing + nonce rotation + refresh.
-                val oauthToken = BlueskyJson.decodeFromString(OAuthToken.serializer(), oauthTokenString)
-                this.pdsURL = pdsURL
-                this.appviewProxy = appviewProxy
-                this.pdsClient = mkOAuthClient(pdsURL, oauthToken)
-                this.client = mkOAuthClient(pdsURL, oauthToken, appviewProxy = appviewProxy)
-
-                // OAuth tokens give us only the DID; we need to fetch the profile to get the
-                // user's actual handle. Handle is required by SessionData (and used as the `repo`
-                // parameter on createRecord/putRecord calls), and the Handle value class rejects
-                // anything that isn't a valid handle — we can't stuff a DID into it.
-                val profileResp = this.client!!.getProfile(
-                    GetProfileQueryParams(actor = oauthToken.subject)
-                )
-                val resolvedHandle = when (profileResp) {
-                    is AtpResponse.Success<GetProfileResponse> -> profileResp.response.handle
-                    is AtpResponse.Failure<*> -> {
-                        clearInMemorySession()
-                        return Result.failure(LoginException("Failed to resolve OAuth profile: ${profileResp.error?.message}"))
-                    }
-                }
-
-                this.session = SessionData(
-                    accessJwt = oauthToken.accessToken,
-                    refreshJwt = oauthToken.refreshToken,
-                    handle = resolvedHandle,
-                    did = oauthToken.subject,
-                    active = true,
-                )
-
-                val labelerMap = this.subscribedLabelers().getOrDefault(emptyMap())
-                buildLabelCache(labelerMap)
-                labelCacheFetchCount = 0
-                val labelers = labelerMap.keys.mapNotNull { it?.did }
-                this.client = mkOAuthClient(pdsURL, oauthToken, labelers, appviewProxy = appviewProxy)
-
-                Log.d("BlueskyAuth", "OAuth clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}, handle=$resolvedHandle")
-                return Result.success(Unit)
-            }
-
-            if (sessionDataString.isEmpty()) {
-                return Result.failure(Exception("No session data found"))
-            }
-
-            val sessionData = SessionData.decodeFromJson(sessionDataString)
-
-            refreshIfNeeded(pdsURL, appviewProxy, sessionData).onFailure {
-                return Result.failure(it)
-            }
-
-            val activeSession = this.session!!
-            val sessionWasRefreshed = activeSession != sessionData
-            Log.d("BlueskyAuth", "refreshIfNeeded complete: sessionRefreshed=$sessionWasRefreshed")
-
-            this.pdsURL = pdsURL
-            this.appviewProxy = appviewProxy
-
-            this.pdsClient = mkClient(pdsURL, activeSession)
-            this.client = mkClient(
-                pdsURL,
-                activeSession,
-                appviewProxy = appviewProxy,
+            initializeInMemory(
+                pdsURL = account.pdsHost,
+                appviewProxy = account.appviewProxy,
+                oauthToken = token,
+                handle = Handle(account.handle),
             )
 
+            // Hydrate the labeler cache and rebuild `client` with the labelers header so future
+            // appview queries respect the user's subscribed labelers.
             val labelerMap = this.subscribedLabelers().getOrDefault(emptyMap())
             buildLabelCache(labelerMap)
             labelCacheFetchCount = 0
             val labelers = labelerMap.keys.mapNotNull { it?.did }
-            this.client = mkClient(
-                pdsURL,
-                activeSession,
-                labelers,
-                appviewProxy = appviewProxy,
-            )
+            this.client = mkClient(account.pdsHost, token, labelers, appviewProxy = account.appviewProxy)
+            // Re-arm the watcher on the new client instance.
+            launchTokenWatcher()
 
-            Log.d("BlueskyAuth", "Clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}")
+            Log.d("BlueskyAuth", "Clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}, handle=${account.handle}")
             return Result.success(Unit)
         } catch (e: Exception) {
             Log.d("BlueskyAuth", "create() failed: ${e::class.simpleName}: ${e.message}")
@@ -1238,7 +1022,7 @@ class BlueskyConn(val context: Context) {
 
             val videoBskyAppClient = AuthenticatedXrpcBlueskyApi(
                 httpClient,
-                BlueskyAuthPlugin.Tokens(serviceAuth, serviceAuth)
+                BlueskyAuthPlugin.Tokens.Bearer(serviceAuth, serviceAuth)
             )
 
             onStatus(VideoUploadStatus.Uploading, null)

@@ -163,7 +163,10 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun changeAppview(newAppviewProxy: String, then: () -> Unit = {}) {
         viewModelScope.launch {
-            bskyConn.changeAppview(newAppviewProxy)
+            val activeDid = bskyConn.session?.did?.did ?: return@launch
+            accountManager.updateAccountAppviewProxy(activeDid, newAppviewProxy)
+            bskyConn.resetClients()
+            bskyConn.create()
             fetchAllNewData(then)
         }
     }
@@ -193,6 +196,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun saveCurrentAccount() {
         viewModelScope.launch {
             val session = bskyConn.session ?: return@launch
+            val token = bskyConn.oauthToken ?: return@launch
             val pds = bskyConn.pdsURL ?: return@launch
             val appview = bskyConn.appviewProxy ?: return@launch
             val user = uiState.user
@@ -205,29 +209,69 @@ class TimelineViewModel @AssistedInject constructor(
                     avatarUrl = user?.avatar?.uri,
                     pdsHost = pds,
                     appviewProxy = appview,
-                    sessionJson = session.encodeToJson(),
+                    oauthTokenJson = sh.christian.ozone.BlueskyJson.encodeToString(
+                        sh.christian.ozone.oauth.OAuthToken.serializer(),
+                        token,
+                    ),
                 )
             )
             refreshAccounts()
         }
     }
 
+    /**
+     * Post-OAuth orchestration: persist the freshly-resolved account into AccountManager,
+     * wire BlueskyConn's in-memory state from the OAuth token + handle, mark the session
+     * authenticated. Called by the deep-link handler in MainActivity right after
+     * BlueskyConn.oauthCompleteLogin returns successfully.
+     */
+    fun completeOAuthLogin(account: StoredAccount, then: () -> Unit = {}) {
+        viewModelScope.launch {
+            accountManager.addAccount(account)
+            val token = sh.christian.ozone.BlueskyJson.decodeFromString(
+                sh.christian.ozone.oauth.OAuthToken.serializer(),
+                account.oauthTokenJson,
+            )
+            bskyConn.initializeInMemory(
+                pdsURL = account.pdsHost,
+                appviewProxy = account.appviewProxy,
+                oauthToken = token,
+                handle = sh.christian.ozone.api.Handle(account.handle),
+            )
+            postInteractionStore.clear()
+            uiState = TimelineUiState(authenticated = true, sessionChecked = true)
+            refreshAccounts()
+            then()
+        }
+    }
+
     fun switchAccount(did: String, then: () -> Unit = {}) {
         viewModelScope.launch {
+            val currentToken = bskyConn.oauthToken
             val currentSession = bskyConn.session
-            if (currentSession != null) {
-                accountManager.updateAccountSession(currentSession.did.did, currentSession.encodeToJson())
+            if (currentToken != null && currentSession != null) {
+                accountManager.updateAccountOAuthToken(
+                    currentSession.did.did,
+                    sh.christian.ozone.BlueskyJson.encodeToString(
+                        sh.christian.ozone.oauth.OAuthToken.serializer(),
+                        currentToken,
+                    ),
+                )
             }
 
             val target = accountManager.getAccount(did) ?: return@launch
             accountManager.setActiveDid(did)
 
-            bskyConn.storeSessionData(
-                target.pdsHost,
-                target.appviewProxy,
-                SessionData.decodeFromJson(target.sessionJson)
+            val targetToken = sh.christian.ozone.BlueskyJson.decodeFromString(
+                sh.christian.ozone.oauth.OAuthToken.serializer(),
+                target.oauthTokenJson,
             )
-            bskyConn.resetClients()
+            bskyConn.initializeInMemory(
+                pdsURL = target.pdsHost,
+                appviewProxy = target.appviewProxy,
+                oauthToken = targetToken,
+                handle = sh.christian.ozone.api.Handle(target.handle),
+            )
             postInteractionStore.clear()
             uiState = TimelineUiState()
             uiState = uiState.copy(authenticated = true, sessionChecked = true)
