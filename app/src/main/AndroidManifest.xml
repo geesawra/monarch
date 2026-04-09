@@ -37,6 +37,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="witchsky.app" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- RFC 8252 form is "scheme:/path" with NO authority/host. Android intent-filter
+                     path matching requires a host, so we filter by scheme alone here and validate
+                     the path inside MainActivity. The scheme is namespaced (= application ID), so
+                     no other app on the device can register a colliding intent-filter. -->
+                <data android:scheme="industries.geesawra.monarch" />
+            </intent-filter>
         </activity>
 
         <receiver

@@ -1,7 +1,10 @@
 package industries.geesawra.monarch
 
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -17,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -206,9 +210,36 @@ fun LoginView(
                 }
             },
             enabled = (handle.isATHandle() || handle.isDID()) && password.isNotEmpty() && currentPDS.isNotEmpty() && !loggingIn.value,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
         ) {
             Text("Login")
+        }
+
+        FilledTonalButton(
+            onClick = {
+                scope.launch {
+                    loggingIn.value = true
+                    bc.oauthBeginLogin(handle, selectedProxy.value).onSuccess { authUrl ->
+                        val intent = CustomTabsIntent.Builder()
+                            .setShowTitle(true)
+                            .build()
+                        intent.intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        intent.launchUrl(ctx, Uri.parse(authUrl))
+                    }.onFailure {
+                        Log.e("LoginView", "OAuth begin failed", it)
+                        Toast.makeText(
+                            ctx,
+                            it.message ?: "Failed to start OAuth login",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    loggingIn.value = false
+                }
+            },
+            enabled = (handle.isATHandle() || handle.isDID()) && currentPDS.isNotEmpty() && !loggingIn.value,
+            modifier = Modifier.padding(bottom = 8.dp)
+        ) {
+            Text("Sign in with Bluesky (OAuth)")
         }
 
         var pdsString = "I'll look up your PDS automatically :^)"

@@ -150,6 +150,47 @@ class MainActivity : ComponentActivity() {
                 )
                 val navController = rememberNavController()
 
+                // OAuth deep-link callback: industries.geesawra.monarch:/oauth/callback?code=...&state=...
+                // Note the SINGLE slash — RFC 8252 form has no authority/host, just scheme + path.
+                val pendingIntent = currentIntent.value
+                LaunchedEffect(pendingIntent) {
+                    val uri = pendingIntent?.data ?: return@LaunchedEffect
+                    if (uri.scheme != "industries.geesawra.monarch" || uri.path != "/oauth/callback") {
+                        return@LaunchedEffect
+                    }
+                    val code = uri.getQueryParameter("code")
+                    val state = uri.getQueryParameter("state")
+                    val errorCode = uri.getQueryParameter("error")
+                    if (errorCode != null) {
+                        val description = uri.getQueryParameter("error_description") ?: errorCode
+                        android.widget.Toast.makeText(
+                            this@MainActivity,
+                            "OAuth failed: $description",
+                            android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                        conn.clearInFlightOAuthState()
+                        currentIntent.value = null
+                        return@LaunchedEffect
+                    }
+                    if (code.isNullOrBlank() || state.isNullOrBlank()) {
+                        currentIntent.value = null
+                        return@LaunchedEffect
+                    }
+                    conn.oauthCompleteLogin(code, state).onSuccess {
+                        timelineViewModel.onNewLogin()
+                        navController.navigate(ViewList.Main.name) {
+                            popUpTo(ViewList.Login.name) { inclusive = true }
+                        }
+                    }.onFailure { err ->
+                        android.widget.Toast.makeText(
+                            this@MainActivity,
+                            err.message ?: "OAuth login failed",
+                            android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    currentIntent.value = null
+                }
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

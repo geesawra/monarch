@@ -1,5 +1,21 @@
 # Monarch - Bluesky Client for Android
 
+## Session bootstrap (Claude Code)
+
+**At the very start of every session**, before any other ozone-related work, run this once so SDK source lookups don't waste tokens on repeated unzips:
+
+```bash
+mkdir -p /tmp/bluesky-sdk/oauth-src /tmp/bluesky-sdk/new-sources \
+  && cd /tmp/bluesky-sdk/new-sources \
+  && UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip -o -q \
+       /home/geesawra/AndroidStudio/projects/monarch/libs/ozone-artifacts/sh/christian/ozone/bluesky-jvm/0.3.3-local/bluesky-jvm-0.3.3-local-sources.jar \
+  && cd /tmp/bluesky-sdk/oauth-src \
+  && UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip -o -q \
+       /home/geesawra/AndroidStudio/projects/monarch/libs/ozone-artifacts/sh/christian/ozone/oauth-jvm/0.3.3-local/oauth-jvm-0.3.3-local-sources.jar
+```
+
+After that, grep `/tmp/bluesky-sdk/new-sources/commonMain/` for bluesky / actor / feed / embed sources, and `/tmp/bluesky-sdk/oauth-src/commonMain/` for OAuth + DPoP sources, instead of re-extracting per query. If those directories are missing or stale (e.g. after `OZONE_REF` bump), re-run the snippet above.
+
 ## Building & Running
 
 ```bash

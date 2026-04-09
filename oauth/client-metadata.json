@@ -1,0 +1,22 @@
+{
+  "client_id": "https://monarch.geesawra.industries/client-metadata.json",
+  "client_name": "Monarch",
+  "client_uri": "https://monarch.geesawra.industries",
+  "logo_uri": "https://monarch.geesawra.industries/icon.png",
+  "tos_uri": "https://monarch.geesawra.industries/terms",
+  "policy_uri": "https://monarch.geesawra.industries/privacy",
+  "redirect_uris": [
+    "industries.geesawra.monarch:/oauth/callback"
+  ],
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "response_types": [
+    "code"
+  ],
+  "scope": "atproto transition:generic",
+  "token_endpoint_auth_method": "none",
+  "application_type": "native",
+  "dpop_bound_access_tokens": true
+}

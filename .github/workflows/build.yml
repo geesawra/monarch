@@ -71,3 +71,25 @@ jobs:
           source ./generate-root.sh app/build/outputs/apk/release/app-release.apk
           npx wrangler r2 object put monarch-releases/$MONARCH_APK_FILENAME --remote true --file=$MONARCH_APK_PATH
           npx wrangler r2 object put monarch-releases/index.html --remote true --file=./index.html
+          echo "MONARCH_APK_FILENAME=$MONARCH_APK_FILENAME" >> $GITHUB_ENV
+
+      - name: Delete previous APKs from Cloudflare R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          # List every monarch-release-*.apk in the bucket, drop the one we just uploaded,
+          # delete the rest. Tolerates listing/delete failures so a stale-cleanup hiccup
+          # never breaks a successful release.
+          set +e
+          npx wrangler r2 object list monarch-releases --remote --prefix monarch-release- > /tmp/r2-listing.txt 2>&1
+          grep -oE 'monarch-release-[0-9]+\.apk' /tmp/r2-listing.txt | sort -u > /tmp/r2-apks.txt
+          cat /tmp/r2-apks.txt
+          while IFS= read -r key; do
+            if [ -z "$key" ] || [ "$key" = "$MONARCH_APK_FILENAME" ]; then
+              continue
+            fi
+            echo "Deleting previous APK: $key"
+            npx wrangler r2 object delete "monarch-releases/$key" --remote
+          done < /tmp/r2-apks.txt
+          exit 0
