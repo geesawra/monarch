@@ -60,14 +60,14 @@ fun FollowersListView(
     backButton: () -> Unit,
     onProfileTap: (Did) -> Unit,
 ) {
-    val listDid = timelineViewModel.uiState.followersListDid ?: return
-    val listName = timelineViewModel.uiState.followersListName ?: ""
-    var selectedTab by rememberSaveable { mutableIntStateOf(if (timelineViewModel.uiState.showFollowersTab) 0 else 1) }
+    val listDid = timelineViewModel.followersListDid ?: return
+    val listName = timelineViewModel.followersListName ?: ""
+    var selectedTab by rememberSaveable { mutableIntStateOf(if (timelineViewModel.showFollowersTab) 0 else 1) }
     var mutualsOnly by rememberSaveable { mutableStateOf(false) }
 
 
-    val followers = timelineViewModel.uiState.profileFollowers
-    val follows = timelineViewModel.uiState.profileFollows
+    val followers = timelineViewModel.profileFollowers
+    val follows = timelineViewModel.profileFollows
     val currentList = if (selectedTab == 0) followers else follows
 
     val knownList = remember(currentList) {
@@ -94,9 +94,9 @@ fun FollowersListView(
 
     LaunchedEffect(endReached, selectedTab) {
         if (!endReached) return@LaunchedEffect
-        if (selectedTab == 0 && timelineViewModel.uiState.profileFollowersCursor != null) {
+        if (selectedTab == 0 && timelineViewModel.profileFollowersCursor != null) {
             timelineViewModel.fetchFollowers(listDid)
-        } else if (selectedTab == 1 && timelineViewModel.uiState.profileFollowsCursor != null) {
+        } else if (selectedTab == 1 && timelineViewModel.profileFollowsCursor != null) {
             timelineViewModel.fetchFollows(listDid)
         }
     }

@@ -197,7 +197,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     timelineViewModel.loadSession()
-                    if (!timelineViewModel.uiState.sessionChecked) {
+                    if (!timelineViewModel.sessionChecked) {
                         Box(
                             modifier = Modifier.fillMaxSize(), // Make the Box take the full available space
                             contentAlignment = Alignment.Center // Align content (LoginView) to the center
@@ -208,7 +208,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val initialRoute =
-                        if (timelineViewModel.uiState.authenticated) ViewList.Main.name else ViewList.Login.name
+                        if (timelineViewModel.authenticated) ViewList.Main.name else ViewList.Login.name
 
                     NavHost(
                         navController = navController,
@@ -431,7 +431,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val notificationIntent = currentIntent.value
-                    val isAuthenticated = timelineViewModel.uiState.authenticated
+                    val isAuthenticated = timelineViewModel.authenticated
                     @OptIn(ExperimentalTime::class)
                     LaunchedEffect(notificationIntent, isAuthenticated) {
                         if (!isAuthenticated) return@LaunchedEffect

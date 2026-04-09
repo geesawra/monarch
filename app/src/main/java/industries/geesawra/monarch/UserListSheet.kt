@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,8 +90,10 @@ fun UserListSheet(
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    items(users.size) { idx ->
-                        val user = users[idx]
+                    items(
+                        items = users,
+                        key = { it.did.did },
+                    ) { user ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

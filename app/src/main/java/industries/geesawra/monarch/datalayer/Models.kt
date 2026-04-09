@@ -2,8 +2,8 @@
 
 package industries.geesawra.monarch.datalayer
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -44,6 +44,7 @@ import sh.christian.ozone.api.Handle
 import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.Uri
 import sh.christian.ozone.api.model.Blob
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -94,8 +95,11 @@ private fun cdnVideoPlaylist(authorDid: Did, blob: Blob?): Uri? {
 }
 
 enum class ThreadConnectorType { PASS_THROUGH, BRANCH, LAST_BRANCH }
+
+@Immutable
 data class ThreadConnector(val level: Int, val type: ThreadConnectorType)
 
+@Immutable
 data class SkeetData(
     val nestingLevel: Int = 0,
     val isReplyToRoot: Boolean = false,
@@ -133,6 +137,7 @@ data class SkeetData(
     val following: Boolean = false,
     val follower: Boolean = false,
     val replyToNotFollowing: Boolean = false,
+    val isMuted: Boolean = false,
     val cachedParent: Pair<SkeetData?, StrongRef?>? = null,
     val cachedRoot: SkeetData? = null,
 ) {
@@ -547,13 +552,18 @@ data class SkeetData(
         segments
     }
 
-    @Composable
-    fun annotatedContent(onMentionClick: ((Did) -> Unit)? = null): AnnotatedString {
+    fun buildAnnotated(
+        primary: Color,
+        onMentionClick: ((Did) -> Unit)? = null,
+    ): AnnotatedString {
         if (this.facets.isEmpty()) {
             return buildAnnotatedString {
                 append(this@SkeetData.content)
             }
         }
+
+        val linkStyles = TextLinkStyles(style = SpanStyle(color = primary))
+        val tagStyle = SpanStyle(color = primary)
 
         return buildAnnotatedString {
             annotatedSegments.forEach { segment ->
@@ -565,7 +575,7 @@ data class SkeetData(
                             is FacetFeatureUnion.Link -> withLink(
                                 LinkAnnotation.Url(
                                     f.value.uri.uri,
-                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary))
+                                    linkStyles,
                                 )
                             ) {
                                 append(segment.content)
@@ -574,18 +584,14 @@ data class SkeetData(
                             is FacetFeatureUnion.Mention -> withLink(
                                 LinkAnnotation.Clickable(
                                     tag = f.value.did.did,
-                                    styles = TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary)),
+                                    styles = linkStyles,
                                     linkInteractionListener = { onMentionClick?.invoke(f.value.did) },
                                 )
                             ) {
                                 append(segment.content)
                             }
 
-                            is FacetFeatureUnion.Tag -> withStyle(
-                                SpanStyle(
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            ) {
+                            is FacetFeatureUnion.Tag -> withStyle(tagStyle) {
                                 append(segment.content)
                             }
 
@@ -662,7 +668,9 @@ data class SkeetData(
     }
 }
 
+@Immutable
 sealed class Notification {
+    @Immutable
     data class RawLike(
         val subject: StrongRef,
         val post: SkeetData,
@@ -672,6 +680,7 @@ sealed class Notification {
     ) :
         Notification()
 
+    @Immutable
     data class RawRepost(
         val subject: StrongRef,
         val post: SkeetData,
@@ -681,12 +690,15 @@ sealed class Notification {
     ) :
         Notification()
 
+    @Immutable
     data class Like(val data: RepeatedNotification, val new: Boolean) :
         Notification()
 
+    @Immutable
     data class Repost(val data: RepeatedNotification, val new: Boolean) :
         Notification()
 
+    @Immutable
     data class Reply(
         val parent: Pair<Cid, AtUri>,
         val reply: Post,
@@ -697,9 +709,11 @@ sealed class Notification {
     ) :
         Notification()
 
+    @Immutable
     data class Follow(val follow: ProfileView, val createdAt: Instant, val new: Boolean) :
         Notification()
 
+    @Immutable
     data class Mention(
         val parent: Pair<Cid, AtUri>,
         val mention: Post,
@@ -710,6 +724,7 @@ sealed class Notification {
     ) :
         Notification()
 
+    @Immutable
     data class Quote(
         val parent: Pair<Cid, AtUri>,
         val quote: Post,
@@ -767,19 +782,22 @@ enum class RepeatableNotification() {
     Repost
 }
 
+@Immutable
 data class RepeatedNotification(
     val kind: RepeatableNotification,
     val post: SkeetData,
-    var authors: List<RepeatedAuthor>,
-    var timestamp: Instant,
+    val authors: List<RepeatedAuthor>,
+    val timestamp: Instant,
     val new: Boolean,
 )
 
+@Immutable
 data class RepeatedAuthor(
     val author: ProfileView,
     val timestamp: Instant,
 )
 
+@Immutable
 data class ThreadPost(
     val post: SkeetData = SkeetData(),
     val level: Int = 0,
@@ -861,5 +879,56 @@ data class ThreadPost(
                 activeConnectors.removeAt(activeConnectors.lastIndex)
             }
         }
+    }
+}
+
+private fun String.containsWordBoundary(word: String): Boolean {
+    var idx = 0
+    while (true) {
+        idx = indexOf(word, idx)
+        if (idx < 0) return false
+        val before = if (idx > 0) this[idx - 1] else ' '
+        val after = if (idx + word.length < length) this[idx + word.length] else ' '
+        if (!before.isLetterOrDigit() && !after.isLetterOrDigit()) return true
+        idx += 1
+    }
+}
+
+private fun matchesMutedWord(skeet: SkeetData, mutedWords: List<app.bsky.actor.MutedWord>, now: Instant): Boolean {
+    if (mutedWords.isEmpty()) return false
+    val contentLower = skeet.content.lowercase()
+    val tags = skeet.facets.flatMap { facet ->
+        facet.features.mapNotNull { feature ->
+            (feature as? app.bsky.richtext.FacetFeatureUnion.Tag)?.value?.tag?.lowercase()
+        }
+    }
+    return mutedWords.any { word ->
+        val expiresAt = word.expiresAt
+        if (expiresAt != null && expiresAt < now) return@any false
+        if (word.actorTarget is app.bsky.actor.MutedWordActorTarget.ExcludeFollowing && skeet.following) return@any false
+        val valueLower = word.value.lowercase()
+        val matchesContent = word.targets.contains(app.bsky.actor.MutedWordTarget.Content) &&
+            contentLower.containsWordBoundary(valueLower)
+        val matchesTag = word.targets.contains(app.bsky.actor.MutedWordTarget.Tag) &&
+            tags.any { it == valueLower }
+        matchesContent || matchesTag
+    }
+}
+
+/**
+ * Mark each skeet with isMuted=true if itself, its parent, or its root matches any muted
+ * word rule. Called once per fetch and whenever the muted-words list changes.
+ */
+fun List<SkeetData>.withMuteFlags(mutedWords: List<app.bsky.actor.MutedWord>): List<SkeetData> {
+    if (mutedWords.isEmpty()) {
+        return if (any { it.isMuted }) map { it.copy(isMuted = false) } else this
+    }
+    val now = Clock.System.now()
+    return map { skeet ->
+        val self = matchesMutedWord(skeet, mutedWords, now)
+        val parentMuted = skeet.cachedParent?.first?.let { matchesMutedWord(it, mutedWords, now) } == true
+        val rootMuted = skeet.cachedRoot?.let { matchesMutedWord(it, mutedWords, now) } == true
+        val muted = self || parentMuted || rootMuted
+        if (muted != skeet.isMuted) skeet.copy(isMuted = muted) else skeet
     }
 }

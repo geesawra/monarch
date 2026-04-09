@@ -482,7 +482,7 @@ fun ComposeView(
                         modifier = Modifier.width(avatarSize()),
                     ) {
                         AsyncImage(
-                            model = timelineViewModel.uiState.user?.avatar?.uri,
+                            model = timelineViewModel.user?.avatar?.uri,
                             contentDescription = null,
                             modifier = Modifier
                                 .size(avatarSize())
@@ -694,8 +694,8 @@ fun ActionRow(
         if (uploadingPost.value) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularWavyProgressIndicator()
-                timelineViewModel.uiState.videoUploadStatus?.let { status ->
-                    val progress = timelineViewModel.uiState.videoUploadProgress
+                timelineViewModel.videoUploadStatus?.let { status ->
+                    val progress = timelineViewModel.videoUploadProgress
                     val text = if (progress != null && progress > 0) {
                         "${status.label} ${progress}%"
                     } else {

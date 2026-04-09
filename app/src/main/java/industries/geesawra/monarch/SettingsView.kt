@@ -367,7 +367,7 @@ fun SettingsView(
                 },
             )
 
-            val mutedWordsCount = timelineViewModel?.uiState?.mutedWords?.size ?: 0
+            val mutedWordsCount = timelineViewModel?.mutedWords?.size ?: 0
             ListItem(
                 headlineContent = { Text("Muted words") },
                 supportingContent = {
@@ -386,7 +386,7 @@ fun SettingsView(
 
                 val enablePush: () -> Unit = {
                     settingsViewModel.setPushNotificationsEnabled(true)
-                    val did = timelineViewModel.uiState.user?.did?.did
+                    val did = timelineViewModel.user?.did?.did
                     if (did != null) {
                         coroutineScope.launch {
                             pushNotificationManager.getAndRegisterToken(did).onFailure {
@@ -444,7 +444,7 @@ fun SettingsView(
 
             if (timelineViewModel != null) {
                 var showFeedPicker by remember { mutableStateOf(false) }
-                val feeds = timelineViewModel.uiState.feeds
+                val feeds = timelineViewModel.feeds
 
                 ListItem(
                     headlineContent = { Text("Default feed") },

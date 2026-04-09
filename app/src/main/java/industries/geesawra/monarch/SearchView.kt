@@ -116,7 +116,7 @@ fun SearchView(
 
         // Tabs
         SearchTabs(
-            hidePeople = viewModel.uiState.searchAuthorFilter != null,
+            hidePeople = viewModel.searchAuthorFilter != null,
             selectedTab = selectedTab,
             onTabSelected = { index ->
                 selectedTab = index
@@ -177,10 +177,10 @@ private fun SearchPostsResults(
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
 ) {
-    val posts = viewModel.uiState.searchPostResults
-    val isSearching = viewModel.uiState.isSearching
+    val posts = viewModel.searchPostResults
+    val isSearching = viewModel.isSearching
 
-    if (posts.isEmpty() && !isSearching && viewModel.uiState.searchQuery.isNotBlank()) {
+    if (posts.isEmpty() && !isSearching && viewModel.searchQuery.isNotBlank()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
@@ -257,10 +257,10 @@ private fun SearchPeopleResults(
     isScrollEnabled: Boolean,
     onProfileTap: (Did) -> Unit,
 ) {
-    val actors = viewModel.uiState.searchActorResults
-    val isSearching = viewModel.uiState.isSearching
+    val actors = viewModel.searchActorResults
+    val isSearching = viewModel.isSearching
 
-    if (actors.isEmpty() && !isSearching && viewModel.uiState.searchQuery.isNotBlank()) {
+    if (actors.isEmpty() && !isSearching && viewModel.searchQuery.isNotBlank()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,

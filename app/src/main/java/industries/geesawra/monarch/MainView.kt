@@ -370,9 +370,9 @@ private fun InnerTimelineView(
     val drawerState = rememberWideNavigationRailState(
         initialValue = WideNavigationRailValue.Collapsed
     )
-    val feedItems = remember(timelineViewModel.uiState.feeds, timelineViewModel.uiState.user?.avatar) {
-        listOf(FeedItem("following", "Following", timelineViewModel.uiState.user?.avatar?.uri)) +
-        timelineViewModel.uiState.feeds.map { FeedItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
+    val feedItems = remember(timelineViewModel.feeds, timelineViewModel.user?.avatar) {
+        listOf(FeedItem("following", "Following", timelineViewModel.user?.avatar?.uri)) +
+        timelineViewModel.feeds.map { FeedItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
     }
     val pagerState = rememberPagerState(pageCount = { feedItems.size })
     val pagerListStates = remember { mutableMapOf<Int, LazyListState>() }
@@ -380,7 +380,7 @@ private fun InnerTimelineView(
     if (settingsState.swipeableFeeds) {
         LaunchedEffect(pagerState.settledPage) {
             val feed = feedItems.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
-            if (feed.uri != timelineViewModel.uiState.selectedFeed) {
+            if (feed.uri != timelineViewModel.selectedFeed) {
                 timelineViewModel.selectFeed(feed.uri, feed.displayName, feed.avatar)
             }
         }
@@ -395,7 +395,7 @@ private fun InnerTimelineView(
         ) {
             MediaFeedView(
                 posts = mediaFeedPosts!!,
-                isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
+                isLoading = timelineViewModel.isFetchingMoreTimeline,
                 onLoadMore = { timelineViewModel.fetchTimeline() },
                 onProfileTap = { did ->
                     mediaFeedPosts = null
@@ -407,22 +407,22 @@ private fun InnerTimelineView(
     }
 
     val isRefreshing =
-        timelineViewModel.uiState.isFetchingMoreTimeline || timelineViewModel.uiState.isFetchingMoreNotifications
+        timelineViewModel.isFetchingMoreTimeline || timelineViewModel.isFetchingMoreNotifications
     val isScrollEnabled = true
     val ctx = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
 
-    LaunchedEffect(timelineViewModel.uiState.loginError) {
-        timelineViewModel.uiState.loginError?.let {
+    LaunchedEffect(timelineViewModel.loginError) {
+        timelineViewModel.loginError?.let {
             Toast.makeText(ctx, "Authentication error: $it", Toast.LENGTH_LONG)
                 .show()
             loginError()
         }
     }
 
-    LaunchedEffect(timelineViewModel.uiState.error) {
-        timelineViewModel.uiState.error?.let {
+    LaunchedEffect(timelineViewModel.error) {
+        timelineViewModel.error?.let {
             onError(it)
             timelineViewModel.clearError()
         }
@@ -666,17 +666,17 @@ private fun InnerTimelineView(
                                         focusRequester.requestFocus()
                                     }
                                 } else if (settingsState.swipeableFeeds) {
-                                    Text(text = timelineViewModel.uiState.user?.displayName
-                                        ?: timelineViewModel.uiState.user?.handle?.handle
+                                    Text(text = timelineViewModel.user?.displayName
+                                        ?: timelineViewModel.user?.handle?.handle
                                         ?: "")
                                 } else {
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        if (timelineViewModel.uiState.feedAvatar != null && timelineViewModel.uiState.selectedFeed != "following") {
+                                        if (timelineViewModel.feedAvatar != null && timelineViewModel.selectedFeed != "following") {
                                             AsyncImage(
-                                                model = timelineViewModel.uiState.feedAvatar,
+                                                model = timelineViewModel.feedAvatar,
                                                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                                 error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                                 modifier = Modifier
@@ -686,12 +686,12 @@ private fun InnerTimelineView(
                                             )
                                         }
 
-                                        Text(text = timelineViewModel.uiState.feedName)
+                                        Text(text = timelineViewModel.feedName)
                                     }
                                 }
 
                                 TabBarDestinations.SEARCH -> {
-                                    val authorFilter = timelineViewModel.uiState.searchAuthorFilter
+                                    val authorFilter = timelineViewModel.searchAuthorFilter
                                     if (authorFilter != null) {
                                         Text(text = "from:$authorFilter")
                                     } else {
@@ -745,7 +745,7 @@ private fun InnerTimelineView(
                                         Icon(Icons.Default.Search, "Search timeline")
                                     }
 
-                                    val user = timelineViewModel.uiState.user
+                                    val user = timelineViewModel.user
                                     var showAccountSwitcher by remember { mutableStateOf(false) }
                                     val avatarClipShape = settingsState.avatarClipShape
 
@@ -789,10 +789,10 @@ private fun InnerTimelineView(
                                 }
 
                                 TabBarDestinations.SEARCH -> {
-                                    val authorFilter = timelineViewModel.uiState.searchAuthorFilter
+                                    val authorFilter = timelineViewModel.searchAuthorFilter
                                     if (authorFilter != null) {
                                         IconButton(onClick = {
-                                            timelineViewModel.setSearchAuthorFilter(null)
+                                            timelineViewModel.changeSearchAuthorFilter(null)
                                         }) {
                                             Icon(Icons.Default.PersonSearch, "Remove author filter")
                                         }
@@ -805,7 +805,7 @@ private fun InnerTimelineView(
                                             SearchFromAuthorDialog(
                                                 onDismiss = { showFromDialog = false },
                                                 onConfirm = { handle ->
-                                                    timelineViewModel.setSearchAuthorFilter(handle)
+                                                    timelineViewModel.changeSearchAuthorFilter(handle)
                                                     showFromDialog = false
                                                 },
                                             )
@@ -828,7 +828,7 @@ private fun InnerTimelineView(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         val feedUri = feedItems.getOrNull(pagerState.settledPage)?.uri ?: "following"
-                                        mediaFeedPosts = timelineViewModel.uiState.feedSkeets[feedUri] ?: timelineViewModel.uiState.skeets
+                                        mediaFeedPosts = timelineViewModel.feedSkeets[feedUri] ?: timelineViewModel.skeets
                                     },
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 ) {
@@ -923,8 +923,8 @@ private fun InnerTimelineView(
                                                         contentPadding = PaddingValues(horizontal = 0.dp),
                                                     ) { page ->
                                                         val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
-                                                        val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
-                                                        val notYetLoaded = feedUri !in timelineViewModel.uiState.feedSkeets
+                                                        val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
+                                                        val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
                                                         val pageListState = rememberLazyListState()
                                                         pagerListStates[page] = pageListState
                                                         ShowSkeets(
@@ -933,7 +933,7 @@ private fun InnerTimelineView(
                                                             state = pageListState,
                                                             onReplyTap = onReplyTap,
                                                             data = pageData,
-                                                            isLoading = notYetLoaded || (timelineViewModel.uiState.isFetchingMoreTimeline && page == pagerState.settledPage),
+                                                            isLoading = notYetLoaded || (timelineViewModel.isFetchingMoreTimeline && page == pagerState.settledPage),
                                                             isScrollEnabled = isScrollEnabled,
                                                             onSeeMoreTap = expandedOnSeeMoreTap,
                                                             onProfileTap = expandedOnProfileTap,
@@ -997,8 +997,8 @@ private fun InnerTimelineView(
                                                 beyondViewportPageCount = 0,
                                             ) { page ->
                                                 val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
-                                                val pageData = timelineViewModel.uiState.feedSkeets[feedUri] ?: listOf()
-                                                val notYetLoaded = feedUri !in timelineViewModel.uiState.feedSkeets
+                                                val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
+                                                val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
                                                 val pageListState = rememberLazyListState()
                                                 pagerListStates[page] = pageListState
                                                 ShowSkeets(
@@ -1007,7 +1007,7 @@ private fun InnerTimelineView(
                                                     state = pageListState,
                                                     onReplyTap = onReplyTap,
                                                     data = pageData,
-                                                    isLoading = notYetLoaded || (timelineViewModel.uiState.isFetchingMoreTimeline && page == pagerState.settledPage),
+                                                    isLoading = notYetLoaded || (timelineViewModel.isFetchingMoreTimeline && page == pagerState.settledPage),
                                                     isScrollEnabled = isScrollEnabled,
                                                     onSeeMoreTap = onSeeMoreTap,
                                                     onProfileTap = onProfileTap,
@@ -1025,8 +1025,8 @@ private fun InnerTimelineView(
                                                 settingsState = settingsState,
                                                 state = timelineState,
                                                 onReplyTap = onReplyTap,
-                                                data = timelineViewModel.uiState.skeets,
-                                                isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
+                                                data = timelineViewModel.skeets,
+                                                isLoading = timelineViewModel.isFetchingMoreTimeline,
                                                 isScrollEnabled = isScrollEnabled,
                                                 onSeeMoreTap = expandedOnSeeMoreTap,
                                                 onProfileTap = expandedOnProfileTap,
@@ -1087,8 +1087,8 @@ private fun InnerTimelineView(
                                         settingsState = settingsState,
                                         state = timelineState,
                                         onReplyTap = onReplyTap,
-                                        data = timelineViewModel.uiState.skeets,
-                                        isLoading = timelineViewModel.uiState.isFetchingMoreTimeline,
+                                        data = timelineViewModel.skeets,
+                                        isLoading = timelineViewModel.isFetchingMoreTimeline,
                                         isScrollEnabled = isScrollEnabled,
                                         onSeeMoreTap = onSeeMoreTap,
                                         onProfileTap = onProfileTap,
@@ -1173,7 +1173,7 @@ private fun DetailThreadPane(
             ShowSkeets(
                 viewModel = timelineViewModel,
                 isScrollEnabled = true,
-                data = timelineViewModel.uiState.currentlyShownThread.flatten(),
+                data = timelineViewModel.currentlyShownThread.flatten(),
                 shouldFetchMoreData = false,
                 isShowingThread = true,
                 settingsState = settingsState,
@@ -1198,8 +1198,8 @@ private fun DetailProfilePane(
     onClose: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    val profile = timelineViewModel.uiState.profileUser
-    val isLoading = timelineViewModel.uiState.isFetchingProfile && profile == null
+    val profile = timelineViewModel.profileUser
+    val isLoading = timelineViewModel.isFetchingProfile && profile == null
     val listState = rememberLazyListState()
 
     Scaffold(
@@ -1241,7 +1241,7 @@ private fun DetailProfilePane(
             ) {
                 if (isLoading) {
                     CircularWavyProgressIndicator()
-                } else if (timelineViewModel.uiState.profileNotFound) {
+                } else if (timelineViewModel.profileNotFound) {
                     Text("Profile not found")
                 }
             }
@@ -1278,12 +1278,12 @@ fun FeedsDrawer(
             label = {
                 Text(text = "Following")
             },
-            selected = timelineViewModel.uiState.selectedFeed.lowercase() == "following",
+            selected = timelineViewModel.selectedFeed.lowercase() == "following",
             onClick = {
                 selectFeed("following", "Following", null)
             },
             icon = {
-                val userAvatar = timelineViewModel.uiState.user?.avatar?.uri
+                val userAvatar = timelineViewModel.user?.avatar?.uri
                 if (userAvatar != null) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -1304,7 +1304,7 @@ fun FeedsDrawer(
             railExpanded = state == WideNavigationRailValue.Expanded,
         )
 
-        timelineViewModel.uiState.feeds.forEach { feed ->
+        timelineViewModel.feeds.forEach { feed ->
             WideNavigationRailItem(
                 label = {
                     Row(
@@ -1314,7 +1314,7 @@ fun FeedsDrawer(
                         Text(text = feed.displayName)
                     }
                 },
-                selected = timelineViewModel.uiState.selectedFeed == feed.uri.atUri,
+                selected = timelineViewModel.selectedFeed == feed.uri.atUri,
                 onClick = {
                     selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
                 },

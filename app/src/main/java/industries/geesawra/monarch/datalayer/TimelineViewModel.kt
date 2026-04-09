@@ -65,8 +65,15 @@ enum class VideoUploadStatus(val label: String) {
     Processing("Processing..."),
 }
 
-data class TimelineUiState(
+data class SessionState(
     val user: ProfileViewDetailed? = null,
+    val authenticated: Boolean = false,
+    val sessionChecked: Boolean = false,
+    val loginError: String? = null,
+    val error: String? = null,
+)
+
+data class TimelineState(
     val selectedFeed: String = "following",
     val feedName: String = "",
     val feedAvatar: String? = null,
@@ -74,33 +81,26 @@ data class TimelineUiState(
     val skeets: List<SkeetData> = listOf(),
     val feedSkeets: Map<String, List<SkeetData>> = mapOf(),
     val feedCursors: Map<String, String?> = mapOf(),
-    val notifications: List<Notification> = listOf(),
-    val isFetchingMoreTimeline: Boolean = false,
-    val isFetchingMoreNotifications: Boolean = false,
-    val authenticated: Boolean = false,
-    val sessionChecked: Boolean = false,
-
     val timelineCursor: String? = null,
+    val isFetchingMoreTimeline: Boolean = false,
+    val mutedWords: List<MutedWord> = listOf(),
+)
+
+data class NotificationsState(
+    val notifications: List<Notification> = listOf(),
     val notificationsCursor: String? = null,
+    val isFetchingMoreNotifications: Boolean = false,
     val unreadNotificationsAmt: Int = 0,
     val seenNotificationsAt: Instant? = null,
+)
 
+data class ThreadState(
     val threadStack: List<ThreadPost> = listOf(),
+) {
+    val currentlyShownThread: ThreadPost get() = threadStack.lastOrNull() ?: ThreadPost()
+}
 
-    val mutedWords: List<MutedWord> = listOf(),
-
-    val followersListDid: Did? = null,
-    val followersListName: String? = null,
-    val profileFollowers: List<ProfileView> = listOf(),
-    val profileFollows: List<ProfileView> = listOf(),
-    val profileFollowersCursor: String? = null,
-    val profileFollowsCursor: String? = null,
-    val showFollowersTab: Boolean = true,
-
-    val loginError: String? = null,
-    val error: String? = null,
-
-    // Profile viewer state
+data class ProfileState(
     val profileUser: ProfileViewDetailed? = null,
     val profilePosts: List<SkeetData> = listOf(),
     val profileFeedCursor: String? = null,
@@ -108,8 +108,19 @@ data class TimelineUiState(
     val isFetchingProfile: Boolean = false,
     val isFetchingProfileFeed: Boolean = false,
     val profileNotFound: Boolean = false,
+)
 
-    // Search state
+data class FollowersState(
+    val followersListDid: Did? = null,
+    val followersListName: String? = null,
+    val profileFollowers: List<ProfileView> = listOf(),
+    val profileFollows: List<ProfileView> = listOf(),
+    val profileFollowersCursor: String? = null,
+    val profileFollowsCursor: String? = null,
+    val showFollowersTab: Boolean = true,
+)
+
+data class SearchState(
     val searchQuery: String = "",
     val searchPostResults: List<SkeetData> = listOf(),
     val searchActorResults: List<ProfileView> = listOf(),
@@ -118,12 +129,13 @@ data class TimelineUiState(
     val searchPostsSort: SearchPostsSort = SearchPostsSort.Latest,
     val searchAuthorFilter: String? = null,
     val isSearching: Boolean = false,
+)
 
-    val videoUploadStatus: VideoUploadStatus? = null,
-    val videoUploadProgress: Long? = null,
-) {
-    val currentlyShownThread: ThreadPost get() = threadStack.lastOrNull() ?: ThreadPost()
-}
+data class VideoUploadState(
+    val status: VideoUploadStatus? = null,
+    val progress: Long? = null,
+)
+
 
 object NotificationBadge {
     val count = kotlinx.coroutines.flow.MutableStateFlow(0)
@@ -145,8 +157,99 @@ class TimelineViewModel @AssistedInject constructor(
         fun create(bskyConn: BlueskyConn): TimelineViewModel
     }
 
-    var uiState by mutableStateOf(TimelineUiState())
-        private set
+    // ── Sliced UI state ─────────────────────────────────────────────────────
+    // Each group is its own mutableStateOf so composables that read from one
+    // group don't recompose when an unrelated group changes. The flat getters
+    // below preserve the old `viewModel.field` call-site API.
+    var sessionState by mutableStateOf(SessionState()); private set
+    var timelineState by mutableStateOf(TimelineState()); private set
+    var notificationsState by mutableStateOf(NotificationsState()); private set
+    var threadState by mutableStateOf(ThreadState()); private set
+    var profileState by mutableStateOf(ProfileState()); private set
+    var followersState by mutableStateOf(FollowersState()); private set
+    var searchState by mutableStateOf(SearchState()); private set
+    var videoUploadState by mutableStateOf(VideoUploadState()); private set
+
+    // ── Flat read-only forwarding getters (compat with existing call sites) ─
+    val user: ProfileViewDetailed? get() = sessionState.user
+    val authenticated: Boolean get() = sessionState.authenticated
+    val sessionChecked: Boolean get() = sessionState.sessionChecked
+    val loginError: String? get() = sessionState.loginError
+    val error: String? get() = sessionState.error
+
+    val selectedFeed: String get() = timelineState.selectedFeed
+    val feedName: String get() = timelineState.feedName
+    val feedAvatar: String? get() = timelineState.feedAvatar
+    val feeds: List<GeneratorView> get() = timelineState.feeds
+    val skeets: List<SkeetData> get() = timelineState.skeets
+    val feedSkeets: Map<String, List<SkeetData>> get() = timelineState.feedSkeets
+    val feedCursors: Map<String, String?> get() = timelineState.feedCursors
+    val timelineCursor: String? get() = timelineState.timelineCursor
+    val isFetchingMoreTimeline: Boolean get() = timelineState.isFetchingMoreTimeline
+    val mutedWords: List<MutedWord> get() = timelineState.mutedWords
+
+    val notifications: List<Notification> get() = notificationsState.notifications
+    val notificationsCursor: String? get() = notificationsState.notificationsCursor
+    val isFetchingMoreNotifications: Boolean get() = notificationsState.isFetchingMoreNotifications
+    val unreadNotificationsAmt: Int get() = notificationsState.unreadNotificationsAmt
+    private val seenNotificationsAt: Instant? get() = notificationsState.seenNotificationsAt
+
+    val threadStack: List<ThreadPost> get() = threadState.threadStack
+    val currentlyShownThread: ThreadPost get() = threadState.currentlyShownThread
+
+    val profileUser: ProfileViewDetailed? get() = profileState.profileUser
+    val profilePosts: List<SkeetData> get() = profileState.profilePosts
+    val profileFeedCursor: String? get() = profileState.profileFeedCursor
+    val profileFeedFilter: GetAuthorFeedFilter? get() = profileState.profileFeedFilter
+    val isFetchingProfile: Boolean get() = profileState.isFetchingProfile
+    val isFetchingProfileFeed: Boolean get() = profileState.isFetchingProfileFeed
+    val profileNotFound: Boolean get() = profileState.profileNotFound
+
+    val followersListDid: Did? get() = followersState.followersListDid
+    val followersListName: String? get() = followersState.followersListName
+    val profileFollowers: List<ProfileView> get() = followersState.profileFollowers
+    val profileFollows: List<ProfileView> get() = followersState.profileFollows
+    val profileFollowersCursor: String? get() = followersState.profileFollowersCursor
+    val profileFollowsCursor: String? get() = followersState.profileFollowsCursor
+    val showFollowersTab: Boolean get() = followersState.showFollowersTab
+
+    val searchQuery: String get() = searchState.searchQuery
+    val searchPostResults: List<SkeetData> get() = searchState.searchPostResults
+    val searchActorResults: List<ProfileView> get() = searchState.searchActorResults
+    val searchPostsCursor: String? get() = searchState.searchPostsCursor
+    val searchActorsCursor: String? get() = searchState.searchActorsCursor
+    val searchPostsSort: SearchPostsSort get() = searchState.searchPostsSort
+    val searchAuthorFilter: String? get() = searchState.searchAuthorFilter
+    val isSearching: Boolean get() = searchState.isSearching
+
+    val videoUploadStatus: VideoUploadStatus? get() = videoUploadState.status
+    val videoUploadProgress: Long? get() = videoUploadState.progress
+
+    // ── Update helpers ──────────────────────────────────────────────────────
+    private inline fun updateSession(block: (SessionState) -> SessionState) {
+        sessionState = block(sessionState)
+    }
+    private inline fun updateTimeline(block: (TimelineState) -> TimelineState) {
+        timelineState = block(timelineState)
+    }
+    private inline fun updateNotifications(block: (NotificationsState) -> NotificationsState) {
+        notificationsState = block(notificationsState)
+    }
+    private inline fun updateThread(block: (ThreadState) -> ThreadState) {
+        threadState = block(threadState)
+    }
+    private inline fun updateProfile(block: (ProfileState) -> ProfileState) {
+        profileState = block(profileState)
+    }
+    private inline fun updateFollowers(block: (FollowersState) -> FollowersState) {
+        followersState = block(followersState)
+    }
+    private inline fun updateSearch(block: (SearchState) -> SearchState) {
+        searchState = block(searchState)
+    }
+    private inline fun updateVideoUpload(block: (VideoUploadState) -> VideoUploadState) {
+        videoUploadState = block(videoUploadState)
+    }
 
     var accounts by mutableStateOf<List<StoredAccount>>(emptyList())
         private set
@@ -156,7 +259,17 @@ class TimelineViewModel @AssistedInject constructor(
 
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
-    private val seenNotificationsAt: Instant? get() = uiState.seenNotificationsAt
+
+    private fun resetAllState() {
+        sessionState = SessionState()
+        timelineState = TimelineState()
+        notificationsState = NotificationsState()
+        threadState = ThreadState()
+        profileState = ProfileState()
+        followersState = FollowersState()
+        searchState = SearchState()
+        videoUploadState = VideoUploadState()
+    }
 
     fun appviewName(): String = bskyConn.appviewName()
     fun appviewProxy(): String? = bskyConn.appviewProxy
@@ -172,13 +285,13 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun clearError() {
-        uiState = uiState.copy(error = null)
+        updateSession { it.copy(error = null) }
     }
 
     private fun handleError(error: Throwable) {
         when (error) {
-            is LoginException -> uiState = uiState.copy(loginError = error.message)
-            else -> uiState = uiState.copy(error = error.message)
+            is LoginException -> updateSession { it.copy(loginError = error.message) }
+            else -> updateSession { it.copy(error = error.message) }
         }
     }
 
@@ -199,7 +312,7 @@ class TimelineViewModel @AssistedInject constructor(
             val token = bskyConn.oauthToken ?: return@launch
             val pds = bskyConn.pdsURL ?: return@launch
             val appview = bskyConn.appviewProxy ?: return@launch
-            val user = uiState.user
+            val user = this@TimelineViewModel.user
 
             accountManager.addAccount(
                 StoredAccount(
@@ -239,7 +352,8 @@ class TimelineViewModel @AssistedInject constructor(
                 handle = sh.christian.ozone.api.Handle(account.handle),
             )
             postInteractionStore.clear()
-            uiState = TimelineUiState(authenticated = true, sessionChecked = true)
+            resetAllState()
+            updateSession { it.copy(authenticated = true, sessionChecked = true) }
             refreshAccounts()
             then()
         }
@@ -273,8 +387,8 @@ class TimelineViewModel @AssistedInject constructor(
                 handle = sh.christian.ozone.api.Handle(target.handle),
             )
             postInteractionStore.clear()
-            uiState = TimelineUiState()
-            uiState = uiState.copy(authenticated = true, sessionChecked = true)
+            resetAllState()
+            updateSession { it.copy(authenticated = true, sessionChecked = true) }
             refreshAccounts()
             fetchAllNewData(then)
         }
@@ -294,7 +408,8 @@ class TimelineViewModel @AssistedInject constructor(
                 val next = remaining.first()
                 switchAccount(next.did, then)
             } else {
-                uiState = TimelineUiState(sessionChecked = true)
+                resetAllState()
+                updateSession { it.copy(sessionChecked = true) }
                 refreshAccounts()
                 then()
             }
@@ -303,18 +418,19 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun onNewLogin() {
         bskyConn.resetClients()
-        uiState = TimelineUiState(authenticated = true, sessionChecked = true)
+        resetAllState()
+        updateSession { it.copy(authenticated = true, sessionChecked = true) }
     }
 
     fun loadSession() {
         viewModelScope.launch {
             if (!bskyConn.hasSession()) {
-                uiState = uiState.copy(sessionChecked = true)
+                updateSession { it.copy(sessionChecked = true) }
                 refreshAccounts()
                 return@launch
             }
 
-            uiState = uiState.copy(authenticated = true, sessionChecked = true)
+            updateSession { it.copy(authenticated = true, sessionChecked = true) }
             refreshAccounts()
         }
     }
@@ -336,15 +452,15 @@ class TimelineViewModel @AssistedInject constructor(
         return viewModelScope.launch {
             bskyConn.fetchSelf().onFailure {
                 handleError(it)
-            }.onSuccess {
-                uiState = uiState.copy(user = it)
+            }.onSuccess { fetched ->
+                updateSession { it.copy(user = fetched) }
                 saveCurrentAccount()
             }
         }
     }
 
     fun fetchTimeline(fresh: Boolean = false, replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads, then: () -> Unit = {}) {
-        uiState = uiState.copy(isFetchingMoreTimeline = true)
+        updateTimeline { it.copy(isFetchingMoreTimeline = true) }
         runCatching {
             timelineFetchJob?.cancel()
         }
@@ -352,86 +468,73 @@ class TimelineViewModel @AssistedInject constructor(
         timelineFetchJob = viewModelScope.launch {
             bskyConn.refreshLabelCacheIfNeeded()
 
-            when (uiState.selectedFeed) {
+            when (selectedFeed) {
                 "following" -> bskyConn.fetchTimeline(
-                    if (fresh) {
-                        null
-                    } else {
-                        uiState.timelineCursor
-                    }
+                    if (fresh) null else timelineCursor
                 )
 
                 else -> bskyConn.fetchFeed(
-                    feed = uiState.selectedFeed,
-                    cursor = if (fresh) {
-                        null
-                    } else {
-                        uiState.timelineCursor
-                    }
+                    feed = selectedFeed,
+                    cursor = if (fresh) null else timelineCursor
                 )
             }.onSuccess { response ->
-                val feedKey = uiState.selectedFeed
-                val existingFeedSkeets = uiState.feedSkeets[feedKey] ?: listOf()
+                val feedKey = selectedFeed
+                val existingFeedSkeets = feedSkeets[feedKey] ?: listOf()
+                val currentMutedWords = mutedWords
                 val newSkeets = if (fresh) {
                     response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
                 } else {
-                    (uiState.skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
-                }
+                    (skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
+                }.withMuteFlags(currentMutedWords)
                 val newFeedSkeets = if (fresh) {
                     newSkeets
                 } else {
                     (existingFeedSkeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
-                }
+                }.withMuteFlags(currentMutedWords)
 
-                uiState = uiState.copy(
-                    skeets = newSkeets,
-                    feedSkeets = uiState.feedSkeets + (feedKey to newFeedSkeets),
-                    feedCursors = uiState.feedCursors + (feedKey to response.cursor),
-                    timelineCursor = response.cursor,
-                    isFetchingMoreTimeline = false
-                )
+                updateTimeline { t ->
+                    t.copy(
+                        skeets = newSkeets,
+                        feedSkeets = t.feedSkeets + (feedKey to newFeedSkeets),
+                        feedCursors = t.feedCursors + (feedKey to response.cursor),
+                        timelineCursor = response.cursor,
+                        isFetchingMoreTimeline = false,
+                    )
+                }
                 newSkeets.forEach { postInteractionStore.seed(it) }
                 then()
-            }.onFailure {
-                if (it is CancellationException) {
+            }.onFailure { err ->
+                if (err is CancellationException) {
                     return@onFailure
                 }
 
                 then()
 
-                uiState = uiState.copy(
-                    isFetchingMoreTimeline = false,
-                    error = "Failed to fetch timeline: ${it.message}"
-                )
+                updateTimeline { it.copy(isFetchingMoreTimeline = false) }
+                updateSession { it.copy(error = "Failed to fetch timeline: ${err.message}") }
             }
         }
     }
 
     fun fetchNotifications(fresh: Boolean = false, then: () -> Unit = {}) {
-        uiState = uiState.copy(isFetchingMoreNotifications = true)
+        updateNotifications { it.copy(isFetchingMoreNotifications = true) }
         runCatching {
             notificationsFetchJob?.cancel()
         }
 
         notificationsFetchJob = viewModelScope.launch {
             val rawNotifs = bskyConn.notifications(
-                if (fresh) {
-                    null
-                } else {
-                    uiState.notificationsCursor
-                }
+                if (fresh) null else notificationsCursor
             )
-                .onFailure {
-                    if (it is CancellationException) {
+                .onFailure { err ->
+                    if (err is CancellationException) {
                         return@onFailure
                     }
 
                     then()
 
-                    uiState = uiState.copy(
-                        isFetchingMoreNotifications = false,
-                        error = "Failed to fetch notifications: ${it.message}"
-                    )
+                    updateNotifications { it.copy(isFetchingMoreNotifications = false) }
+                    updateSession { it.copy(error = "Failed to fetch notifications: ${err.message}") }
                 }.getOrNull()
 
             if (rawNotifs == null) {
@@ -444,7 +547,7 @@ class TimelineViewModel @AssistedInject constructor(
                     true -> acc
                 }
             }
-            uiState = uiState.copy(unreadNotificationsAmt = unreadCount)
+            updateNotifications { it.copy(unreadNotificationsAmt = unreadCount) }
             NotificationBadge.set(unreadCount)
 
             val posts = parseRawNotifications(rawNotifs)
@@ -453,16 +556,18 @@ class TimelineViewModel @AssistedInject constructor(
             val processed = processGroupedNotifications(notifs, grouped)
 
             if (fresh) {
-                uiState = uiState.copy(notifications = listOf())
+                updateNotifications { it.copy(notifications = listOf()) }
             }
 
-            val merged = (uiState.notifications + processed).distinctBy { it.uniqueKey() }
+            val merged = (notifications + processed).distinctBy { it.uniqueKey() }
 
-            uiState = uiState.copy(
-                notifications = merged,
-                notificationsCursor = rawNotifs.cursor,
-                isFetchingMoreNotifications = false,
-            )
+            updateNotifications {
+                it.copy(
+                    notifications = merged,
+                    notificationsCursor = rawNotifs.cursor,
+                    isFetchingMoreNotifications = false,
+                )
+            }
 
             then()
         }
@@ -652,13 +757,12 @@ class TimelineViewModel @AssistedInject constructor(
 
         val processRepeatable =
             { kind: RepeatableNotification, list: MutableMap<Cid, RepeatedNotification>, post: SkeetData, author: ProfileView, createdAt: Instant, new: Boolean ->
-                if (list.contains(post.cid)) {
-                    val l = list[post.cid]!!
-                    l.authors += RepeatedAuthor(author, createdAt)
-                    if (createdAt > l.timestamp) {
-                        l.timestamp = createdAt
-                    }
-                    list[post.cid] = l
+                val existing = list[post.cid]
+                if (existing != null) {
+                    list[post.cid] = existing.copy(
+                        authors = existing.authors + RepeatedAuthor(author, createdAt),
+                        timestamp = if (createdAt > existing.timestamp) createdAt else existing.timestamp,
+                    )
                 } else {
                     list[post.cid] = RepeatedNotification(
                         kind = kind,
@@ -743,12 +847,12 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun updateSeenNotifications() {
-        uiState = uiState.copy(seenNotificationsAt = Clock.System.now())
+        updateNotifications { it.copy(seenNotificationsAt = Clock.System.now()) }
         viewModelScope.launch {
             bskyConn.updateSeenNotifications().onFailure {
                 handleError(it)
             }.onSuccess {
-                uiState = uiState.copy(unreadNotificationsAmt = 0)
+                updateNotifications { it.copy(unreadNotificationsAmt = 0) }
                 NotificationBadge.clear()
             }
         }
@@ -774,18 +878,18 @@ class TimelineViewModel @AssistedInject constructor(
             linkPreview = linkPreview,
             threadgateRules = threadgateRules,
             onVideoStatus = { status, progress ->
-                uiState = uiState.copy(videoUploadStatus = status, videoUploadProgress = progress)
+                updateVideoUpload { VideoUploadState(status = status, progress = progress) }
             },
         )
-        uiState = uiState.copy(videoUploadStatus = null, videoUploadProgress = null)
+        updateVideoUpload { VideoUploadState() }
         result.onSuccess { uri ->
-            if (uiState.selectedFeed == "following") {
+            if (selectedFeed == "following") {
                 kotlinx.coroutines.delay(500)
                 bskyConn.getPosts(listOf(uri)).onSuccess { posts ->
                     val newSkeet = posts.firstOrNull()?.let { SkeetData.fromPostView(it, it.author) }
                     if (newSkeet != null) {
                         postInteractionStore.seed(newSkeet)
-                        uiState = uiState.copy(skeets = listOf(newSkeet) + uiState.skeets)
+                        updateTimeline { it.copy(skeets = listOf(newSkeet) + it.skeets) }
                     }
                 }
             }
@@ -797,20 +901,22 @@ class TimelineViewModel @AssistedInject constructor(
         return viewModelScope.launch {
             bskyConn.feeds().onFailure {
                 handleError(it)
-            }.onSuccess {
-                uiState = uiState.copy(feeds = it)
+            }.onSuccess { fetched ->
+                updateTimeline { it.copy(feeds = fetched) }
             }
         }
     }
 
     fun applyFeedState(uri: String, displayName: String, avatar: String?) {
-        uiState = uiState.copy(
-            selectedFeed = uri,
-            feedName = displayName,
-            feedAvatar = avatar,
-            skeets = uiState.feedSkeets[uri] ?: listOf(),
-            timelineCursor = uiState.feedCursors[uri],
-        )
+        updateTimeline {
+            it.copy(
+                selectedFeed = uri,
+                feedName = displayName,
+                feedAvatar = avatar,
+                skeets = it.feedSkeets[uri] ?: listOf(),
+                timelineCursor = it.feedCursors[uri],
+            )
+        }
     }
 
     fun selectFeed(uri: String, displayName: String, avatar: String?, then: () -> Unit = {}) {
@@ -851,10 +957,8 @@ class TimelineViewModel @AssistedInject constructor(
             bskyConn.deletePost(uri.rkey()).onFailure {
                 handleError(it)
             }.onSuccess {
-                uiState = uiState.copy(
-                    skeets = uiState.skeets.filter { it.uri != uri },
-                    profilePosts = uiState.profilePosts.filter { it.uri != uri },
-                )
+                updateTimeline { t -> t.copy(skeets = t.skeets.filter { it.uri != uri }) }
+                updateProfile { p -> p.copy(profilePosts = p.profilePosts.filter { it.uri != uri }) }
                 then()
             }
         }
@@ -891,23 +995,35 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun startThread(tappedElement: SkeetData) {
-        uiState = uiState.copy(threadStack = listOf(ThreadPost(post = tappedElement)))
+        updateThread { ThreadState(threadStack = listOf(ThreadPost(post = tappedElement))) }
     }
 
     fun setThread(tappedElement: SkeetData) {
-        uiState = uiState.copy(threadStack = uiState.threadStack + ThreadPost(post = tappedElement))
+        updateThread { it.copy(threadStack = it.threadStack + ThreadPost(post = tappedElement)) }
     }
 
     fun popThread() {
-        if (uiState.threadStack.size > 1) {
-            uiState = uiState.copy(threadStack = uiState.threadStack.dropLast(1))
+        if (threadStack.size > 1) {
+            updateThread { it.copy(threadStack = it.threadStack.dropLast(1)) }
         }
+    }
+
+    private fun reapplyMuteFlags(words: List<MutedWord>) {
+        updateTimeline { t ->
+            t.copy(
+                mutedWords = words,
+                skeets = t.skeets.withMuteFlags(words),
+                feedSkeets = t.feedSkeets.mapValues { (_, list) -> list.withMuteFlags(words) },
+            )
+        }
+        updateProfile { p -> p.copy(profilePosts = p.profilePosts.withMuteFlags(words)) }
+        updateSearch { s -> s.copy(searchPostResults = s.searchPostResults.withMuteFlags(words)) }
     }
 
     fun fetchMutedWords() {
         viewModelScope.launch {
-            bskyConn.getMutedWords().onSuccess {
-                uiState = uiState.copy(mutedWords = it)
+            bskyConn.getMutedWords().onSuccess { fetched ->
+                reapplyMuteFlags(fetched)
             }
         }
     }
@@ -919,50 +1035,50 @@ class TimelineViewModel @AssistedInject constructor(
                 targets = targets,
                 actorTarget = actorTarget,
             )
-            val updated = uiState.mutedWords + newWord
+            val updated = mutedWords + newWord
             bskyConn.setMutedWords(updated).onSuccess {
-                uiState = uiState.copy(mutedWords = updated)
-            }.onFailure {
-                uiState = uiState.copy(error = it.message)
+                reapplyMuteFlags(updated)
+            }.onFailure { err ->
+                updateSession { it.copy(error = err.message) }
             }
         }
     }
 
     fun removeMutedWord(word: MutedWord) {
         viewModelScope.launch {
-            val updated = uiState.mutedWords.filter { it.value != word.value || it.targets != word.targets }
+            val updated = mutedWords.filter { it.value != word.value || it.targets != word.targets }
             bskyConn.setMutedWords(updated).onSuccess {
-                uiState = uiState.copy(mutedWords = updated)
-            }.onFailure {
-                uiState = uiState.copy(error = it.message)
+                reapplyMuteFlags(updated)
+            }.onFailure { err ->
+                updateSession { it.copy(error = err.message) }
             }
         }
     }
 
     fun openFollowersList(did: Did, showFollowers: Boolean, name: String? = null) {
-        val displayName = name ?: uiState.profileUser?.let { if (it.did == did) it.displayName ?: it.handle.handle else null } ?: did.did
-        uiState = uiState.copy(
-            followersListDid = did,
-            followersListName = displayName,
-            profileFollowers = listOf(),
-            profileFollows = listOf(),
-            profileFollowersCursor = null,
-            profileFollowsCursor = null,
-            showFollowersTab = showFollowers,
-        )
+        val displayName = name ?: profileUser?.let { if (it.did == did) it.displayName ?: it.handle.handle else null } ?: did.did
+        updateFollowers {
+            FollowersState(
+                followersListDid = did,
+                followersListName = displayName,
+                showFollowersTab = showFollowers,
+            )
+        }
     }
 
     fun fetchFollowers(did: Did, fresh: Boolean = false) {
         viewModelScope.launch {
-            val cursor = if (fresh) null else uiState.profileFollowersCursor
+            val cursor = if (fresh) null else profileFollowersCursor
             bskyConn.getFollowers(did, cursor).onSuccess { res ->
-                val updated = if (fresh) res.followers else uiState.profileFollowers + res.followers
+                val updated = if (fresh) res.followers else profileFollowers + res.followers
                 val name = res.subject.displayName ?: res.subject.handle.handle
-                uiState = uiState.copy(
-                    profileFollowers = updated,
-                    profileFollowersCursor = res.cursor,
-                    followersListName = name,
-                )
+                updateFollowers {
+                    it.copy(
+                        profileFollowers = updated,
+                        profileFollowersCursor = res.cursor,
+                        followersListName = name,
+                    )
+                }
             }.onFailure {
                 handleError(it)
             }
@@ -971,13 +1087,15 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun fetchFollows(did: Did, fresh: Boolean = false) {
         viewModelScope.launch {
-            val cursor = if (fresh) null else uiState.profileFollowsCursor
+            val cursor = if (fresh) null else profileFollowsCursor
             bskyConn.getFollows(did, cursor).onSuccess { res ->
-                val updated = if (fresh) res.follows else uiState.profileFollows + res.follows
-                uiState = uiState.copy(
-                    profileFollows = updated,
-                    profileFollowsCursor = res.cursor,
-                )
+                val updated = if (fresh) res.follows else profileFollows + res.follows
+                updateFollowers {
+                    it.copy(
+                        profileFollows = updated,
+                        profileFollowsCursor = res.cursor,
+                    )
+                }
             }.onFailure {
                 handleError(it)
             }
@@ -1065,13 +1183,11 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun getThread(parentHeight: Long = 80, then: () -> Unit) {
         viewModelScope.launch {
-            bskyConn.getThread(uiState.currentlyShownThread.post.uri, parentHeight).onFailure {
+            bskyConn.getThread(currentlyShownThread.post.uri, parentHeight).onFailure {
                 handleError(it)
             }.onSuccess {
                 val asd = readThread(it.thread)
-                uiState = uiState.copy(
-                    threadStack = uiState.threadStack.dropLast(1) + asd,
-                )
+                updateThread { t -> t.copy(threadStack = t.threadStack.dropLast(1) + asd) }
                 asd.flatten().forEach { postInteractionStore.seed(it) }
                 then()
             }
@@ -1079,23 +1195,21 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun openProfile(did: Did) {
-        val cachedProfile = if (did == bskyConn.session?.did) uiState.user else null
-        uiState = uiState.copy(
-            profileUser = cachedProfile,
-            profilePosts = listOf(),
-            profileFeedCursor = null,
-            profileFeedFilter = null,
-            isFetchingProfile = true,
-            isFetchingProfileFeed = true,
-            profileNotFound = false,
-        )
+        val cachedProfile = if (did == bskyConn.session?.did) user else null
+        updateProfile {
+            ProfileState(
+                profileUser = cachedProfile,
+                isFetchingProfile = true,
+                isFetchingProfileFeed = true,
+            )
+        }
 
         viewModelScope.launch {
             bskyConn.fetchActor(did).onFailure {
                 handleError(it)
-                uiState = uiState.copy(isFetchingProfile = false, profileNotFound = true)
-            }.onSuccess {
-                uiState = uiState.copy(profileUser = it, isFetchingProfile = false)
+                updateProfile { it.copy(isFetchingProfile = false, profileNotFound = true) }
+            }.onSuccess { fetched ->
+                updateProfile { it.copy(profileUser = fetched, isFetchingProfile = false) }
             }
         }
 
@@ -1103,99 +1217,110 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun fetchProfileFeed(did: Did? = null, fresh: Boolean = false) {
-        val profileDid = did ?: uiState.profileUser?.did ?: return
-        uiState = uiState.copy(isFetchingProfileFeed = true)
+        val profileDid = did ?: profileUser?.did ?: return
+        updateProfile { it.copy(isFetchingProfileFeed = true) }
 
         viewModelScope.launch {
             bskyConn.getAuthorFeed(
                 did = profileDid,
-                cursor = if (fresh) null else uiState.profileFeedCursor,
-                filter = uiState.profileFeedFilter,
-            ).onFailure {
-                if (it is CancellationException) return@onFailure
-                handleError(it)
-                uiState = uiState.copy(isFetchingProfileFeed = false)
+                cursor = if (fresh) null else profileFeedCursor,
+                filter = profileFeedFilter,
+            ).onFailure { err ->
+                if (err is CancellationException) return@onFailure
+                handleError(err)
+                updateProfile { it.copy(isFetchingProfileFeed = false) }
             }.onSuccess { timeline ->
+                val currentMutedWords = mutedWords
                 val newPosts = timeline.feed.map {
                     SkeetData.fromFeedViewPost(it, bskyConn.session?.did)
                 }.distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
 
-                uiState = uiState.copy(
-                    profilePosts = if (fresh) newPosts else (uiState.profilePosts + newPosts).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid },
-                    profileFeedCursor = timeline.cursor,
-                    isFetchingProfileFeed = false,
-                )
+                updateProfile { p ->
+                    val merged = if (fresh) newPosts
+                        else (p.profilePosts + newPosts).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
+                    p.copy(
+                        profilePosts = merged.withMuteFlags(currentMutedWords),
+                        profileFeedCursor = timeline.cursor,
+                        isFetchingProfileFeed = false,
+                    )
+                }
                 newPosts.forEach { postInteractionStore.seed(it) }
             }
         }
     }
 
-    fun setProfileFeedFilter(filter: GetAuthorFeedFilter?) {
-        uiState = uiState.copy(
-            profileFeedFilter = filter,
-            profilePosts = listOf(),
-            profileFeedCursor = null,
-        )
+    fun changeProfileFeedFilter(filter: GetAuthorFeedFilter?) {
+        updateProfile {
+            it.copy(
+                profileFeedFilter = filter,
+                profilePosts = listOf(),
+                profileFeedCursor = null,
+            )
+        }
         fetchProfileFeed(fresh = true)
     }
 
     fun followProfile() {
-        val profile = uiState.profileUser ?: return
+        val profile = profileUser ?: return
         viewModelScope.launch {
             bskyConn.follow(profile.did).onFailure {
                 handleError(it)
             }.onSuccess { rkey ->
                 val followUri = AtUri("at://${bskyConn.session?.did?.did}/app.bsky.graph.follow/${rkey.rkey}")
                 val updatedViewer = (profile.viewer ?: ViewerState()).copy(following = followUri)
-                uiState = uiState.copy(
-                    profileUser = profile.copy(
-                        viewer = updatedViewer,
-                        followersCount = (profile.followersCount ?: 0) + 1,
+                updateProfile {
+                    it.copy(
+                        profileUser = profile.copy(
+                            viewer = updatedViewer,
+                            followersCount = (profile.followersCount ?: 0) + 1,
+                        )
                     )
-                )
+                }
             }
         }
     }
 
     fun unfollowProfile() {
-        val profile = uiState.profileUser ?: return
+        val profile = profileUser ?: return
         val followUri = profile.viewer?.following ?: return
         viewModelScope.launch {
             bskyConn.unfollow(followUri).onFailure {
                 handleError(it)
             }.onSuccess {
                 val updatedViewer = profile.viewer!!.copy(following = null)
-                uiState = uiState.copy(
-                    profileUser = profile.copy(
-                        viewer = updatedViewer,
-                        followersCount = ((profile.followersCount ?: 0) - 1).coerceAtLeast(0),
+                updateProfile {
+                    it.copy(
+                        profileUser = profile.copy(
+                            viewer = updatedViewer,
+                            followersCount = ((profile.followersCount ?: 0) - 1).coerceAtLeast(0),
+                        )
                     )
-                )
+                }
             }
         }
     }
 
     fun muteProfile() {
-        val profile = uiState.profileUser ?: return
+        val profile = profileUser ?: return
         viewModelScope.launch {
             bskyConn.muteActor(profile.did).onFailure {
                 handleError(it)
             }.onSuccess {
-                bskyConn.fetchActor(profile.did).onSuccess {
-                    uiState = uiState.copy(profileUser = it)
+                bskyConn.fetchActor(profile.did).onSuccess { fetched ->
+                    updateProfile { it.copy(profileUser = fetched) }
                 }
             }
         }
     }
 
     fun unmuteProfile() {
-        val profile = uiState.profileUser ?: return
+        val profile = profileUser ?: return
         viewModelScope.launch {
             bskyConn.unmuteActor(profile.did).onFailure {
                 handleError(it)
             }.onSuccess {
-                bskyConn.fetchActor(profile.did).onSuccess {
-                    uiState = uiState.copy(profileUser = it)
+                bskyConn.fetchActor(profile.did).onSuccess { fetched ->
+                    updateProfile { it.copy(profileUser = fetched) }
                 }
             }
         }
@@ -1203,28 +1328,21 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun search(query: String, fresh: Boolean = true) {
         if (query.isBlank()) {
-            uiState = uiState.copy(
-                searchQuery = "",
-                searchPostResults = listOf(),
-                searchActorResults = listOf(),
-                searchPostsCursor = null,
-                searchActorsCursor = null,
-                isSearching = false,
-            )
+            updateSearch { SearchState(searchAuthorFilter = it.searchAuthorFilter, searchPostsSort = it.searchPostsSort) }
             return
         }
 
         if (fresh) {
-            uiState = uiState.copy(
-                searchQuery = query,
-                searchPostResults = listOf(),
-                searchActorResults = listOf(),
-                searchPostsCursor = null,
-                searchActorsCursor = null,
-                isSearching = true,
-            )
+            updateSearch {
+                SearchState(
+                    searchQuery = query,
+                    isSearching = true,
+                    searchAuthorFilter = it.searchAuthorFilter,
+                    searchPostsSort = it.searchPostsSort,
+                )
+            }
         } else {
-            uiState = uiState.copy(isSearching = true)
+            updateSearch { it.copy(isSearching = true) }
         }
 
         searchPosts(query, fresh)
@@ -1232,8 +1350,8 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     private fun searchPosts(query: String, fresh: Boolean) {
-        val effectiveQuery = if (uiState.searchAuthorFilter != null) {
-            "from:${uiState.searchAuthorFilter} $query"
+        val effectiveQuery = if (searchAuthorFilter != null) {
+            "from:$searchAuthorFilter $query"
         } else {
             query
         }
@@ -1241,21 +1359,26 @@ class TimelineViewModel @AssistedInject constructor(
         viewModelScope.launch {
             bskyConn.searchPosts(
                 query = effectiveQuery,
-                sort = uiState.searchPostsSort,
-                cursor = if (fresh) null else uiState.searchPostsCursor,
-            ).onFailure {
-                if (it is CancellationException) return@onFailure
-                uiState = uiState.copy(isSearching = false, error = it.message)
+                sort = searchPostsSort,
+                cursor = if (fresh) null else searchPostsCursor,
+            ).onFailure { err ->
+                if (err is CancellationException) return@onFailure
+                updateSearch { it.copy(isSearching = false) }
+                updateSession { it.copy(error = err.message) }
             }.onSuccess { (posts, cursor) ->
+                val currentMutedWords = mutedWords
                 val newSkeets = posts.map {
                     SkeetData.fromPostView(it, it.author)
                 }
-                uiState = uiState.copy(
-                    searchPostResults = if (fresh) newSkeets
-                    else (uiState.searchPostResults + newSkeets).distinctBy { it.cid },
-                    searchPostsCursor = cursor,
-                    isSearching = false,
-                )
+                updateSearch { s ->
+                    val merged = if (fresh) newSkeets
+                        else (s.searchPostResults + newSkeets).distinctBy { it.cid }
+                    s.copy(
+                        searchPostResults = merged.withMuteFlags(currentMutedWords),
+                        searchPostsCursor = cursor,
+                        isSearching = false,
+                    )
+                }
                 newSkeets.forEach { postInteractionStore.seed(it) }
             }
         }
@@ -1265,47 +1388,49 @@ class TimelineViewModel @AssistedInject constructor(
         viewModelScope.launch {
             bskyConn.searchActors(
                 query = query,
-                cursor = if (fresh) null else uiState.searchActorsCursor,
-            ).onFailure {
-                if (it is CancellationException) return@onFailure
-                uiState = uiState.copy(isSearching = false)
+                cursor = if (fresh) null else searchActorsCursor,
+            ).onFailure { err ->
+                if (err is CancellationException) return@onFailure
+                updateSearch { it.copy(isSearching = false) }
             }.onSuccess { (actors, cursor) ->
-                uiState = uiState.copy(
-                    searchActorResults = if (fresh) actors
-                    else (uiState.searchActorResults + actors).distinctBy { it.did },
-                    searchActorsCursor = cursor,
-                    isSearching = false,
-                )
+                updateSearch { s ->
+                    s.copy(
+                        searchActorResults = if (fresh) actors
+                            else (s.searchActorResults + actors).distinctBy { it.did },
+                        searchActorsCursor = cursor,
+                        isSearching = false,
+                    )
+                }
             }
         }
     }
 
     fun fetchMoreSearchPosts() {
-        if (uiState.searchPostsCursor == null || uiState.searchQuery.isBlank()) return
-        searchPosts(uiState.searchQuery, fresh = false)
+        if (searchPostsCursor == null || searchQuery.isBlank()) return
+        searchPosts(searchQuery, fresh = false)
     }
 
     fun fetchMoreSearchActors() {
-        if (uiState.searchActorsCursor == null || uiState.searchQuery.isBlank()) return
-        searchActors(uiState.searchQuery, fresh = false)
+        if (searchActorsCursor == null || searchQuery.isBlank()) return
+        searchActors(searchQuery, fresh = false)
     }
 
     fun setSearchSort(sort: SearchPostsSort) {
-        uiState = uiState.copy(searchPostsSort = sort)
-        if (uiState.searchQuery.isNotBlank()) {
-            search(uiState.searchQuery, fresh = true)
+        updateSearch { it.copy(searchPostsSort = sort) }
+        if (searchQuery.isNotBlank()) {
+            search(searchQuery, fresh = true)
         }
     }
 
-    fun setSearchAuthorFilter(handle: String?) {
-        uiState = uiState.copy(searchAuthorFilter = handle)
-        if (uiState.searchQuery.isNotBlank()) {
-            search(uiState.searchQuery, fresh = true)
+    fun changeSearchAuthorFilter(handle: String?) {
+        updateSearch { it.copy(searchAuthorFilter = handle) }
+        if (searchQuery.isNotBlank()) {
+            search(searchQuery, fresh = true)
         }
     }
 
     fun isOwnProfile(): Boolean {
-        return uiState.profileUser?.did == bskyConn.session?.did
+        return profileUser?.did == bskyConn.session?.did
     }
 
     fun updateProfile(
@@ -1322,9 +1447,9 @@ class TimelineViewModel @AssistedInject constructor(
                 then(false)
             }.onSuccess {
                 // Refresh both the profile view and the self user data
-                val did = uiState.profileUser?.did ?: bskyConn.session?.did ?: return@onSuccess
-                bskyConn.fetchActor(did).onSuccess {
-                    uiState = uiState.copy(profileUser = it)
+                val did = profileUser?.did ?: bskyConn.session?.did ?: return@onSuccess
+                bskyConn.fetchActor(did).onSuccess { fetched ->
+                    updateProfile { it.copy(profileUser = fetched) }
                 }
                 fetchSelf()
                 then(true)

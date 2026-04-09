@@ -55,7 +55,7 @@ fun MutedWordsView(
     var targetTag by remember { mutableStateOf(false) }
     var actorTargetAll by remember { mutableStateOf(true) }
 
-    val mutedWords = timelineViewModel.uiState.mutedWords
+    val mutedWords = timelineViewModel.mutedWords
 
     Scaffold(
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),

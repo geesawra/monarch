@@ -328,6 +328,13 @@ private fun SkeetHeaderSection(
     onAvatarTap: ((Did) -> Unit)?,
 ) {
     val minSize = avatarSize()
+    val context = LocalContext.current
+    val avatarRequest = remember(skeet.authorAvatarURL) {
+        ImageRequest.Builder(context)
+            .data(skeet.authorAvatarURL)
+            .crossfade(true)
+            .build()
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -335,10 +342,7 @@ private fun SkeetHeaderSection(
         verticalAlignment = Alignment.Top
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(skeet.authorAvatarURL)
-                .crossfade(true)
-                .build(),
+            model = avatarRequest,
             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             contentDescription = "Avatar",
@@ -373,6 +377,13 @@ private fun SkeetThreadLine(
     overrideAvatarSize: Dp? = null,
 ) {
     val minSize = overrideAvatarSize ?: avatarSize()
+    val context = LocalContext.current
+    val avatarRequest = remember(skeet.authorAvatarURL) {
+        ImageRequest.Builder(context)
+            .data(skeet.authorAvatarURL)
+            .crossfade(true)
+            .build()
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -380,10 +391,7 @@ private fun SkeetThreadLine(
             .fillMaxHeight()
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(skeet.authorAvatarURL)
-                .crossfade(true)
-                .build(),
+            model = avatarRequest,
             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             contentDescription = "Avatar",
@@ -475,9 +483,13 @@ private fun SkeetContent(
             PostTextSize.Large -> MaterialTheme.typography.bodyLarge
         }
         val uriHandler = if (LocalBaselineProfileMode.current) NoOpUriHandler else LocalUriHandler.current
+        val primaryColor = MaterialTheme.colorScheme.primary
+        val annotated = remember(skeet.cid, primaryColor, onMentionClick) {
+            skeet.buildAnnotated(primaryColor, onMentionClick)
+        }
         CompositionLocalProvider(LocalUriHandler provides uriHandler) {
         Text(
-            text = skeet.annotatedContent(onMentionClick = onMentionClick),
+            text = annotated,
             color = MaterialTheme.colorScheme.onSurface,
             style = textStyle,
         )
@@ -709,11 +721,15 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal, isVisible: 
         }
     } else {
         ev.thumb?.let {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
+            val context = LocalContext.current
+            val request = remember(it.uri) {
+                ImageRequest.Builder(context)
                     .data(it.uri)
                     .crossfade(true)
-                    .build(),
+                    .build()
+            }
+            AsyncImage(
+                model = request,
                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 contentScale = ContentScale.Fit,
@@ -769,11 +785,14 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
         ) {
             val thumbUrl = if (needsFetch) enrichedThumb else ev.thumb?.uri
             if (thumbUrl != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
+                val thumbRequest = remember(thumbUrl) {
+                    ImageRequest.Builder(context)
                         .data(thumbUrl)
                         .crossfade(true)
-                        .build(),
+                        .build()
+                }
+                AsyncImage(
+                    model = thumbRequest,
                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     contentScale = ContentScale.Crop,
@@ -964,11 +983,15 @@ private fun SkeetReason(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         it.value.by.avatar?.let { avatarUri ->
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
+                            val repostAvatarContext = LocalContext.current
+                            val repostAvatarRequest = remember(avatarUri.uri) {
+                                ImageRequest.Builder(repostAvatarContext)
                                     .data(avatarUri.uri)
                                     .crossfade(true)
-                                    .build(),
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = repostAvatarRequest,
                                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                 contentDescription = null,
@@ -1185,11 +1208,15 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                         ) {
                             val avatarUrl = labelerAvatar(it)
                             if (avatarUrl != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
+                                val labelerContext = LocalContext.current
+                                val labelerRequest = remember(avatarUrl) {
+                                    ImageRequest.Builder(labelerContext)
                                         .data(avatarUrl)
                                         .crossfade(true)
-                                        .build(),
+                                        .build()
+                                }
+                                AsyncImage(
+                                    model = labelerRequest,
                                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     contentDescription = definition.plaintext,

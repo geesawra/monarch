@@ -63,7 +63,7 @@ fun NotificationsView(
     val context = LocalContext.current
     DisposableEffect(Unit) {
         onDispose {
-            if (viewModel.uiState.unreadNotificationsAmt != 0) {
+            if (viewModel.unreadNotificationsAmt != 0) {
                 viewModel.updateSeenNotifications()
             }
             val nm = context.getSystemService(android.app.NotificationManager::class.java)
@@ -84,7 +84,7 @@ fun NotificationsView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(
-            items = viewModel.uiState.notifications,
+            items = viewModel.notifications,
             key = { it.uniqueKey() }
         ) { notif ->
             val isUnread = viewModel.isNotificationNew(notif)
@@ -126,7 +126,7 @@ fun NotificationsView(
 
     OnEndOfListReached(
         listState = state,
-        items = viewModel.uiState.notifications,
+        items = viewModel.notifications,
         onEndReached = { viewModel.fetchNotifications() },
     )
 }

@@ -79,7 +79,7 @@ fun ThreadView(
                 )
             },
         ) { padding ->
-            val thread = timelineViewModel.uiState.currentlyShownThread
+            val thread = timelineViewModel.currentlyShownThread
             val tappedPostUri = remember { thread.post.uri }
             val threadData = remember(thread) { thread.flatten() }
             val focusIdx = remember(threadData) {

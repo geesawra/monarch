@@ -144,10 +144,10 @@ fun ProfileView(
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listStates = profileNavTabs.associate { it.filter to rememberLazyListState() }
-    val currentFilter = timelineViewModel.uiState.profileFeedFilter
+    val currentFilter = timelineViewModel.profileFeedFilter
     val listState = listStates[currentFilter] ?: rememberLazyListState()
-    val profile = timelineViewModel.uiState.profileUser
-    val isLoading = timelineViewModel.uiState.isFetchingProfile && profile == null
+    val profile = timelineViewModel.profileUser
+    val isLoading = timelineViewModel.isFetchingProfile && profile == null
     val wasEdited = remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isMediaFeedMode by remember { mutableStateOf(false) }
@@ -301,7 +301,7 @@ fun ProfileView(
                     ) {
                         SmallFloatingActionButton(
                             onClick = {
-                                mediaFeedSnapshot = timelineViewModel.uiState.profilePosts
+                                mediaFeedSnapshot = timelineViewModel.profilePosts
                                 isMediaFeedMode = true
                             },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -327,7 +327,7 @@ fun ProfileView(
             },
             bottomBar = {
                 NavigationBar {
-                    val currentFilter = timelineViewModel.uiState.profileFeedFilter
+                    val currentFilter = timelineViewModel.profileFeedFilter
                     profileNavTabs.forEach { tab ->
                         NavigationBarItem(
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
@@ -339,7 +339,7 @@ fun ProfileView(
                                         listState.animateScrollToItem(0)
                                     }
                                 } else {
-                                    timelineViewModel.setProfileFeedFilter(tab.filter)
+                                    timelineViewModel.changeProfileFeedFilter(tab.filter)
                                 }
                             },
                         )
@@ -348,7 +348,7 @@ fun ProfileView(
             },
         ) { padding ->
             if (profile == null) {
-                if (timelineViewModel.uiState.profileNotFound) {
+                if (timelineViewModel.profileNotFound) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -368,7 +368,7 @@ fun ProfileView(
             }
 
             if (isMediaFeedMode) {
-                val posts = mediaFeedSnapshot!! + timelineViewModel.uiState.profilePosts.filter { post ->
+                val posts = mediaFeedSnapshot!! + timelineViewModel.profilePosts.filter { post ->
                     mediaFeedSnapshot!!.none { it.cid == post.cid }
                 }
                 Dialog(
@@ -377,7 +377,7 @@ fun ProfileView(
                 ) {
                     MediaFeedView(
                         posts = posts,
-                        isLoading = timelineViewModel.uiState.isFetchingProfileFeed,
+                        isLoading = timelineViewModel.isFetchingProfileFeed,
                         onLoadMore = { timelineViewModel.fetchProfileFeed() },
                         onProfileTap = { did ->
                             isMediaFeedMode = false
@@ -454,7 +454,7 @@ internal fun ProfileContent(
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
 ) {
-    val posts = timelineViewModel.uiState.profilePosts
+    val posts = timelineViewModel.profilePosts
     val avatarClipShape = settingsState.avatarClipShape
 
     LazyColumn(
@@ -507,7 +507,7 @@ internal fun ProfileContent(
             }
         }
 
-        if (timelineViewModel.uiState.isFetchingProfileFeed) {
+        if (timelineViewModel.isFetchingProfileFeed) {
             item(key = "loading") {
                 LoadingBox()
             }
