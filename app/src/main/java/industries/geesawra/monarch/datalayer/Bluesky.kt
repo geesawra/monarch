@@ -1579,6 +1579,7 @@ class BlueskyConn(val context: Context) {
     suspend fun updateProfile(
         displayName: String?,
         description: String?,
+        pronouns: String?,
         avatarUri: Uri? = null,
         bannerUri: Uri? = null,
     ): Result<Unit> {
@@ -1616,6 +1617,7 @@ class BlueskyConn(val context: Context) {
             val updatedProfile = Profile(
                 displayName = displayName ?: currentProfile.displayName,
                 description = description ?: currentProfile.description,
+                pronouns = pronouns ?: currentProfile.pronouns,
                 avatar = avatarBlob,
                 banner = bannerBlob,
                 labels = currentProfile.labels,

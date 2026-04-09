@@ -195,6 +195,7 @@ private fun RenderNotification(
                         postTextSize = settingsState.postTextSize,
                         avatarShape = avatarClipShape,
                         showLabels = settingsState.showLabels,
+                        showPronouns = settingsState.showPronounsInPosts,
                         onShowThread = {
                             onProfileTap?.invoke(notification.follow.did)
                         },
@@ -221,6 +222,7 @@ private fun RenderNotification(
             postTextSize = settingsState.postTextSize,
             avatarShape = avatarClipShape,
             showLabels = settingsState.showLabels,
+            showPronouns = settingsState.showPronounsInPosts,
             renderingMention = true,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
@@ -238,6 +240,7 @@ private fun RenderNotification(
             postTextSize = settingsState.postTextSize,
             avatarShape = avatarClipShape,
             showLabels = settingsState.showLabels,
+            showPronouns = settingsState.showPronounsInPosts,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
         )
@@ -253,6 +256,7 @@ private fun RenderNotification(
             postTextSize = settingsState.postTextSize,
             avatarShape = avatarClipShape,
             showLabels = settingsState.showLabels,
+            showPronouns = settingsState.showPronounsInPosts,
             renderingReplyNotif = false,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,

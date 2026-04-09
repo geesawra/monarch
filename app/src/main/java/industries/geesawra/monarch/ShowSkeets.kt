@@ -292,6 +292,7 @@ fun ShowSkeets(
                             postTextSize = settingsState.postTextSize,
                             avatarShape = avatarClipShape,
                             showLabels = settingsState.showLabels,
+                            showPronouns = settingsState.showPronounsInPosts,
                             onAvatarTap = onProfileTap,
                             onShowThread = { tapped ->
                                 onSeeMoreTap?.invoke(tapped)
@@ -334,6 +335,7 @@ fun ShowSkeets(
                                     postTextSize = settingsState.postTextSize,
                                     avatarShape = avatarClipShape,
                                     showLabels = settingsState.showLabels,
+                            showPronouns = settingsState.showPronounsInPosts,
                                     onAvatarTap = onProfileTap,
                                     onShowThread = { skeet ->
                                         if (onSeeMoreTap != null) {
@@ -389,6 +391,7 @@ fun ShowSkeets(
                                     postTextSize = settingsState.postTextSize,
                                     avatarShape = avatarClipShape,
                                     showLabels = settingsState.showLabels,
+                            showPronouns = settingsState.showPronounsInPosts,
                                     onAvatarTap = onProfileTap,
                                     onShowThread = { skeet ->
                                         if (onSeeMoreTap != null) {
@@ -410,6 +413,7 @@ fun ShowSkeets(
                             postTextSize = settingsState.postTextSize,
                             avatarShape = avatarClipShape,
                             showLabels = settingsState.showLabels,
+                            showPronouns = settingsState.showPronounsInPosts,
                             onAvatarTap = onProfileTap,
                             onShowThread = {},
                             isVisible = isVisible,
@@ -423,6 +427,7 @@ fun ShowSkeets(
                             postTextSize = settingsState.postTextSize,
                             avatarShape = avatarClipShape,
                             showLabels = settingsState.showLabels,
+                            showPronouns = settingsState.showPronounsInPosts,
                             onAvatarTap = onProfileTap,
                             onShowThread = { tapped ->
                                 if (onSeeMoreTap != null) {

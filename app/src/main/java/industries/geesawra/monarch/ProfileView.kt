@@ -11,6 +11,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -496,6 +497,7 @@ internal fun ProfileContent(
                     postTextSize = settingsState.postTextSize,
                     avatarShape = avatarClipShape,
                     showLabels = settingsState.showLabels,
+                    showPronouns = settingsState.showPronounsInPosts,
                     onAvatarTap = onProfileTap,
                     onShowThread = { s ->
                         timelineViewModel.startThread(s)
@@ -637,11 +639,29 @@ internal fun ProfileHeader(
                 }
             }
 
-            Text(
-                text = "@${profile.handle.handle}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = "@${profile.handle.handle}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!profile.pronouns.isNullOrBlank()) {
+                    Text(
+                        text = profile.pronouns!!,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = MaterialTheme.shapes.small,
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
 
             // "Follows you" badge
             if (profile.viewer?.followedBy != null) {
@@ -787,6 +807,7 @@ private fun EditProfileSheet(
 
     var displayName by remember { mutableStateOf(profile.displayName ?: "") }
     var description by remember { mutableStateOf(profile.description ?: "") }
+    var pronouns by remember { mutableStateOf(profile.pronouns ?: "") }
     var avatarUri by remember { mutableStateOf<Uri?>(null) }
     var bannerUri by remember { mutableStateOf<Uri?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -890,6 +911,16 @@ private fun EditProfileSheet(
                 ),
             )
 
+            // Pronouns
+            OutlinedTextField(
+                value = pronouns,
+                onValueChange = { pronouns = it },
+                label = { Text("Pronouns") },
+                placeholder = { Text("she/her, they/them, …") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             // Description / Bio
             OutlinedTextField(
                 value = description,
@@ -926,6 +957,7 @@ private fun EditProfileSheet(
                         timelineViewModel.updateProfile(
                             displayName = displayName,
                             description = description,
+                            pronouns = pronouns,
                             avatarUri = avatarUri,
                             bannerUri = bannerUri,
                         ) { success ->

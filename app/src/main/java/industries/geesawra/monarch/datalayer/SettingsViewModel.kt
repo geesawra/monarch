@@ -54,6 +54,7 @@ data class SettingsState(
     val avatarShape: AvatarShape = AvatarShape.Circle,
     val replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads,
     val showLabels: Boolean = true,
+    val showPronounsInPosts: Boolean = false,
     val defaultFeed: DefaultFeed = DefaultFeed(),
     val forceCompactLayout: Boolean = false,
     val swipeableFeeds: Boolean = true,
@@ -77,6 +78,7 @@ class SettingsViewModel @Inject constructor(
         private val AVATAR_SHAPE = stringPreferencesKey("avatar_shape")
         private val REPLY_FILTER_MODE = stringPreferencesKey("reply_filter_mode")
         private val SHOW_LABELS = stringPreferencesKey("show_labels")
+        private val SHOW_PRONOUNS_IN_POSTS = stringPreferencesKey("show_pronouns_in_posts")
         private val DEFAULT_FEED_URI = stringPreferencesKey("default_feed_uri")
         private val DEFAULT_FEED_NAME = stringPreferencesKey("default_feed_name")
         private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
@@ -103,6 +105,7 @@ class SettingsViewModel @Inject constructor(
                     avatarShape = prefs[AVATAR_SHAPE]?.let { runCatching { AvatarShape.valueOf(it) }.getOrNull() } ?: AvatarShape.Circle,
                     replyFilterMode = prefs[REPLY_FILTER_MODE]?.let { runCatching { ReplyFilterMode.valueOf(it) }.getOrNull() } ?: ReplyFilterMode.OnlyFilterDeepThreads,
                     showLabels = prefs[SHOW_LABELS]?.toBooleanStrictOrNull() ?: !narrowScreen,
+                    showPronounsInPosts = prefs[SHOW_PRONOUNS_IN_POSTS]?.toBooleanStrictOrNull() ?: false,
                     defaultFeed = DefaultFeed(
                         uri = prefs[DEFAULT_FEED_URI] ?: "following",
                         displayName = prefs[DEFAULT_FEED_NAME] ?: "Following",
@@ -161,6 +164,12 @@ class SettingsViewModel @Inject constructor(
     fun setShowLabels(show: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[SHOW_LABELS] = show.toString() }
+        }
+    }
+
+    fun setShowPronounsInPosts(show: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[SHOW_PRONOUNS_IN_POSTS] = show.toString() }
         }
     }
 

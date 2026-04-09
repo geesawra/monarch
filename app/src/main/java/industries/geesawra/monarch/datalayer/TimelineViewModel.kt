@@ -1267,12 +1267,13 @@ class TimelineViewModel @AssistedInject constructor(
     fun updateProfile(
         displayName: String?,
         description: String?,
+        pronouns: String?,
         avatarUri: android.net.Uri? = null,
         bannerUri: android.net.Uri? = null,
         then: (Boolean) -> Unit = {},
     ) {
         viewModelScope.launch {
-            bskyConn.updateProfile(displayName, description, avatarUri, bannerUri).onFailure {
+            bskyConn.updateProfile(displayName, description, pronouns, avatarUri, bannerUri).onFailure {
                 handleError(it)
                 then(false)
             }.onSuccess {

@@ -118,6 +118,7 @@ fun SkeetView(
     inThread: Boolean = false,
     showInReplyTo: Boolean = true,
     showLabels: Boolean = true,
+    showPronouns: Boolean = false,
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
     renderingReplyNotif: Boolean = false,
@@ -218,6 +219,7 @@ fun SkeetView(
                 SkeetHeader(
                     skeet = skeet,
                     showLabels = showLabels,
+                    showPronouns = showPronouns,
                     labelDisplayName = { viewModel?.labelDisplayName(it) },
                     labelDescription = { viewModel?.labelDescription(it) },
                     labelerAvatar = { viewModel?.labelerAvatar(it) }
@@ -256,6 +258,7 @@ fun FocusedSkeetView(
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
     showLabels: Boolean = true,
+    showPronouns: Boolean = false,
     onShowThread: (SkeetData) -> Unit = {},
     onAvatarTap: ((Did) -> Unit)? = null,
     isVisible: Boolean = true,
@@ -271,6 +274,7 @@ fun FocusedSkeetView(
             skeet = skeet,
             avatarShape = avatarShape,
             showLabels = showLabels,
+            showPronouns = showPronouns,
             viewModel = viewModel,
             onAvatarTap = onAvatarTap,
         )
@@ -319,6 +323,7 @@ private fun SkeetHeaderSection(
     skeet: SkeetData,
     avatarShape: Shape,
     showLabels: Boolean,
+    showPronouns: Boolean = false,
     viewModel: TimelineViewModel?,
     onAvatarTap: ((Did) -> Unit)?,
 ) {
@@ -351,6 +356,7 @@ private fun SkeetHeaderSection(
             modifier = Modifier.padding(start = avatarTextGap()),
             skeet = skeet,
             showLabels = showLabels,
+            showPronouns = showPronouns,
             labelDisplayName = { viewModel?.labelDisplayName(it) },
             labelDescription = { viewModel?.labelDescription(it) },
             labelerAvatar = { viewModel?.labelerAvatar(it) }
@@ -1069,7 +1075,7 @@ private fun labelDefinition(rawValue: String): LabelDefinition {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, labelDisplayName: (Label) -> String? = { null }, labelDescription: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
+private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, showPronouns: Boolean = false, labelDisplayName: (Label) -> String? = { null }, labelDescription: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
     val authorName = skeet.authorName?.ifEmpty { null } ?: (skeet.authorHandle?.handle ?: "")
 
     val isBot = skeet.authorLabels.any { it.`val` == "bot" }
@@ -1120,13 +1126,31 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             }
         }
 
-        skeet.authorHandle?.let {
-            Text(
-                text = "@$it",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(bottom = if (!showLabels) 8.dp else 4.dp),
-            )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(bottom = if (!showLabels) 8.dp else 4.dp),
+        ) {
+            skeet.authorHandle?.let {
+                Text(
+                    text = "@$it",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            if (showPronouns && !skeet.authorPronouns.isNullOrBlank()) {
+                Text(
+                    text = skeet.authorPronouns!!,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = MaterialTheme.shapes.small,
+                        )
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                )
+            }
         }
 
         if (showLabels) {

@@ -328,6 +328,17 @@ fun SettingsView(
                 },
             )
 
+            ListItem(
+                headlineContent = { Text("Show pronouns in posts") },
+                supportingContent = { Text("Render the author's pronouns next to their handle") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.showPronounsInPosts,
+                        onCheckedChange = { settingsViewModel.setShowPronounsInPosts(it) }
+                    )
+                },
+            )
+
             val mutedWordsCount = timelineViewModel?.uiState?.mutedWords?.size ?: 0
             ListItem(
                 headlineContent = { Text("Muted words") },
