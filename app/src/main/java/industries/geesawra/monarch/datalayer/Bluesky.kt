@@ -35,6 +35,7 @@ import app.bsky.embed.Record
 import app.bsky.embed.Video
 import app.bsky.feed.FeedViewPost
 import app.bsky.feed.GeneratorView
+import app.bsky.feed.GetFeedGeneratorQueryParams
 import app.bsky.feed.GetFeedGeneratorsQueryParams
 import app.bsky.feed.GetFeedQueryParams
 import app.bsky.feed.GetFeedResponse
@@ -105,6 +106,9 @@ import io.ktor.http.isSuccess
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
 import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -1104,20 +1108,38 @@ class BlueskyConn(val context: Context) {
             }
 
             val feedUris = savedFeeds.value.items.filter {
-                it.type is SavedFeedType.Feed
+                it.type is SavedFeedType.Feed && it.value.startsWith("at://")
             }.map { AtUri(it.value) }
 
             if (feedUris.isEmpty()) {
                 return Result.success(emptyList())
             }
 
-            val resp = client!!.getFeedGenerators(
-                GetFeedGeneratorsQueryParams(
-                    feedUris
+            val batch = runCatching {
+                client!!.getFeedGenerators(
+                    GetFeedGeneratorsQueryParams(feedUris)
                 )
-            ).requireResponse()
+            }.getOrNull()
 
-            return Result.success(resp.feeds)
+            if (batch is AtpResponse.Success) {
+                return Result.success(batch.response.feeds)
+            }
+
+            val resolved = coroutineScope {
+                feedUris.map { uri ->
+                    async {
+                        runCatching {
+                            client!!.getFeedGenerator(
+                                GetFeedGeneratorQueryParams(uri)
+                            )
+                        }.getOrNull()?.let { resp ->
+                            (resp as? AtpResponse.Success)?.response
+                        }
+                    }
+                }.awaitAll()
+            }.mapNotNull { it?.takeIf { r -> r.isValid }?.view }
+
+            return Result.success(resolved)
         }
     }
 
