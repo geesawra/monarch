@@ -19,6 +19,7 @@ import app.bsky.actor.MutedWordsPref
 import app.bsky.actor.PreferencesUnion
 import app.bsky.actor.Profile
 import app.bsky.actor.PutPreferencesRequest
+import app.bsky.actor.Type as SavedFeedType
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.SearchActorsQueryParams
@@ -1103,7 +1104,7 @@ class BlueskyConn(val context: Context) {
             }
 
             val feedUris = savedFeeds.value.items.filter {
-                it.type.value != "timeline"
+                it.type is SavedFeedType.Feed
             }.map { AtUri(it.value) }
 
             if (feedUris.isEmpty()) {
