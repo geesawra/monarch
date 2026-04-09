@@ -11,6 +11,20 @@
 
 The worktree may not have `local.properties` — copy it from the main repo root if the build fails with "SDK location not found".
 
+### Ozone prerequisite (first build + after ozone edits)
+
+Monarch consumes `sh.christian.ozone:*:0.3.3-local`, a version that **only exists in your local `~/.m2`**. It is not on Maven Central. Before the first build (and after any edit to the ozone submodule at `libs/ozone`), run:
+
+```bash
+scripts/publish-ozone-local.sh
+```
+
+This generates a throwaway GPG key (first run only, cached at `~/.local/share/monarch/ozone-publish-key/`), then publishes the four ozone modules Monarch needs (`:bluesky`, `:oauth`, `:api-gen-runtime`, `:api-gen-runtime-internal`) as `0.3.3-local` to mavenLocal. Uses JDK 21 by default — override with `JAVA_HOME=/path/to/jdk21`.
+
+If you skip this step, Gradle will fail to resolve `sh.christian.ozone:bluesky:0.3.3-local` and the build will error out immediately. That's intentional — an earlier iteration used `0.3.3` (which exists on Maven Central) and quietly picked up the upstream artifact whose API doesn't match Monarch's source. The `-local` suffix is the loud-failure guard.
+
+The submodule lives at `libs/ozone/` and is pinned ahead of the tagged `0.3.3` release, so the published coordinate shares the version number but the API has drifted — which is why the suffix matters.
+
 ## Architecture
 
 MVVM with Jetpack Compose. Single-activity app (`MainActivity`) with NavHost navigation.

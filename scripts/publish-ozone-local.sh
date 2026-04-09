@@ -18,11 +18,16 @@
 #      ozone modules Monarch's :bluesky transitively pulls in:
 #        :bluesky, :oauth, :api-gen-runtime, :api-gen-runtime-internal
 #      using the throwaway key as signingInMemoryKey.
-#   3. Uses JDK 21 from /usr/lib/jvm/java-21-openjdk (override with JAVA_HOME).
+#   3. Overrides POM_VERSION to 0.3.3-local via -P so the published coordinate
+#      is sh.christian.ozone:*:0.3.3-local. Matches Monarch's libs.versions.toml
+#      `ozone = "0.3.3-local"`. No such version exists on Maven Central, so if
+#      this script hasn't been run, Monarch's Gradle resolution fails loudly
+#      instead of silently downloading the upstream 0.3.3 artifact (which has
+#      a different API than the submodule HEAD).
+#   4. Uses JDK 21 from /usr/lib/jvm/java-21-openjdk (override with JAVA_HOME).
 #
 # After running this, Monarch's settings.gradle.kts -- which has mavenLocal()
-# scoped to the sh.christian.ozone group -- will resolve ozone from ~/.m2
-# instead of Maven Central.
+# scoped to the sh.christian.ozone group -- will resolve ozone from ~/.m2.
 #
 # Usage:
 #   scripts/publish-ozone-local.sh             # uses /usr/lib/jvm/java-21-openjdk
@@ -89,9 +94,12 @@ for m in "${MODULES[@]}"; do
   TASKS+=("$m:publishKotlinMultiplatformPublicationToMavenLocal")
 done
 
-echo "==> publishing ozone modules to mavenLocal (JAVA_HOME=$JAVA_HOME)"
+LOCAL_VERSION="0.3.3-local"
+
+echo "==> publishing ozone modules as $LOCAL_VERSION to mavenLocal (JAVA_HOME=$JAVA_HOME)"
 ./gradlew "${TASKS[@]}" \
+  -PPOM_VERSION="$LOCAL_VERSION" \
   -PsigningInMemoryKey="$ARMORED_KEY" \
   -PsigningInMemoryKeyPassword=""
 
-echo "==> done. Monarch will now pick up sh.christian.ozone:* from ~/.m2"
+echo "==> done. Monarch will now pick up sh.christian.ozone:*:$LOCAL_VERSION from ~/.m2"
