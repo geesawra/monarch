@@ -338,6 +338,31 @@ class BlueskyConn(val context: Context) {
         sharedOAuthHttpClient = null
     }
 
+    /**
+     * Retry a call once after a short delay if it fails with a DPoP-related error.
+     *
+     * The SDK's [BlueskyAuthPlugin] already retries once internally on `use_dpop_nonce`, but
+     * under concurrent requests or repeated nonce rotations that retry can still surface an
+     * error: the fresh nonce from the first round-trip hasn't fully propagated into
+     * [sharedAuthTokens] by the time a sibling in-flight request signs its DPoP header. A
+     * brief delay lets the nonce settle, and the second attempt signs with the latest nonce.
+     *
+     * Transparent to callers — only retries once, and only for errors whose message mentions
+     * DPoP. Persistent failures surface normally.
+     */
+    private suspend fun <T> retryOnDpopHiccup(block: suspend () -> Result<T>): Result<T> {
+        val first = block()
+        if (first.isSuccess) return first
+        val err = first.exceptionOrNull() ?: return first
+        val msg = err.message ?: return first
+        if (!msg.contains("DPoP", ignoreCase = true) && !msg.contains("use_dpop_nonce")) {
+            return first
+        }
+        Log.d("BlueskyAuth", "Retrying after DPoP hiccup: $msg")
+        delay(150)
+        return block()
+    }
+
     fun appviewName(): String {
         return when (appviewProxy) {
             "did:web:api.bsky.app#bsky_appview" -> "Bluesky"
@@ -732,11 +757,9 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun fetchFeed(feed: String, cursor: String? = null): Result<Timeline> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    suspend fun fetchFeed(feed: String, cursor: String? = null): Result<Timeline> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val timeline = client!!.getFeed(
                 GetFeedQueryParams(
@@ -745,25 +768,19 @@ class BlueskyConn(val context: Context) {
                     cursor = cursor
                 )
             )
-            val feed = when (timeline) {
-                is AtpResponse.Failure<*> -> {
-                    return Result.failure(Exception("Failed to fetch timeline: ${timeline.error}"))
-                }
-
+            val resp = when (timeline) {
+                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch timeline: ${timeline.error}")
                 is AtpResponse.Success<GetFeedResponse> -> timeline.response
             }
-
-            return Result.success(Timeline(feed.cursor, feed.feed))
+            Timeline(resp.cursor, resp.feed)
         }
     }
 
     suspend fun fetchTimeline(
         cursor: String? = null
-    ): Result<Timeline> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    ): Result<Timeline> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val timeline = client!!.getTimeline(
                 GetTimelineQueryParams(
@@ -771,15 +788,11 @@ class BlueskyConn(val context: Context) {
                     cursor = cursor
                 )
             )
-            val feed = when (timeline) {
-                is AtpResponse.Failure<*> -> {
-                    return Result.failure(Exception("Failed to fetch timeline: ${timeline.error}"))
-                }
-
+            val resp = when (timeline) {
+                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch timeline: ${timeline.error}")
                 is AtpResponse.Success<GetTimelineResponse> -> timeline.response
             }
-
-            return Result.success(Timeline(feed.cursor, feed.feed))
+            Timeline(resp.cursor, resp.feed)
         }
     }
 
@@ -938,11 +951,9 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val ret = client!!.getProfile(
                 GetProfileQueryParams(
@@ -950,9 +961,9 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed fetching record: ${ret.error}"))
-                is AtpResponse.Success<GetProfileResponse> -> Result.success(ret.response)
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Failed fetching record: ${ret.error}")
+                is AtpResponse.Success<GetProfileResponse> -> ret.response
             }
         }
     }
@@ -1311,20 +1322,18 @@ class BlueskyConn(val context: Context) {
 
     suspend fun notifications(
         cursor: String? = null,
-    ): Result<ListNotificationsResponse> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    ): Result<ListNotificationsResponse> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val ret = client!!.listNotifications(
                 ListNotificationsQueryParams(
                     cursor = cursor,
                 )
             )
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch notifications: ${ret.error}"))
-                is AtpResponse.Success<ListNotificationsResponse> -> Result.success(ret.response)
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch notifications: ${ret.error}")
+                is AtpResponse.Success<ListNotificationsResponse> -> ret.response
             }
         }
     }
@@ -1381,11 +1390,9 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun getPosts(uri: List<AtUri>): Result<List<PostView>> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    suspend fun getPosts(uri: List<AtUri>): Result<List<PostView>> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val ret = client!!.getPosts(
                 GetPostsQueryParams(
@@ -1393,9 +1400,9 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch posts: ${ret.error}"))
-                is AtpResponse.Success<GetPostsResponse> -> Result.success(ret.response.posts)
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch posts: ${ret.error}")
+                is AtpResponse.Success<GetPostsResponse> -> ret.response.posts
             }
         }
     }
@@ -1475,11 +1482,9 @@ class BlueskyConn(val context: Context) {
         return deleteRecord(rKey, "app.bsky.feed.post")
     }
 
-    suspend fun getThread(uri: AtUri, parentHeight: Long = 80): Result<GetPostThreadResponse> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    suspend fun getThread(uri: AtUri, parentHeight: Long = 80): Result<GetPostThreadResponse> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val res = client!!.getPostThread(
                 GetPostThreadQueryParams(
@@ -1489,9 +1494,9 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            return when (res) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get thread: ${res.error?.message}"))
-                is AtpResponse.Success<GetPostThreadResponse> -> Result.success(res.response)
+            when (res) {
+                is AtpResponse.Failure<*> -> throw Exception("Could not get thread: ${res.error?.message}")
+                is AtpResponse.Success<GetPostThreadResponse> -> res.response
             }
         }
     }
@@ -1520,11 +1525,9 @@ class BlueskyConn(val context: Context) {
         did: Did,
         cursor: String? = null,
         filter: app.bsky.feed.GetAuthorFeedFilter? = null,
-    ): Result<Timeline> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    ): Result<Timeline> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val ret = client!!.getAuthorFeed(
                 app.bsky.feed.GetAuthorFeedQueryParams(
@@ -1535,11 +1538,9 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch author feed: ${ret.error}"))
-                is AtpResponse.Success<app.bsky.feed.GetAuthorFeedResponse> -> Result.success(
-                    Timeline(ret.response.cursor, ret.response.feed)
-                )
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch author feed: ${ret.error}")
+                is AtpResponse.Success<app.bsky.feed.GetAuthorFeedResponse> -> Timeline(ret.response.cursor, ret.response.feed)
             }
         }
     }
@@ -1727,11 +1728,9 @@ class BlueskyConn(val context: Context) {
         sort: app.bsky.feed.SearchPostsSort? = app.bsky.feed.SearchPostsSort.Latest,
         cursor: String? = null,
         author: Did? = null,
-    ): Result<Pair<List<PostView>, String?>> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    ): Result<Pair<List<PostView>, String?>> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val ret = client!!.searchPosts(
                 app.bsky.feed.SearchPostsQueryParams(
@@ -1743,11 +1742,9 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Search failed: ${ret.error}"))
-                is AtpResponse.Success<app.bsky.feed.SearchPostsResponse> -> Result.success(
-                    ret.response.posts to ret.response.cursor
-                )
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Search failed: ${ret.error}")
+                is AtpResponse.Success<app.bsky.feed.SearchPostsResponse> -> ret.response.posts to ret.response.cursor
             }
         }
     }
@@ -1755,11 +1752,9 @@ class BlueskyConn(val context: Context) {
     suspend fun searchActors(
         query: String,
         cursor: String? = null,
-    ): Result<Pair<List<app.bsky.actor.ProfileView>, String?>> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
+    ): Result<Pair<List<app.bsky.actor.ProfileView>, String?>> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
 
             val ret = client!!.searchActors(
                 SearchActorsQueryParams(
@@ -1769,11 +1764,9 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Search failed: ${ret.error}"))
-                is AtpResponse.Success<SearchActorsResponse> -> Result.success(
-                    ret.response.actors to ret.response.cursor
-                )
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Search failed: ${ret.error}")
+                is AtpResponse.Success<SearchActorsResponse> -> ret.response.actors to ret.response.cursor
             }
         }
     }
