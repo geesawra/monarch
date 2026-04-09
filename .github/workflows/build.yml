@@ -41,6 +41,33 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      # Monarch depends on `sh.christian.ozone:*:0.3.3-local`, a version that only exists
+      # after running scripts/publish-ozone-local.sh. The script clones ozone, builds it, and
+      # stages the resulting maven layout into libs/ozone-artifacts/ (which is .gitignored).
+      # Cache the output keyed on OZONE_REF so we only pay the ~3-5 min ozone build cost when
+      # the pinned ref actually changes. On cache hit, libs/ozone-artifacts/ is restored from
+      # cache and the "Publish ozone" step is skipped entirely.
+      - name: Extract OZONE_REF
+        id: ozone-ref
+        run: |
+          ref=$(grep '^OZONE_REF=' scripts/publish-ozone-local.sh | head -1 | cut -d'"' -f2)
+          echo "ref=$ref" >> $GITHUB_OUTPUT
+          echo "pinned ozone ref: $ref"
+
+      - name: Cache ozone build
+        id: ozone-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            libs/ozone-artifacts
+            ~/.cache/monarch-ozone-src
+            ~/.local/share/monarch/ozone-publish-key
+          key: ozone-build-${{ steps.ozone-ref.outputs.ref }}-v1
+
+      - name: Publish ozone artifacts locally
+        if: steps.ozone-cache.outputs.cache-hit != 'true'
+        run: scripts/publish-ozone-local.sh
+
       - name: Decode google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
