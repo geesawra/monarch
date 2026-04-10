@@ -530,6 +530,19 @@ fun ComposeView(
                 )
 
                 inReplyTo.value?.let {
+                    Text(
+                        text = if (isQuotePost.value) "Quoting" else "Replying to",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .padding(end = 8.dp, top = 4.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceContainerHigh,
+                                MaterialTheme.shapes.small,
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
                     OutlinedCard(
                         modifier = Modifier.padding(8.dp)
                     ) {
