@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -52,6 +53,32 @@ fun DiscardChangesDialog(
         dismissButton = {
             OutlinedButton(onClick = onKeepEditing) {
                 Text("Keep editing")
+            }
+        }
+    )
+}
+
+@Composable
+fun SaveDraftDialog(
+    onSaveDraft: () -> Unit,
+    onDiscard: () -> Unit,
+    onKeepEditing: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onKeepEditing,
+        title = { Text("Save draft?") },
+        text = { Text("Save your post as a draft, or discard it.") },
+        confirmButton = {
+            Button(onClick = onSaveDraft) {
+                Text("Save draft")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onKeepEditing) {
+                Text("Keep editing")
+            }
+            TextButton(onClick = onDiscard) {
+                Text("Discard")
             }
         }
     )

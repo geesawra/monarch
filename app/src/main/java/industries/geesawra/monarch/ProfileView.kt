@@ -3,6 +3,7 @@
 package industries.geesawra.monarch
 
 import android.net.Uri
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -173,6 +174,11 @@ fun ProfileView(
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
     val isQuotePost = remember { mutableStateOf(false) }
+    val profileTextFieldState = rememberTextFieldState()
+    val profileMediaSelected = remember { mutableStateOf(listOf<android.net.Uri>()) }
+    val profileMediaSelectedIsVideo = remember { mutableStateOf(false) }
+    val profileThreadgateRules = remember { mutableStateOf<List<app.bsky.feed.ThreadgateAllowUnion>?>(null) }
+    val profileLinkPreview = remember { mutableStateOf<industries.geesawra.monarch.datalayer.LinkPreviewData?>(null) }
     val focusManager = LocalFocusManager.current
 
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
@@ -227,6 +233,11 @@ fun ProfileView(
                 wasEdited = wasEdited,
                 initialText = if (profile != null) "@${profile.handle.handle} " else "",
                 initialMentions = if (profile != null) mapOf(profile.handle.handle to profile.did) else emptyMap(),
+                textfieldState = profileTextFieldState,
+                mediaSelected = profileMediaSelected,
+                mediaSelectedIsVideo = profileMediaSelectedIsVideo,
+                threadgateRules = profileThreadgateRules,
+                linkPreview = profileLinkPreview,
             )
         },
     ) { scaffoldPadding ->

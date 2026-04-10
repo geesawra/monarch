@@ -3,6 +3,7 @@
 package industries.geesawra.monarch.datalayer
 
 import android.content.Context
+import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
@@ -26,6 +27,21 @@ import app.bsky.actor.SearchActorsQueryParams
 import app.bsky.actor.SearchActorsResponse
 import app.bsky.actor.SearchActorsTypeaheadQueryParams
 import app.bsky.actor.SearchActorsTypeaheadResponse
+import app.bsky.draft.CreateDraftRequest
+import app.bsky.draft.CreateDraftResponse
+import app.bsky.draft.DeleteDraftRequest
+import app.bsky.draft.Draft
+import app.bsky.draft.DraftEmbedExternal
+import app.bsky.draft.DraftEmbedImage
+import app.bsky.draft.DraftEmbedLocalRef
+import app.bsky.draft.DraftEmbedRecord
+import app.bsky.draft.DraftEmbedVideo
+import app.bsky.draft.DraftPost
+import app.bsky.draft.DraftThreadgateAllowUnion
+import app.bsky.draft.DraftWithId
+import app.bsky.draft.GetDraftsQueryParams
+import app.bsky.draft.GetDraftsResponse
+import app.bsky.draft.UpdateDraftRequest
 import app.bsky.embed.AspectRatio
 import app.bsky.embed.External
 import app.bsky.embed.ExternalExternal
@@ -90,6 +106,7 @@ import com.atproto.server.GetServiceAuthResponse
 import industries.geesawra.monarch.collection
 import industries.geesawra.monarch.did
 import industries.geesawra.monarch.rkey
+import java.util.UUID
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.statement.bodyAsText
@@ -135,6 +152,7 @@ import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.Handle
 import sh.christian.ozone.api.Nsid
+import sh.christian.ozone.api.Tid
 import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.Blob
 import sh.christian.ozone.api.model.JsonContent
@@ -190,6 +208,7 @@ class BlueskyConn(val context: Context) {
         private val OAUTH_IN_FLIGHT_HANDLE = stringPreferencesKey(AuthData.OAuthInFlightHandle.name)
         private val OAUTH_IN_FLIGHT_PDS_URL = stringPreferencesKey(AuthData.OAuthInFlightPdsURL.name)
         private val OAUTH_IN_FLIGHT_APPVIEW_PROXY = stringPreferencesKey(AuthData.OAuthInFlightAppviewProxy.name)
+        private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
 
         // OAuth client identity. Must match the JSON document hosted at OAUTH_CLIENT_ID exactly.
         // See oauth/client-metadata.json and oauth/README.md.
@@ -1956,6 +1975,120 @@ class BlueskyConn(val context: Context) {
             }
         }
     }
+
+    private suspend fun getOrCreateDeviceId(): String {
+        val existing = context.dataStore.data.first()[DEVICE_ID_KEY]
+        if (existing != null) return existing
+        val id = UUID.randomUUID().toString()
+        context.dataStore.edit { it[DEVICE_ID_KEY] = id }
+        return id
+    }
+
+    fun buildDraft(
+        text: String,
+        mediaUris: List<Uri> = emptyList(),
+        isVideo: Boolean = false,
+        replyData: SkeetData? = null,
+        isQuotePost: Boolean = false,
+        linkPreview: LinkPreviewData? = null,
+        threadgateRules: List<ThreadgateAllowUnion>? = null,
+        deviceId: String,
+    ): Draft {
+        val embedImages = if (!isVideo && mediaUris.isNotEmpty()) {
+            mediaUris.map { DraftEmbedImage(localRef = DraftEmbedLocalRef(it.toString())) }
+        } else null
+
+        val embedVideos = if (isVideo && mediaUris.isNotEmpty()) {
+            listOf(DraftEmbedVideo(localRef = DraftEmbedLocalRef(mediaUris.first().toString())))
+        } else null
+
+        val embedExternals = if (linkPreview != null && mediaUris.isEmpty()) {
+            listOf(DraftEmbedExternal(uri = sh.christian.ozone.api.Uri(linkPreview.url)))
+        } else null
+
+        val embedRecords = if (replyData != null && (isQuotePost || replyData.uri.atUri.isNotEmpty())) {
+            listOf(DraftEmbedRecord(record = StrongRef(replyData.uri, replyData.cid)))
+        } else null
+
+        val draftPost = DraftPost(
+            text = text,
+            embedImages = embedImages,
+            embedVideos = embedVideos,
+            embedExternals = embedExternals,
+            embedRecords = if (isQuotePost) embedRecords else null,
+        )
+
+        val draftThreadgateAllow = threadgateRules?.map { rule ->
+            when (rule) {
+                is ThreadgateAllowUnion.MentionRule -> DraftThreadgateAllowUnion.MentionRule(rule.value)
+                is ThreadgateAllowUnion.FollowerRule -> DraftThreadgateAllowUnion.FollowerRule(rule.value)
+                is ThreadgateAllowUnion.FollowingRule -> DraftThreadgateAllowUnion.FollowingRule(rule.value)
+                is ThreadgateAllowUnion.ListRule -> DraftThreadgateAllowUnion.ListRule(rule.value)
+                is ThreadgateAllowUnion.Unknown -> null
+            }
+        }?.filterNotNull()
+
+        return Draft(
+            deviceId = deviceId,
+            deviceName = "${Build.MANUFACTURER} ${Build.MODEL}",
+            posts = listOf(draftPost),
+            threadgateAllow = draftThreadgateAllow,
+        )
+    }
+
+    suspend fun createDraft(draft: Draft): Result<String> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
+
+            val ret = pdsClient!!.createDraft(CreateDraftRequest(draft = draft))
+
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Could not create draft: ${ret.error?.message}")
+                is AtpResponse.Success<CreateDraftResponse> -> ret.response.id
+            }
+        }
+    }
+
+    suspend fun getDrafts(cursor: String? = null, limit: Long = 50): Result<GetDraftsResponse> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
+
+            val ret = pdsClient!!.getDrafts(GetDraftsQueryParams(limit = limit, cursor = cursor))
+
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Could not fetch drafts: ${ret.error?.message}")
+                is AtpResponse.Success<GetDraftsResponse> -> ret.response
+            }
+        }
+    }
+
+    suspend fun updateDraft(id: Tid, draft: Draft): Result<Unit> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
+
+            val ret = pdsClient!!.updateDraft(UpdateDraftRequest(draft = DraftWithId(id = id, draft = draft)))
+
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Could not update draft: ${ret.error?.message}")
+                is AtpResponse.Success<*> -> Unit
+            }
+        }
+    }
+
+    suspend fun deleteDraft(id: Tid): Result<Unit> = retryOnDpopHiccup {
+        runCatching {
+            create().getOrThrow()
+
+            val ret = pdsClient!!.deleteDraft(DeleteDraftRequest(id = id))
+
+            when (ret) {
+                is AtpResponse.Failure<*> -> throw Exception("Could not delete draft: ${ret.error?.message}")
+                is AtpResponse.Success<*> -> Unit
+            }
+        }
+    }
+
+    suspend fun deviceId(): String = getOrCreateDeviceId()
 
     private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> {
         return runCatching {

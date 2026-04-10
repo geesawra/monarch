@@ -143,7 +143,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.net.Uri
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import app.bsky.feed.ThreadgateAllowUnion
 import industries.geesawra.monarch.datalayer.AvatarShape
+import industries.geesawra.monarch.datalayer.LinkPreviewData
 import industries.geesawra.monarch.datalayer.NotificationBadge
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
@@ -201,13 +207,14 @@ fun MainView(
 ) {
     val scrollState = rememberScrollState()
     val wasEdited = remember { mutableStateOf(false) }
-    var showDiscardDialog by remember { mutableStateOf(false) }
+    var showSaveDraftDialog by remember { mutableStateOf(false) }
+    var showDraftsSheet by remember { mutableStateOf(false) }
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
             confirmValueChange = { targetValue ->
                 if (targetValue == SheetValue.Hidden && wasEdited.value) {
-                    showDiscardDialog = true
+                    showSaveDraftDialog = true
                     false
                 } else {
                     true
@@ -217,6 +224,11 @@ fun MainView(
     )
     val inReplyTo = remember { mutableStateOf<SkeetData?>(null) }
     val isQuotePost = remember { mutableStateOf(false) }
+    val composeTextFieldState = rememberTextFieldState()
+    val composeMediaSelected = remember { mutableStateOf(listOf<Uri>()) }
+    val composeMediaSelectedIsVideo = remember { mutableStateOf(false) }
+    val composeThreadgateRules = remember { mutableStateOf<List<ThreadgateAllowUnion>?>(null) }
+    val composeLinkPreview = remember { mutableStateOf<LinkPreviewData?>(null) }
 
     LaunchedEffect(timelineViewModel.redraftText) {
         if (timelineViewModel.redraftText != null) {
@@ -235,7 +247,7 @@ fun MainView(
     val focusManager = LocalFocusManager.current
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
         if (wasEdited.value) {
-            showDiscardDialog = true
+            showSaveDraftDialog = true
         } else {
             focusManager.clearFocus()
             coroutineScope.launch {
@@ -244,17 +256,90 @@ fun MainView(
         }
     }
 
-    if (showDiscardDialog) {
-        DiscardChangesDialog(
-            onDiscard = {
-                showDiscardDialog = false
+    if (showSaveDraftDialog) {
+        SaveDraftDialog(
+            onSaveDraft = {
+                showSaveDraftDialog = false
+                timelineViewModel.saveDraft(
+                    text = composeTextFieldState.text.toString(),
+                    mediaUris = composeMediaSelected.value,
+                    isVideo = composeMediaSelectedIsVideo.value,
+                    replyData = if (isQuotePost.value) inReplyTo.value else null,
+                    isQuotePost = isQuotePost.value,
+                    linkPreview = composeLinkPreview.value,
+                    threadgateRules = composeThreadgateRules.value,
+                )
                 wasEdited.value = false
                 focusManager.clearFocus()
                 coroutineScope.launch {
                     scaffoldState.bottomSheetState.hide()
                 }
             },
-            onKeepEditing = { showDiscardDialog = false },
+            onDiscard = {
+                showSaveDraftDialog = false
+                wasEdited.value = false
+                timelineViewModel.clearActiveDraft()
+                focusManager.clearFocus()
+                coroutineScope.launch {
+                    scaffoldState.bottomSheetState.hide()
+                }
+            },
+            onKeepEditing = { showSaveDraftDialog = false },
+        )
+    }
+
+    var localDeviceId by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        localDeviceId = timelineViewModel.deviceId()
+    }
+
+    if (showDraftsSheet) {
+        DraftsListSheet(
+            timelineViewModel = timelineViewModel,
+            localDeviceId = localDeviceId,
+            onDismiss = { showDraftsSheet = false },
+            onLoadDraft = { draftView ->
+                showDraftsSheet = false
+                val post = draftView.draft.posts.firstOrNull() ?: return@DraftsListSheet
+                composeTextFieldState.edit {
+                    replace(0, length, post.text)
+                    selection = androidx.compose.ui.text.TextRange(post.text.length)
+                }
+                val isFromThisDevice = draftView.draft.deviceId == null || draftView.draft.deviceId == localDeviceId
+                if (isFromThisDevice) {
+                    val imageUris = post.embedImages?.map { Uri.parse(it.localRef.path) } ?: emptyList()
+                    val videoUris = post.embedVideos?.map { Uri.parse(it.localRef.path) } ?: emptyList()
+                    if (videoUris.isNotEmpty()) {
+                        composeMediaSelected.value = videoUris
+                        composeMediaSelectedIsVideo.value = true
+                    } else {
+                        composeMediaSelected.value = imageUris
+                        composeMediaSelectedIsVideo.value = false
+                    }
+                } else {
+                    composeMediaSelected.value = emptyList()
+                    composeMediaSelectedIsVideo.value = false
+                }
+                val embedRecord = post.embedRecords?.firstOrNull()
+                if (embedRecord != null) {
+                    isQuotePost.value = true
+                    coroutineScope.launch {
+                        val postViews = timelineViewModel.fetchPostViews(listOf(embedRecord.record.uri))
+                        val quotePost = postViews?.firstOrNull()
+                        if (quotePost != null) {
+                            inReplyTo.value = SkeetData.fromPostView(quotePost, quotePost.author)
+                        }
+                    }
+                } else {
+                    isQuotePost.value = false
+                    inReplyTo.value = null
+                }
+                timelineViewModel.setActiveDraftId(draftView.id)
+                wasEdited.value = true
+                coroutineScope.launch {
+                    scaffoldState.bottomSheetState.expand()
+                }
+            },
         )
     }
 
@@ -285,6 +370,12 @@ fun MainView(
                 isQuotePost = isQuotePost,
                 wasEdited = wasEdited,
                 initialText = redraftText,
+                textfieldState = composeTextFieldState,
+                mediaSelected = composeMediaSelected,
+                mediaSelectedIsVideo = composeMediaSelectedIsVideo,
+                threadgateRules = composeThreadgateRules,
+                linkPreview = composeLinkPreview,
+                onDraftsClick = { showDraftsSheet = true },
             )
         },
         snackbarHost = {

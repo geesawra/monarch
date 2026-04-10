@@ -25,6 +25,7 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -272,6 +273,11 @@ class MainActivity : ComponentActivity() {
                             val threadIsQuotePost = remember { mutableStateOf(false) }
                             val threadScrollState = rememberScrollState()
                             val threadContext = LocalContext.current
+                            val threadTextFieldState = rememberTextFieldState()
+                            val threadMediaSelected = remember { mutableStateOf(listOf<android.net.Uri>()) }
+                            val threadMediaSelectedIsVideo = remember { mutableStateOf(false) }
+                            val threadThreadgateRules = remember { mutableStateOf<List<app.bsky.feed.ThreadgateAllowUnion>?>(null) }
+                            val threadLinkPreview = remember { mutableStateOf<industries.geesawra.monarch.datalayer.LinkPreviewData?>(null) }
 
                             BottomSheetScaffold(
                                 modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
@@ -288,6 +294,11 @@ class MainActivity : ComponentActivity() {
                                         isQuotePost = threadIsQuotePost,
                                         scaffoldState = threadScaffoldState,
                                         scrollState = threadScrollState,
+                                        textfieldState = threadTextFieldState,
+                                        mediaSelected = threadMediaSelected,
+                                        mediaSelectedIsVideo = threadMediaSelectedIsVideo,
+                                        threadgateRules = threadThreadgateRules,
+                                        linkPreview = threadLinkPreview,
                                     )
                                 },
                             ) {

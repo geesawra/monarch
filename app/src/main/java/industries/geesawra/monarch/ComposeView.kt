@@ -47,9 +47,11 @@ import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CameraRoll
@@ -156,22 +158,23 @@ fun ComposeView(
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
     initialText: String = "",
     initialMentions: Map<String, Did> = emptyMap(),
+    textfieldState: TextFieldState,
+    mediaSelected: MutableState<List<Uri>>,
+    mediaSelectedIsVideo: MutableState<Boolean>,
+    threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
+    linkPreview: MutableState<LinkPreviewData?>,
+    onDraftsClick: () -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val charCount = remember { mutableIntStateOf(0) }
     val maxChars = 300
-    val textfieldState = rememberTextFieldState()
     val facets = remember { mutableListOf<Facet>() }
-    val mediaSelected = remember { mutableStateOf(listOf<Uri>()) }
-    val mediaSelectedIsVideo = remember { mutableStateOf(false) }
-    val threadgateRules = remember { mutableStateOf<List<ThreadgateAllowUnion>?>(null) }
     val mentionResults = remember { mutableStateOf(listOf<ProfileViewBasic>()) }
     val showMentionDropdown = remember { mutableStateOf(false) }
     val mentionDids = remember { mutableStateMapOf<String, Did>() }
 
-    val linkPreview = remember { mutableStateOf<LinkPreviewData?>(null) }
     val linkPreviewLoading = remember { mutableStateOf(false) }
     val linkPreviewDismissed = remember { mutableStateOf(false) }
     val linkPreviewCache = remember { mutableMapOf<String, LinkPreviewData?>() }
@@ -188,6 +191,7 @@ fun ComposeView(
                     isQuotePost.value = false
                     mediaSelected.value = listOf()
                     mediaSelectedIsVideo.value = false
+                    threadgateRules.value = null
                     mentionResults.value = listOf()
                     showMentionDropdown.value = false
                     mentionDids.clear()
@@ -195,6 +199,7 @@ fun ComposeView(
                     linkPreviewLoading.value = false
                     linkPreviewDismissed.value = false
                     linkPreviewCache.clear()
+                    timelineViewModel.clearActiveDraft()
                 }
             }
 
@@ -331,6 +336,7 @@ fun ComposeView(
                     linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
                     threadgateRules = threadgateRules,
                     wasEdited = wasEdited,
+                    onDraftsClick = onDraftsClick,
                 )
 
                 LaunchedEffect(Unit) {
@@ -637,6 +643,7 @@ fun ActionRow(
     linkPreview: LinkPreviewData? = null,
     threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
+    onDraftsClick: () -> Unit = {},
 ) {
     var showThreadgateSheet by remember { mutableStateOf(false) }
 
@@ -685,6 +692,9 @@ fun ActionRow(
                     contentDescription = "Reply settings",
                     tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
                 )
+            }
+            TextButton(onClick = onDraftsClick) {
+                Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
             }
         }
 
@@ -755,6 +765,10 @@ fun ActionRow(
                             threadgateRules = threadgateRules.value,
                         ).onSuccess {
                             wasEdited.value = false
+                            timelineViewModel.draftsState.activeDraftId?.let { draftId ->
+                                timelineViewModel.deleteDraft(draftId)
+                                timelineViewModel.clearActiveDraft()
+                            }
                             if (autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
                                 timelineViewModel.like(inReplyToData.uri, inReplyToData.cid)
                             }

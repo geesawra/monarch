@@ -151,6 +151,13 @@ data class VideoUploadState(
     val progress: Long? = null,
 )
 
+data class DraftsState(
+    val drafts: List<app.bsky.draft.DraftView> = emptyList(),
+    val cursor: String? = null,
+    val isLoading: Boolean = false,
+    val activeDraftId: sh.christian.ozone.api.Tid? = null,
+)
+
 
 object NotificationBadge {
     val count = kotlinx.coroutines.flow.MutableStateFlow(0)
@@ -185,6 +192,7 @@ class TimelineViewModel @AssistedInject constructor(
     var searchState by mutableStateOf(SearchState()); private set
     var videoUploadState by mutableStateOf(VideoUploadState()); private set
     var publicationsState by mutableStateOf(PublicationsState()); private set
+    var draftsState by mutableStateOf(DraftsState()); private set
     var redraftText by mutableStateOf<String?>(null); private set
 
     fun setRedraft(text: String?) { redraftText = text }
@@ -274,6 +282,9 @@ class TimelineViewModel @AssistedInject constructor(
     private inline fun updatePublications(block: (PublicationsState) -> PublicationsState) {
         publicationsState = block(publicationsState)
     }
+    private inline fun updateDrafts(block: (DraftsState) -> DraftsState) {
+        draftsState = block(draftsState)
+    }
 
     var accounts by mutableStateOf<List<StoredAccount>>(emptyList())
         private set
@@ -294,6 +305,7 @@ class TimelineViewModel @AssistedInject constructor(
         searchState = SearchState()
         videoUploadState = VideoUploadState()
         publicationsState = PublicationsState()
+        draftsState = DraftsState()
     }
 
     fun appviewName(): String = bskyConn.appviewName()
@@ -997,6 +1009,88 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun isOwnPost(skeet: SkeetData): Boolean {
         return skeet.did == bskyConn.session?.did
+    }
+
+    fun fetchDrafts(fresh: Boolean = true) {
+        viewModelScope.launch {
+            if (draftsState.isLoading) return@launch
+            updateDrafts { it.copy(isLoading = true) }
+            val cursor = if (fresh) null else draftsState.cursor
+            bskyConn.getDrafts(cursor = cursor).onSuccess { response ->
+                updateDrafts {
+                    it.copy(
+                        drafts = if (fresh) response.drafts else it.drafts + response.drafts,
+                        cursor = response.cursor,
+                        isLoading = false,
+                    )
+                }
+            }.onFailure { error ->
+                updateDrafts { it.copy(isLoading = false) }
+                handleError(error)
+            }
+        }
+    }
+
+    fun saveDraft(
+        text: String,
+        mediaUris: List<Uri> = emptyList(),
+        isVideo: Boolean = false,
+        replyData: SkeetData? = null,
+        isQuotePost: Boolean = false,
+        linkPreview: LinkPreviewData? = null,
+        threadgateRules: List<ThreadgateAllowUnion>? = null,
+    ) {
+        viewModelScope.launch {
+            val deviceId = bskyConn.deviceId()
+            val draft = bskyConn.buildDraft(
+                text = text,
+                mediaUris = mediaUris,
+                isVideo = isVideo,
+                replyData = replyData,
+                isQuotePost = isQuotePost,
+                linkPreview = linkPreview,
+                threadgateRules = threadgateRules,
+                deviceId = deviceId,
+            )
+            bskyConn.createDraft(draft).onSuccess {
+                fetchDrafts()
+            }.onFailure { error ->
+                val msg = error.message ?: ""
+                if (msg.contains("DraftLimitReached", ignoreCase = true)) {
+                    updateSession { it.copy(error = "Draft limit reached. Delete an existing draft to save a new one.") }
+                } else {
+                    handleError(error)
+                }
+            }
+        }
+    }
+
+    fun deleteDraft(id: sh.christian.ozone.api.Tid, then: () -> Unit = {}) {
+        viewModelScope.launch {
+            bskyConn.deleteDraft(id).onSuccess {
+                updateDrafts { it.copy(drafts = it.drafts.filter { d -> d.id != id }) }
+                if (draftsState.activeDraftId == id) {
+                    updateDrafts { it.copy(activeDraftId = null) }
+                }
+                then()
+            }.onFailure {
+                handleError(it)
+            }
+        }
+    }
+
+    fun setActiveDraftId(id: sh.christian.ozone.api.Tid?) {
+        updateDrafts { it.copy(activeDraftId = id) }
+    }
+
+    fun clearActiveDraft() {
+        updateDrafts { it.copy(activeDraftId = null) }
+    }
+
+    suspend fun deviceId(): String = bskyConn.deviceId()
+
+    suspend fun fetchPostViews(uris: List<AtUri>): List<app.bsky.feed.PostView>? {
+        return bskyConn.getPosts(uris).getOrNull()
     }
 
     fun deleteLike(cid: Cid) {
