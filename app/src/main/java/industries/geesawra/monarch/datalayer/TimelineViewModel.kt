@@ -131,6 +131,17 @@ data class SearchState(
     val isSearching: Boolean = false,
 )
 
+data class PublicationsState(
+    val publicationsDid: Did? = null,
+    val publications: List<PublicationRecord> = emptyList(),
+    val hasPublications: Boolean = false,
+    val isFetchingPublications: Boolean = false,
+    val selectedPublication: PublicationRecord? = null,
+    val documents: List<DocumentRecord> = emptyList(),
+    val isFetchingDocuments: Boolean = false,
+    val selectedDocument: DocumentRecord? = null,
+)
+
 data class VideoUploadState(
     val status: VideoUploadStatus? = null,
     val progress: Long? = null,
@@ -169,6 +180,7 @@ class TimelineViewModel @AssistedInject constructor(
     var followersState by mutableStateOf(FollowersState()); private set
     var searchState by mutableStateOf(SearchState()); private set
     var videoUploadState by mutableStateOf(VideoUploadState()); private set
+    var publicationsState by mutableStateOf(PublicationsState()); private set
 
     // ── Flat read-only forwarding getters (compat with existing call sites) ─
     val user: ProfileViewDetailed? get() = sessionState.user
@@ -250,6 +262,9 @@ class TimelineViewModel @AssistedInject constructor(
     private inline fun updateVideoUpload(block: (VideoUploadState) -> VideoUploadState) {
         videoUploadState = block(videoUploadState)
     }
+    private inline fun updatePublications(block: (PublicationsState) -> PublicationsState) {
+        publicationsState = block(publicationsState)
+    }
 
     var accounts by mutableStateOf<List<StoredAccount>>(emptyList())
         private set
@@ -269,6 +284,7 @@ class TimelineViewModel @AssistedInject constructor(
         followersState = FollowersState()
         searchState = SearchState()
         videoUploadState = VideoUploadState()
+        publicationsState = PublicationsState()
     }
 
     fun appviewName(): String = bskyConn.appviewName()
@@ -1220,6 +1236,39 @@ class TimelineViewModel @AssistedInject constructor(
         }
 
         fetchProfileFeed(did, fresh = true)
+    }
+
+    fun fetchPublications(did: Did) {
+        updatePublications { PublicationsState(publicationsDid = did, isFetchingPublications = true) }
+        viewModelScope.launch {
+            bskyConn.listPublications(did).onFailure {
+                updatePublications { it.copy(isFetchingPublications = false) }
+            }.onSuccess { pubs ->
+                updatePublications { it.copy(publications = pubs, isFetchingPublications = false) }
+            }
+        }
+    }
+
+    fun fetchDocuments(publication: PublicationRecord) {
+        updatePublications { it.copy(selectedPublication = publication, isFetchingDocuments = true, documents = emptyList(), selectedDocument = null) }
+        viewModelScope.launch {
+            val did = publicationsState.publicationsDid ?: return@launch
+            bskyConn.listDocuments(did).onFailure {
+                updatePublications { it.copy(isFetchingDocuments = false) }
+            }.onSuccess { docs ->
+                val filtered = docs.filter { it.document.site == publication.uri.atUri }
+                    .sortedByDescending { it.document.publishedAt }
+                updatePublications { it.copy(documents = filtered, isFetchingDocuments = false) }
+            }
+        }
+    }
+
+    fun selectDocument(document: DocumentRecord) {
+        updatePublications { it.copy(selectedDocument = document) }
+    }
+
+    fun clearSelectedPublication() {
+        updatePublications { it.copy(selectedPublication = null, documents = emptyList(), selectedDocument = null) }
     }
 
     fun fetchProfileFeed(did: Did? = null, fresh: Boolean = false) {

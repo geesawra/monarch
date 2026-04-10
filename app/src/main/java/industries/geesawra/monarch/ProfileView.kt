@@ -112,6 +112,9 @@ import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -141,6 +144,7 @@ fun ProfileView(
     onProfileTap: (Did) -> Unit,
     onSettingsTap: () -> Unit = {},
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
+    onDocumentTap: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listStates = profileNavTabs.associate { it.filter to rememberLazyListState() }
@@ -152,6 +156,7 @@ fun ProfileView(
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isMediaFeedMode by remember { mutableStateOf(false) }
     var mediaFeedSnapshot by remember { mutableStateOf<List<SkeetData>?>(null) }
+    var isPublicationsTab by remember { mutableStateOf(false) }
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
@@ -332,14 +337,23 @@ fun ProfileView(
                         NavigationBarItem(
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
                             label = { Text(tab.label) },
-                            selected = tab.filter == currentFilter,
+                            selected = if (tab.isPublications) isPublicationsTab else (!isPublicationsTab && tab.filter == currentFilter),
                             onClick = {
-                                if (tab.filter == currentFilter) {
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(0)
+                                if (tab.isPublications) {
+                                    if (!isPublicationsTab) {
+                                        isPublicationsTab = true
+                                        profile?.did?.let { timelineViewModel.fetchPublications(it) }
                                     }
                                 } else {
-                                    timelineViewModel.changeProfileFeedFilter(tab.filter)
+                                    isPublicationsTab = false
+                                    timelineViewModel.clearSelectedPublication()
+                                    if (tab.filter == currentFilter) {
+                                        coroutineScope.launch {
+                                            listState.animateScrollToItem(0)
+                                        }
+                                    } else {
+                                        timelineViewModel.changeProfileFeedFilter(tab.filter)
+                                    }
                                 }
                             },
                         )
@@ -408,6 +422,8 @@ fun ProfileView(
                                 }
                             },
                             onFollowersTap = onFollowersTap,
+                            isPublicationsTab = isPublicationsTab,
+                            onDocumentTap = onDocumentTap,
                         )
                     }
                 }
@@ -453,6 +469,8 @@ internal fun ProfileContent(
     onProfileTap: (Did) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
+    isPublicationsTab: Boolean = false,
+    onDocumentTap: () -> Unit = {},
 ) {
     val posts = timelineViewModel.profilePosts
     val avatarClipShape = settingsState.avatarClipShape
@@ -480,45 +498,121 @@ internal fun ProfileContent(
             )
         }
 
-        // Posts
-        itemsIndexed(
-            items = posts,
-            key = { _, skeet -> "post_${skeet.key()}" }
-        ) { _, skeet ->
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                ),
-            ) {
-                SkeetView(
-                    viewModel = timelineViewModel,
-                    skeet = skeet,
-                    onReplyTap = onReplyTap,
-                    postTextSize = settingsState.postTextSize,
-                    avatarShape = avatarClipShape,
-                    showLabels = settingsState.showLabels,
-                    showPronouns = settingsState.showPronounsInPosts,
-                    onAvatarTap = onProfileTap,
-                    onShowThread = { s ->
-                        timelineViewModel.startThread(s)
-                        onThreadTap(s)
-                    }
-                )
-            }
-        }
+        if (isPublicationsTab) {
+            val pubState = timelineViewModel.publicationsState
+            val selectedPub = pubState.selectedPublication
 
-        if (timelineViewModel.isFetchingProfileFeed) {
-            item(key = "loading") {
-                LoadingBox()
+            if (pubState.isFetchingPublications || pubState.isFetchingDocuments) {
+                item(key = "pub_loading") { LoadingBox() }
+            } else if (selectedPub != null) {
+                item(key = "pub_back") {
+                    TextButton(
+                        onClick = { timelineViewModel.clearSelectedPublication() },
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(selectedPub.publication.name)
+                    }
+                }
+                if (pubState.documents.isEmpty()) {
+                    item(key = "no_docs") {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Text("No articles yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                items(pubState.documents.size, key = { "doc_$it" }) { idx ->
+                    val doc = pubState.documents[idx]
+                    OutlinedCard(
+                        onClick = {
+                            timelineViewModel.selectDocument(doc)
+                            onDocumentTap()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(doc.document.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            doc.document.description?.let {
+                                Spacer(Modifier.height(4.dp))
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                            doc.document.publishedAt?.let {
+                                Spacer(Modifier.height(4.dp))
+                                Text(it.substringBefore("T"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (pubState.publications.isEmpty()) {
+                    item(key = "no_pubs") {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Text("No publications", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                items(pubState.publications.size, key = { "pub_$it" }) { idx ->
+                    val pub = pubState.publications[idx]
+                    OutlinedCard(
+                        onClick = { timelineViewModel.fetchDocuments(pub) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(pub.publication.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            pub.publication.description?.let {
+                                Spacer(Modifier.height(4.dp))
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                            }
+                            pub.publication.url?.let {
+                                Spacer(Modifier.height(4.dp))
+                                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            itemsIndexed(
+                items = posts,
+                key = { _, skeet -> "post_${skeet.key()}" }
+            ) { _, skeet ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    ),
+                ) {
+                    SkeetView(
+                        viewModel = timelineViewModel,
+                        skeet = skeet,
+                        onReplyTap = onReplyTap,
+                        postTextSize = settingsState.postTextSize,
+                        avatarShape = avatarClipShape,
+                        showLabels = settingsState.showLabels,
+                        showPronouns = settingsState.showPronounsInPosts,
+                        onAvatarTap = onProfileTap,
+                        onShowThread = { s ->
+                            timelineViewModel.startThread(s)
+                            onThreadTap(s)
+                        }
+                    )
+                }
+            }
+
+            if (timelineViewModel.isFetchingProfileFeed) {
+                item(key = "loading") {
+                    LoadingBox()
+                }
             }
         }
     }
 
-    OnEndOfListReached(
-        listState = listState,
-        items = posts,
-        onEndReached = { timelineViewModel.fetchProfileFeed() },
-    )
+    if (!isPublicationsTab) {
+        OnEndOfListReached(
+            listState = listState,
+            items = posts,
+            onEndReached = { timelineViewModel.fetchProfileFeed() },
+        )
+    }
 }
 
 @Composable
@@ -992,6 +1086,7 @@ private data class ProfileTab(
     val icon: ImageVector,
     val filter: GetAuthorFeedFilter?,
     val isMediaFeed: Boolean = false,
+    val isPublications: Boolean = false,
 )
 
 private val profileNavTabs = listOf(
@@ -999,4 +1094,5 @@ private val profileNavTabs = listOf(
     ProfileTab("Replies", Icons.AutoMirrored.Filled.Reply, GetAuthorFeedFilter.PostsWithReplies),
     ProfileTab("Media", Icons.Default.Image, GetAuthorFeedFilter.PostsWithMedia),
     ProfileTab("Video", Icons.Default.Videocam, GetAuthorFeedFilter.PostsWithVideo),
+    ProfileTab("Publications", Icons.AutoMirrored.Filled.MenuBook, null, isPublications = true),
 )

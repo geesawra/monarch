@@ -82,6 +82,7 @@ enum class ViewList() {
     Settings,
     MutedWords,
     FollowersList,
+    DocumentReader,
 }
 
 @AndroidEntryPoint
@@ -341,6 +342,9 @@ class MainActivity : ComponentActivity() {
                                     val encodedName = URLEncoder.encode(name, "UTF-8")
                                     navController.navigate("FollowersList/${did.did}/$showFollowers/$encodedName")
                                 },
+                                onDocumentTap = {
+                                    navController.navigate(ViewList.DocumentReader.name)
+                                },
                             )
                         }
                         composable(
@@ -366,6 +370,15 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onProfileTap = { profileDid ->
                                     navController.navigate("Profile/${profileDid.did}")
+                                },
+                            )
+                        }
+                        composable(route = ViewList.DocumentReader.name) {
+                            DocumentReaderView(
+                                timelineViewModel = timelineViewModel,
+                                settingsState = settings,
+                                backButton = {
+                                    navController.popBackStack()
                                 },
                             )
                         }

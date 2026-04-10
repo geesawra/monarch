@@ -921,6 +921,50 @@ private fun matchesMutedWord(skeet: SkeetData, mutedWords: List<app.bsky.actor.M
  * Mark each skeet with isMuted=true if itself, its parent, or its root matches any muted
  * word rule. Called once per fetch and whenever the muted-words list changes.
  */
+@Immutable
+data class StandardPublication(
+    val name: String,
+    val url: String? = null,
+    val description: String? = null,
+)
+
+enum class ContentBlockType { PARAGRAPH, HEADING, LIST_ITEM, CODE, BLOCKQUOTE, IMAGE, UNKNOWN }
+
+@Immutable
+data class ContentBlock(
+    val type: ContentBlockType,
+    val text: String = "",
+    val level: Int = 0,
+)
+
+@Immutable
+data class StandardDocument(
+    val title: String,
+    val path: String? = null,
+    val description: String? = null,
+    val textContent: String? = null,
+    val contentBlocks: List<ContentBlock> = emptyList(),
+    val publishedAt: String? = null,
+    val updatedAt: String? = null,
+    val tags: List<String> = emptyList(),
+    val site: String? = null,
+)
+
+@Immutable
+data class PublicationRecord(
+    val uri: AtUri,
+    val cid: Cid,
+    val publication: StandardPublication,
+)
+
+@Immutable
+data class DocumentRecord(
+    val uri: AtUri,
+    val cid: Cid,
+    val document: StandardDocument,
+    val authorDid: Did,
+)
+
 fun List<SkeetData>.withMuteFlags(mutedWords: List<app.bsky.actor.MutedWord>): List<SkeetData> {
     if (mutedWords.isEmpty()) {
         return if (any { it.isMuted }) map { it.copy(isMuted = false) } else this

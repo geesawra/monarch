@@ -80,6 +80,8 @@ import com.atproto.repo.CreateRecordRequest
 import com.atproto.repo.CreateRecordResponse
 import com.atproto.repo.DeleteRecordRequest
 import com.atproto.repo.GetRecordQueryParams
+import com.atproto.repo.ListRecordsQueryParams
+import com.atproto.repo.ListRecordsResponse
 import com.atproto.repo.GetRecordResponse
 import com.atproto.repo.StrongRef
 import com.atproto.repo.UploadBlobResponse
@@ -125,6 +127,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import sh.christian.ozone.BlueskyApi
 import sh.christian.ozone.BlueskyJson
 import sh.christian.ozone.XrpcBlueskyApi
+import sh.christian.ozone.api.AtIdentifier
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.AuthenticatedXrpcBlueskyApi
 import sh.christian.ozone.api.BlueskyAuthPlugin
@@ -952,6 +955,141 @@ class BlueskyConn(val context: Context) {
             return when (ret) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Failed fetching record: ${ret.error}"))
                 is AtpResponse.Success<GetRecordResponse> -> Result.success(ret.response.value)
+            }
+        }
+    }
+
+    private val pdsCache = mutableMapOf<String, String>()
+
+    private suspend fun listRecordsFromRepo(did: Did, collection: String): Result<List<com.atproto.repo.ListRecordsRecord>> {
+        val pds = pdsCache.getOrPut(did.did) {
+            pdsForHandle(did.did).getOrElse { return Result.failure(it) }
+        }
+        val httpClient = createRetryHttpClient(baseUrl = pds)
+        val api = XrpcBlueskyApi(httpClient)
+        return try {
+            val ret = api.listRecords(
+                ListRecordsQueryParams(
+                    repo = did as AtIdentifier,
+                    collection = Nsid(collection),
+                    limit = 100,
+                )
+            )
+            when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed listing $collection: ${ret.error}"))
+                is AtpResponse.Success<ListRecordsResponse> -> Result.success(ret.response.records)
+            }
+        } finally {
+            httpClient.close()
+        }
+    }
+
+    private fun kotlinx.serialization.json.JsonObject.str(key: String): String? =
+        get(key)?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+
+    private fun parseContentBlocks(content: kotlinx.serialization.json.JsonElement?): List<ContentBlock> {
+        if (content == null) return emptyList()
+        val blocks = mutableListOf<ContentBlock>()
+
+        fun processBlock(block: kotlinx.serialization.json.JsonObject) {
+            val type = block.str("\$type") ?: ""
+            val plaintext = block.str("plaintext") ?: ""
+            when {
+                type.contains("header", true) -> {
+                    val level = block["level"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() } ?: 1
+                    if (plaintext.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.HEADING, plaintext, level))
+                }
+                type.contains("text", true) && !type.contains("list", true) -> {
+                    if (plaintext.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.PARAGRAPH, plaintext))
+                }
+                type.contains("blockquote", true) -> {
+                    if (plaintext.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.BLOCKQUOTE, plaintext))
+                }
+                type.contains("code", true) -> {
+                    blocks.add(ContentBlock(ContentBlockType.CODE, plaintext))
+                }
+                type.contains("image", true) -> {
+                    val alt = block.str("alt") ?: ""
+                    blocks.add(ContentBlock(ContentBlockType.IMAGE, alt))
+                }
+                type.contains("unorderedList", true) || type.contains("orderedList", true) -> {
+                    val children = block["children"] as? kotlinx.serialization.json.JsonArray ?: return
+                    children.forEach { item ->
+                        val itemObj = item as? kotlinx.serialization.json.JsonObject ?: return@forEach
+                        val itemContent = itemObj["content"] as? kotlinx.serialization.json.JsonObject
+                        val itemText = itemContent?.str("plaintext") ?: itemObj.str("plaintext") ?: ""
+                        if (itemText.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.LIST_ITEM, itemText))
+                    }
+                }
+                else -> {
+                    if (plaintext.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.PARAGRAPH, plaintext))
+                }
+            }
+        }
+
+        val contentObj = content as? kotlinx.serialization.json.JsonObject ?: return emptyList()
+        val pages = contentObj["pages"] as? kotlinx.serialization.json.JsonArray ?: return emptyList()
+
+        for (page in pages) {
+            val pageObj = page as? kotlinx.serialization.json.JsonObject ?: continue
+            val pageBlocks = pageObj["blocks"] as? kotlinx.serialization.json.JsonArray ?: continue
+            for (entry in pageBlocks) {
+                val entryObj = entry as? kotlinx.serialization.json.JsonObject ?: continue
+                val block = entryObj["block"] as? kotlinx.serialization.json.JsonObject
+                if (block != null) {
+                    processBlock(block)
+                }
+            }
+        }
+
+        return blocks
+    }
+
+    suspend fun listPublications(did: Did): Result<List<PublicationRecord>> {
+        return listRecordsFromRepo(did, "site.standard.publication").map { records ->
+            records.mapNotNull { record ->
+                runCatching {
+                    val obj = record.value.value as kotlinx.serialization.json.JsonObject
+                    PublicationRecord(
+                        uri = record.uri,
+                        cid = record.cid,
+                        publication = StandardPublication(
+                            name = obj.str("name") ?: return@mapNotNull null,
+                            url = obj.str("url"),
+                            description = obj.str("description"),
+                        ),
+                    )
+                }.getOrNull()
+            }
+        }
+    }
+
+    suspend fun listDocuments(did: Did): Result<List<DocumentRecord>> {
+        return listRecordsFromRepo(did, "site.standard.document").map { records ->
+            records.mapNotNull { record ->
+                runCatching {
+                    val obj = record.value.value as kotlinx.serialization.json.JsonObject
+                    val tagsArray = obj["tags"] as? kotlinx.serialization.json.JsonArray
+                    val contentBlocks = parseContentBlocks(obj["content"])
+                    val textContent = obj.str("textContent")
+                        ?: contentBlocks.joinToString("\n\n") { it.text }.ifBlank { null }
+                    DocumentRecord(
+                        uri = record.uri,
+                        cid = record.cid,
+                        authorDid = did,
+                        document = StandardDocument(
+                            title = obj.str("title") ?: return@mapNotNull null,
+                            path = obj.str("path"),
+                            description = obj.str("description"),
+                            textContent = textContent,
+                            contentBlocks = contentBlocks,
+                            publishedAt = obj.str("publishedAt"),
+                            updatedAt = obj.str("updatedAt"),
+                            site = obj.str("site"),
+                            tags = tagsArray?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: emptyList(),
+                        ),
+                    )
+                }.getOrNull()
             }
         }
     }
