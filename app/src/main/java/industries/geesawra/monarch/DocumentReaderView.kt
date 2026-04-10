@@ -18,7 +18,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.graphics.painter.ColorPainter
+import coil3.compose.AsyncImage
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -103,13 +111,6 @@ fun DocumentReaderView(
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 item(key = "header") {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = doc.document.title,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-
                     doc.document.description?.let { desc ->
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -152,7 +153,7 @@ fun DocumentReaderView(
                         val block = doc.document.contentBlocks[idx]
                         when (block.type) {
                             ContentBlockType.HEADING -> {
-                                Spacer(modifier = Modifier.height(if (idx > 0) 16.dp else 0.dp))
+                                Spacer(modifier = Modifier.height(if (idx > 0) 24.dp else 0.dp))
                                 Text(
                                     text = block.text,
                                     style = when (block.level) {
@@ -162,20 +163,20 @@ fun DocumentReaderView(
                                     },
                                     fontWeight = FontWeight.Bold,
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                             }
                             ContentBlockType.PARAGRAPH -> {
                                 Text(
                                     text = block.text,
                                     style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
                             }
                             ContentBlockType.BLOCKQUOTE -> {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
+                                        .padding(vertical = 8.dp)
                                         .drawBehind {
                                             drawRect(
                                                 color = accentColor,
@@ -192,13 +193,13 @@ fun DocumentReaderView(
                                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
                             }
                             ContentBlockType.CODE -> {
                                 Surface(
                                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                                     shape = MaterialTheme.shapes.small,
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                                 ) {
                                     Text(
                                         text = block.text,
@@ -209,15 +210,98 @@ fun DocumentReaderView(
                                         modifier = Modifier.padding(12.dp),
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
                             }
                             ContentBlockType.LIST_ITEM -> {
-                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                Row(modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)) {
                                     Text("•  ", style = MaterialTheme.typography.bodyLarge)
                                     Text(
                                         text = block.text,
                                         style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
                                     )
+                                }
+                            }
+                            ContentBlockType.HORIZONTAL_RULE -> {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                HorizontalDivider()
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            ContentBlockType.WEBSITE -> {
+                                if (block.linkUrl?.isNotBlank() == true) {
+                                    OutlinedCard(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(block.linkUrl))
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            if (block.linkTitle?.isNotBlank() == true) {
+                                                Text(block.linkTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            if (block.linkDescription?.isNotBlank() == true) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(block.linkDescription, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(block.linkUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                            ContentBlockType.LINK -> {
+                                if (block.embeddedPost != null) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    ) {
+                                        SkeetView(
+                                            skeet = block.embeddedPost,
+                                            showLabels = false,
+                                            onShowThread = {},
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                } else if (block.linkUrl?.isNotBlank() == true) {
+                                    OutlinedCard(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(block.linkUrl))
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(block.linkTitle ?: block.linkUrl, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(block.linkUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                            ContentBlockType.IMAGE -> {
+                                if (block.imageUrl != null) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    AsyncImage(
+                                        model = block.imageUrl,
+                                        contentDescription = block.text.ifBlank { null },
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 200.dp)
+                                            .clip(MaterialTheme.shapes.medium),
+                                        contentScale = ContentScale.FillWidth,
+                                    )
+                                    if (block.text.isNotBlank()) {
+                                        Text(
+                                            text = block.text,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(top = 4.dp),
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(16.dp))
                                 }
                             }
                             else -> {
@@ -226,7 +310,7 @@ fun DocumentReaderView(
                                         text = block.text,
                                         style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
                                     )
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(modifier = Modifier.height(16.dp))
                                 }
                             }
                         }

@@ -987,7 +987,7 @@ class BlueskyConn(val context: Context) {
     private fun kotlinx.serialization.json.JsonObject.str(key: String): String? =
         get(key)?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
 
-    private fun parseContentBlocks(content: kotlinx.serialization.json.JsonElement?): List<ContentBlock> {
+    private fun parseContentBlocks(content: kotlinx.serialization.json.JsonElement?, did: Did? = null): List<ContentBlock> {
         if (content == null) return emptyList()
         val blocks = mutableListOf<ContentBlock>()
 
@@ -1010,7 +1010,15 @@ class BlueskyConn(val context: Context) {
                 }
                 type.contains("image", true) -> {
                     val alt = block.str("alt") ?: ""
-                    blocks.add(ContentBlock(ContentBlockType.IMAGE, alt))
+                    val imageBlob = block["image"] as? kotlinx.serialization.json.JsonObject
+                    val blobRef = imageBlob?.let { img ->
+                        val ref = img["ref"] as? kotlinx.serialization.json.JsonObject
+                        ref?.str("\$link")
+                    }
+                    val imageUrl = if (blobRef != null && did != null) {
+                        "https://cdn.bsky.app/img/feed_fullsize/plain/${did.did}/$blobRef@jpeg"
+                    } else null
+                    blocks.add(ContentBlock(ContentBlockType.IMAGE, alt, imageUrl = imageUrl))
                 }
                 type.contains("unorderedList", true) || type.contains("orderedList", true) -> {
                     val children = block["children"] as? kotlinx.serialization.json.JsonArray ?: return
@@ -1020,6 +1028,24 @@ class BlueskyConn(val context: Context) {
                         val itemText = itemContent?.str("plaintext") ?: itemObj.str("plaintext") ?: ""
                         if (itemText.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.LIST_ITEM, itemText))
                     }
+                }
+                type.contains("horizontalRule", true) -> {
+                    blocks.add(ContentBlock(ContentBlockType.HORIZONTAL_RULE))
+                }
+                type.contains("website", true) -> {
+                    val src = block.str("src") ?: ""
+                    val title = block.str("title") ?: ""
+                    val description = block.str("description")
+                    blocks.add(ContentBlock(ContentBlockType.WEBSITE, linkUrl = src, linkTitle = title, linkDescription = description))
+                }
+                type.contains("iframe", true) -> {
+                    val url = block.str("url") ?: ""
+                    if (url.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.LINK, linkUrl = url, linkTitle = "Embedded content"))
+                }
+                type.contains("bskyPost", true) -> {
+                    val postRef = block["postRef"] as? kotlinx.serialization.json.JsonObject
+                    val uri = postRef?.str("uri") ?: ""
+                    if (uri.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.LINK, linkUrl = uri, linkTitle = "Bluesky post"))
                 }
                 else -> {
                     if (plaintext.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.PARAGRAPH, plaintext))
@@ -1070,7 +1096,7 @@ class BlueskyConn(val context: Context) {
                 runCatching {
                     val obj = record.value.value as kotlinx.serialization.json.JsonObject
                     val tagsArray = obj["tags"] as? kotlinx.serialization.json.JsonArray
-                    val contentBlocks = parseContentBlocks(obj["content"])
+                    val contentBlocks = parseContentBlocks(obj["content"], did)
                     val textContent = obj.str("textContent")
                         ?: contentBlocks.joinToString("\n\n") { it.text }.ifBlank { null }
                     DocumentRecord(

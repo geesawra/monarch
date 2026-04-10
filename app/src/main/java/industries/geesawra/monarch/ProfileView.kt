@@ -144,6 +144,7 @@ fun ProfileView(
     onProfileTap: (Did) -> Unit,
     onSettingsTap: () -> Unit = {},
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
+    onPublicationTap: () -> Unit = {},
     onDocumentTap: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -156,7 +157,7 @@ fun ProfileView(
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isMediaFeedMode by remember { mutableStateOf(false) }
     var mediaFeedSnapshot by remember { mutableStateOf<List<SkeetData>?>(null) }
-    var isPublicationsTab by remember { mutableStateOf(false) }
+    val isPublicationsTab = timelineViewModel.publicationsState.isTabActive
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
@@ -341,11 +342,10 @@ fun ProfileView(
                             onClick = {
                                 if (tab.isPublications) {
                                     if (!isPublicationsTab) {
-                                        isPublicationsTab = true
                                         profile?.did?.let { timelineViewModel.fetchPublications(it) }
                                     }
                                 } else {
-                                    isPublicationsTab = false
+                                    timelineViewModel.setPublicationsTabActive(false)
                                     timelineViewModel.clearSelectedPublication()
                                     if (tab.filter == currentFilter) {
                                         coroutineScope.launch {
@@ -423,6 +423,7 @@ fun ProfileView(
                             },
                             onFollowersTap = onFollowersTap,
                             isPublicationsTab = isPublicationsTab,
+                            onPublicationTap = onPublicationTap,
                             onDocumentTap = onDocumentTap,
                         )
                     }
@@ -470,6 +471,7 @@ internal fun ProfileContent(
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
     isPublicationsTab: Boolean = false,
+    onPublicationTap: () -> Unit = {},
     onDocumentTap: () -> Unit = {},
 ) {
     val posts = timelineViewModel.profilePosts
@@ -500,61 +502,24 @@ internal fun ProfileContent(
 
         if (isPublicationsTab) {
             val pubState = timelineViewModel.publicationsState
-            val selectedPub = pubState.selectedPublication
 
-            if (pubState.isFetchingPublications || pubState.isFetchingDocuments) {
+            if (pubState.isFetchingPublications) {
                 item(key = "pub_loading") { LoadingBox() }
-            } else if (selectedPub != null) {
-                item(key = "pub_back") {
-                    TextButton(
-                        onClick = { timelineViewModel.clearSelectedPublication() },
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(selectedPub.publication.name)
-                    }
-                }
-                if (pubState.documents.isEmpty()) {
-                    item(key = "no_docs") {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text("No articles yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                items(pubState.documents.size, key = { "doc_$it" }) { idx ->
-                    val doc = pubState.documents[idx]
-                    OutlinedCard(
-                        onClick = {
-                            timelineViewModel.selectDocument(doc)
-                            onDocumentTap()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(doc.document.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            doc.document.description?.let {
-                                Spacer(Modifier.height(4.dp))
-                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                            doc.document.publishedAt?.let {
-                                Spacer(Modifier.height(4.dp))
-                                Text(it.substringBefore("T"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
             } else {
                 if (pubState.publications.isEmpty()) {
                     item(key = "no_pubs") {
                         Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text("No publications", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("No blogs", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
                 items(pubState.publications.size, key = { "pub_$it" }) { idx ->
                     val pub = pubState.publications[idx]
                     OutlinedCard(
-                        onClick = { timelineViewModel.fetchDocuments(pub) },
+                        onClick = {
+                            timelineViewModel.fetchDocuments(pub)
+                            onPublicationTap()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -1094,5 +1059,5 @@ private val profileNavTabs = listOf(
     ProfileTab("Replies", Icons.AutoMirrored.Filled.Reply, GetAuthorFeedFilter.PostsWithReplies),
     ProfileTab("Media", Icons.Default.Image, GetAuthorFeedFilter.PostsWithMedia),
     ProfileTab("Video", Icons.Default.Videocam, GetAuthorFeedFilter.PostsWithVideo),
-    ProfileTab("Publications", Icons.AutoMirrored.Filled.MenuBook, null, isPublications = true),
+    ProfileTab("Blogs", Icons.AutoMirrored.Filled.MenuBook, null, isPublications = true),
 )

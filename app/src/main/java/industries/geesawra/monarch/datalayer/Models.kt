@@ -928,13 +928,18 @@ data class StandardPublication(
     val description: String? = null,
 )
 
-enum class ContentBlockType { PARAGRAPH, HEADING, LIST_ITEM, CODE, BLOCKQUOTE, IMAGE, UNKNOWN }
+enum class ContentBlockType { PARAGRAPH, HEADING, LIST_ITEM, CODE, BLOCKQUOTE, IMAGE, HORIZONTAL_RULE, WEBSITE, LINK, UNKNOWN }
 
 @Immutable
 data class ContentBlock(
     val type: ContentBlockType,
     val text: String = "",
     val level: Int = 0,
+    val imageUrl: String? = null,
+    val linkUrl: String? = null,
+    val linkTitle: String? = null,
+    val linkDescription: String? = null,
+    val embeddedPost: SkeetData? = null,
 )
 
 @Immutable

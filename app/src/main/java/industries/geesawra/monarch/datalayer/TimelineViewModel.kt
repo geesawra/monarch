@@ -135,6 +135,7 @@ data class PublicationsState(
     val publicationsDid: Did? = null,
     val publications: List<PublicationRecord> = emptyList(),
     val hasPublications: Boolean = false,
+    val isTabActive: Boolean = false,
     val isFetchingPublications: Boolean = false,
     val selectedPublication: PublicationRecord? = null,
     val documents: List<DocumentRecord> = emptyList(),
@@ -1238,14 +1239,21 @@ class TimelineViewModel @AssistedInject constructor(
         fetchProfileFeed(did, fresh = true)
     }
 
+    fun setPublicationsTabActive(active: Boolean) {
+        updatePublications { it.copy(isTabActive = active) }
+    }
+
     fun fetchPublications(did: Did) {
-        updatePublications { PublicationsState(publicationsDid = did, isFetchingPublications = true) }
+        updatePublications { PublicationsState(publicationsDid = did, isTabActive = true, isFetchingPublications = true) }
         viewModelScope.launch {
-            bskyConn.listPublications(did).onFailure {
+            val allPubs = bskyConn.listPublications(did).getOrElse {
                 updatePublications { it.copy(isFetchingPublications = false) }
-            }.onSuccess { pubs ->
-                updatePublications { it.copy(publications = pubs, isFetchingPublications = false) }
+                return@launch
             }
+            val allDocs = bskyConn.listDocuments(did).getOrDefault(emptyList())
+            val docSites = allDocs.mapNotNull { it.document.site }.toSet()
+            val pubs = allPubs.filter { it.uri.atUri in docSites }
+            updatePublications { it.copy(publications = pubs, isFetchingPublications = false) }
         }
     }
 
@@ -1265,6 +1273,25 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun selectDocument(document: DocumentRecord) {
         updatePublications { it.copy(selectedDocument = document) }
+        val postUris = document.document.contentBlocks
+            .filter { it.linkTitle == "Bluesky post" && it.linkUrl?.startsWith("at://") == true }
+            .mapNotNull { it.linkUrl?.let { uri -> AtUri(uri) } }
+        if (postUris.isEmpty()) return
+        viewModelScope.launch {
+            bskyConn.getPosts(postUris).onSuccess { postViews ->
+                val postMap = postViews.associateBy { it.uri.atUri }
+                val updatedBlocks = document.document.contentBlocks.map { block ->
+                    if (block.linkTitle == "Bluesky post" && block.linkUrl != null) {
+                        val postView = postMap[block.linkUrl]
+                        if (postView != null) {
+                            block.copy(embeddedPost = SkeetData.fromPostView(postView, postView.author))
+                        } else block
+                    } else block
+                }
+                val updatedDoc = document.copy(document = document.document.copy(contentBlocks = updatedBlocks))
+                updatePublications { it.copy(selectedDocument = updatedDoc) }
+            }
+        }
     }
 
     fun clearSelectedPublication() {
