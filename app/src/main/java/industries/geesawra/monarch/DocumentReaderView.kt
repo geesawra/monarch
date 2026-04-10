@@ -2,6 +2,7 @@ package industries.geesawra.monarch
 
 import android.content.Intent
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
@@ -230,8 +231,7 @@ fun DocumentReaderView(
                                 if (block.linkUrl?.isNotBlank() == true) {
                                     OutlinedCard(
                                         onClick = {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(block.linkUrl))
-                                            context.startActivity(intent)
+                                            openUrl(context, block.linkUrl, settingsState.openLinksInBrowser)
                                         },
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                     ) {
@@ -266,8 +266,7 @@ fun DocumentReaderView(
                                 } else if (block.linkUrl?.isNotBlank() == true) {
                                     OutlinedCard(
                                         onClick = {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(block.linkUrl))
-                                            context.startActivity(intent)
+                                            openUrl(context, block.linkUrl, settingsState.openLinksInBrowser)
                                         },
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                     ) {
@@ -330,8 +329,7 @@ fun DocumentReaderView(
                     item(key = "readOnWeb") {
                         OutlinedButton(
                             onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(canonicalUrl))
-                                context.startActivity(intent)
+                                openUrl(context, canonicalUrl, settingsState.openLinksInBrowser)
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
@@ -343,5 +341,14 @@ fun DocumentReaderView(
                 }
             }
         }
+    }
+}
+
+internal fun openUrl(context: android.content.Context, url: String, useExternalBrowser: Boolean) {
+    val uri = Uri.parse(url)
+    if (useExternalBrowser) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    } else {
+        CustomTabsIntent.Builder().build().launchUrl(context, uri)
     }
 }

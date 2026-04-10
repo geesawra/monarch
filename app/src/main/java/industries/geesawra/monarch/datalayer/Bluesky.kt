@@ -1040,7 +1040,7 @@ class BlueskyConn(val context: Context) {
                 }
                 type.contains("iframe", true) -> {
                     val url = block.str("url") ?: ""
-                    if (url.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.LINK, linkUrl = url, linkTitle = "Embedded content"))
+                    if (url.isNotBlank()) blocks.add(ContentBlock(ContentBlockType.LINK, linkUrl = url, linkTitle = "Open in browser"))
                 }
                 type.contains("bskyPost", true) -> {
                     val postRef = block["postRef"] as? kotlinx.serialization.json.JsonObject

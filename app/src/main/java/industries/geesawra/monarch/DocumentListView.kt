@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import android.content.Intent
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import industries.geesawra.monarch.datalayer.DocumentRecord
 import industries.geesawra.monarch.datalayer.SettingsState
@@ -44,6 +48,7 @@ fun DocumentListView(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val pubState = timelineViewModel.publicationsState
     val publication = pubState.selectedPublication
+    val context = LocalContext.current
 
     val contentModifier = if (!settingsState.forceCompactLayout) {
         Modifier.widthIn(max = 600.dp)
@@ -96,10 +101,21 @@ fun DocumentListView(
                 } else {
                     items(pubState.documents.size, key = { "doc_$it" }) { idx ->
                         val doc = pubState.documents[idx]
+                        val canonicalUrl = if (publication?.publication?.url != null && doc.document.path != null) {
+                            publication.publication.url.trimEnd('/') + doc.document.path
+                        } else null
                         OutlinedCard(
                             onClick = {
-                                timelineViewModel.selectDocument(doc)
-                                onDocumentTap()
+                                if (canonicalUrl != null) {
+                                    if (settingsState.openLinksInBrowser) {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(canonicalUrl)))
+                                    } else {
+                                        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(canonicalUrl))
+                                    }
+                                } else {
+                                    timelineViewModel.selectDocument(doc)
+                                    onDocumentTap()
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {

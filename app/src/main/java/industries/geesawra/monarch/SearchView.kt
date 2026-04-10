@@ -178,7 +178,7 @@ private fun SearchPostsResults(
     onProfileTap: (Did) -> Unit,
 ) {
     val posts = viewModel.searchPostResults
-    val isSearching = viewModel.isSearching
+    val isSearching = viewModel.isSearchingPosts
 
     if (posts.isEmpty() && !isSearching && viewModel.searchQuery.isNotBlank()) {
         Box(
@@ -258,7 +258,7 @@ private fun SearchPeopleResults(
     onProfileTap: (Did) -> Unit,
 ) {
     val actors = viewModel.searchActorResults
-    val isSearching = viewModel.isSearching
+    val isSearching = viewModel.isSearchingActors
 
     if (actors.isEmpty() && !isSearching && viewModel.searchQuery.isNotBlank()) {
         Box(

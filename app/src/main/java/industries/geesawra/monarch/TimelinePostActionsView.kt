@@ -1,5 +1,8 @@
 package industries.geesawra.monarch
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -108,6 +111,7 @@ fun TimelinePostActionsView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel?,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
+    onRedraft: (SkeetData) -> Unit = { s -> timelineViewModel?.setRedraft(s.content) },
     skeet: SkeetData,
     inThread: Boolean = false,
 ) {
@@ -125,6 +129,7 @@ fun TimelinePostActionsView(
     }
     val haptic = LocalHapticFeedback.current
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRedraftDialog by remember { mutableStateOf(false) }
     val isOwnPost = timelineViewModel?.isOwnPost(skeet) == true
 
     if (showDeleteDialog) {
@@ -145,6 +150,31 @@ fun TimelinePostActionsView(
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { showDeleteDialog = false }) {
+                    androidx.compose.material3.Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showRedraftDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showRedraftDialog = false },
+            title = { androidx.compose.material3.Text("Delete and redraft?") },
+            text = { androidx.compose.material3.Text("The post will be deleted and its text copied to the composer.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showRedraftDialog = false
+                    timelineViewModel?.deletePost(skeet.uri) {}
+                    onRedraft(skeet)
+                }) {
+                    androidx.compose.material3.Text(
+                        "Redraft",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showRedraftDialog = false }) {
                     androidx.compose.material3.Text("Cancel")
                 }
             }
@@ -184,16 +214,20 @@ fun TimelinePostActionsView(
         }
 
         if (isOwnPost) {
-            IconButton(
+            LongPressIconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     showDeleteDialog = true
-                }
+                },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showRedraftDialog = true
+                },
             ) {
                 Icon(
                     modifier = Modifier.size(actionIconSize()),
                     imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
+                    contentDescription = "Delete (long press to redraft)",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -330,6 +364,14 @@ fun TimelinePostActionsView(
                 )
             }
             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Copy text") },
+                    onClick = {
+                        showMenu = false
+                        val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Post", skeet.content))
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text("Liked by") },
                     onClick = { showMenu = false; showLikesSheet = true },

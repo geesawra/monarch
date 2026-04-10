@@ -128,8 +128,11 @@ data class SearchState(
     val searchActorsCursor: String? = null,
     val searchPostsSort: SearchPostsSort = SearchPostsSort.Latest,
     val searchAuthorFilter: String? = null,
-    val isSearching: Boolean = false,
-)
+    val isSearchingPosts: Boolean = false,
+    val isSearchingActors: Boolean = false,
+) {
+    val isSearching: Boolean get() = isSearchingPosts || isSearchingActors
+}
 
 data class PublicationsState(
     val publicationsDid: Did? = null,
@@ -182,6 +185,9 @@ class TimelineViewModel @AssistedInject constructor(
     var searchState by mutableStateOf(SearchState()); private set
     var videoUploadState by mutableStateOf(VideoUploadState()); private set
     var publicationsState by mutableStateOf(PublicationsState()); private set
+    var redraftText by mutableStateOf<String?>(null); private set
+
+    fun setRedraft(text: String?) { redraftText = text }
 
     // ── Flat read-only forwarding getters (compat with existing call sites) ─
     val user: ProfileViewDetailed? get() = sessionState.user
@@ -234,6 +240,8 @@ class TimelineViewModel @AssistedInject constructor(
     val searchPostsSort: SearchPostsSort get() = searchState.searchPostsSort
     val searchAuthorFilter: String? get() = searchState.searchAuthorFilter
     val isSearching: Boolean get() = searchState.isSearching
+    val isSearchingPosts: Boolean get() = searchState.isSearchingPosts
+    val isSearchingActors: Boolean get() = searchState.isSearchingActors
 
     val videoUploadStatus: VideoUploadStatus? get() = videoUploadState.status
     val videoUploadProgress: Long? get() = videoUploadState.progress
@@ -1418,13 +1426,14 @@ class TimelineViewModel @AssistedInject constructor(
             updateSearch {
                 SearchState(
                     searchQuery = query,
-                    isSearching = true,
+                    isSearchingPosts = true,
+                    isSearchingActors = true,
                     searchAuthorFilter = it.searchAuthorFilter,
                     searchPostsSort = it.searchPostsSort,
                 )
             }
         } else {
-            updateSearch { it.copy(isSearching = true) }
+            updateSearch { it.copy(isSearchingPosts = true, isSearchingActors = true) }
         }
 
         searchPosts(query, fresh)
@@ -1445,7 +1454,7 @@ class TimelineViewModel @AssistedInject constructor(
                 cursor = if (fresh) null else searchPostsCursor,
             ).onFailure { err ->
                 if (err is CancellationException) return@onFailure
-                updateSearch { it.copy(isSearching = false) }
+                updateSearch { it.copy(isSearchingPosts = false) }
                 updateSession { it.copy(error = err.message) }
             }.onSuccess { (posts, cursor) ->
                 val currentMutedWords = mutedWords
@@ -1458,7 +1467,7 @@ class TimelineViewModel @AssistedInject constructor(
                     s.copy(
                         searchPostResults = merged.withMuteFlags(currentMutedWords),
                         searchPostsCursor = cursor,
-                        isSearching = false,
+                        isSearchingPosts = false,
                     )
                 }
                 newSkeets.forEach { postInteractionStore.seed(it) }
@@ -1473,14 +1482,14 @@ class TimelineViewModel @AssistedInject constructor(
                 cursor = if (fresh) null else searchActorsCursor,
             ).onFailure { err ->
                 if (err is CancellationException) return@onFailure
-                updateSearch { it.copy(isSearching = false) }
+                updateSearch { it.copy(isSearchingActors = false) }
             }.onSuccess { (actors, cursor) ->
                 updateSearch { s ->
                     s.copy(
                         searchActorResults = if (fresh) actors
                             else (s.searchActorResults + actors).distinctBy { it.did },
                         searchActorsCursor = cursor,
-                        isSearching = false,
+                        isSearchingActors = false,
                     )
                 }
             }
@@ -1488,12 +1497,14 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun fetchMoreSearchPosts() {
-        if (searchPostsCursor == null || searchQuery.isBlank()) return
+        if (searchPostsCursor == null || searchQuery.isBlank() || searchState.isSearchingPosts) return
+        updateSearch { it.copy(isSearchingPosts = true) }
         searchPosts(searchQuery, fresh = false)
     }
 
     fun fetchMoreSearchActors() {
-        if (searchActorsCursor == null || searchQuery.isBlank()) return
+        if (searchActorsCursor == null || searchQuery.isBlank() || searchState.isSearchingActors) return
+        updateSearch { it.copy(isSearchingActors = true) }
         searchActors(searchQuery, fresh = false)
     }
 

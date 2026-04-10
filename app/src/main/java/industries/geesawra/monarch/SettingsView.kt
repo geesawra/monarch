@@ -229,6 +229,17 @@ fun SettingsView(
             )
 
             ListItem(
+                headlineContent = { Text("Open links in browser") },
+                supportingContent = { Text("Use default browser instead of in-app tabs") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.openLinksInBrowser,
+                        onCheckedChange = { settingsViewModel.setOpenLinksInBrowser(it) }
+                    )
+                },
+            )
+
+            ListItem(
                 headlineContent = { Text("Force compact layout") },
                 supportingContent = { Text("Use phone layout on large screens") },
                 trailingContent = {
