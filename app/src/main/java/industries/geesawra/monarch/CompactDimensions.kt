@@ -10,7 +10,7 @@ fun isNarrowScreen(): Boolean =
     LocalConfiguration.current.screenWidthDp <= 360
 
 @Composable
-private fun isExpandedScreen(): Boolean =
+fun isExpandedScreen(): Boolean =
     LocalConfiguration.current.screenWidthDp >= 840
 
 @Composable

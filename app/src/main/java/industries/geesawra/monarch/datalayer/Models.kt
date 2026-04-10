@@ -137,6 +137,7 @@ data class SkeetData(
     val following: Boolean = false,
     val follower: Boolean = false,
     val replyToNotFollowing: Boolean = false,
+    val isReplyByRecord: Boolean = false,
     val isMuted: Boolean = false,
     val cachedParent: Pair<SkeetData?, StrongRef?>? = null,
     val cachedRoot: SkeetData? = null,
@@ -253,6 +254,7 @@ data class SkeetData(
                 follower = post.post.author.viewer?.followedBy != null,
                 did = did,
                 replyToNotFollowing = replyToNotFollowing,
+                isReplyByRecord = content.reply != null,
                 cachedParent = computedParent,
                 cachedRoot = computedRoot,
             )

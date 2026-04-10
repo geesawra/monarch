@@ -1015,9 +1015,8 @@ private fun SkeetReason(
         }
 
         if (!isRepost && showInReplyTo) {
-            skeet.reply?.let {
-                it
-                val parent = it.parent
+            if (skeet.reply != null) {
+                val parent = skeet.reply.parent
                 when (parent) {
                     is ReplyRefParentUnion.PostView -> {
                         Text(
@@ -1052,6 +1051,26 @@ private fun SkeetReason(
                             )
                         }
                     }
+                }
+            } else if (skeet.isReplyByRecord) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Reply,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Replying to a thread",
+                        color = MaterialTheme.colorScheme.outline,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
                 }
             }
         }

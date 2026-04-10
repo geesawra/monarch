@@ -818,7 +818,7 @@ private fun InnerTimelineView(
                     )
                 },
                 floatingActionButton = {
-                    if (LocalBaselineProfileMode.current) {} else when (currentDestination) {
+                    if (LocalBaselineProfileMode.current || isExpandedScreen) {} else when (currentDestination) {
                         TabBarDestinations.TIMELINE -> {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -876,6 +876,148 @@ private fun InnerTimelineView(
                         when (currentDestination) {
                             TabBarDestinations.TIMELINE -> {
                                 if (settingsState.swipeableFeeds) {
+                                    if (isExpandedScreen) {
+                                        Row(modifier = Modifier.fillMaxSize()) {
+                                            Box(modifier = Modifier.weight(0.45f).fillMaxHeight()) {
+                                                Column(modifier = Modifier.fillMaxSize()) {
+                                                    SecondaryScrollableTabRow(
+                                                        selectedTabIndex = pagerState.currentPage.coerceIn(0, (feedItems.size - 1).coerceAtLeast(0)),
+                                                        edgePadding = 8.dp,
+                                                        divider = {},
+                                                    ) {
+                                                        feedItems.forEachIndexed { index, feed ->
+                                                            Tab(
+                                                                selected = pagerState.currentPage == index,
+                                                                onClick = {
+                                                                    coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                                                },
+                                                                text = {
+                                                                    Row(
+                                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        if (feed.avatar != null) {
+                                                                            AsyncImage(
+                                                                                model = feed.avatar,
+                                                                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                                                modifier = Modifier
+                                                                                    .size(18.dp)
+                                                                                    .clip(CircleShape),
+                                                                                contentDescription = null,
+                                                                            )
+                                                                        }
+                                                                        Text(feed.displayName)
+                                                                    }
+                                                                },
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Spacer(modifier = Modifier.height(2.dp))
+
+                                                    HorizontalPager(
+                                                        state = pagerState,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        beyondViewportPageCount = 0,
+                                                        contentPadding = PaddingValues(horizontal = 0.dp),
+                                                    ) { page ->
+                                                        val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
+                                                        val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
+                                                        val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
+                                                        val pageListState = rememberLazyListState()
+                                                        pagerListStates[page] = pageListState
+                                                        ShowSkeets(
+                                                            viewModel = timelineViewModel,
+                                                            settingsState = settingsState,
+                                                            state = pageListState,
+                                                            onReplyTap = onReplyTap,
+                                                            data = pageData,
+                                                            isLoading = notYetLoaded || (timelineViewModel.isFetchingMoreTimeline && page == pagerState.settledPage),
+                                                            isScrollEnabled = isScrollEnabled,
+                                                            onSeeMoreTap = expandedOnSeeMoreTap,
+                                                            onProfileTap = expandedOnProfileTap,
+                                                            shouldFetchMoreData = page == pagerState.settledPage,
+                                                            searchFilter = timelineSearchQuery,
+                                                        )
+                                                    }
+                                                }
+                                                Column(
+                                                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                                ) {
+                                                    SmallFloatingActionButton(
+                                                        onClick = {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                            val feedUri = feedItems.getOrNull(pagerState.settledPage)?.uri ?: "following"
+                                                            mediaFeedPosts = timelineViewModel.feedSkeets[feedUri] ?: timelineViewModel.skeets
+                                                        },
+                                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                    ) {
+                                                        Icon(Icons.Default.ViewStream, "Media scroll")
+                                                    }
+                                                    FloatingActionButton(
+                                                        onClick = {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                            fobOnClick()
+                                                        }
+                                                    ) {
+                                                        Icon(Icons.Filled.Create, "Post")
+                                                    }
+                                                }
+                                            }
+
+                                            VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
+
+                                            Box(
+                                                modifier = Modifier.weight(0.55f).fillMaxHeight(),
+                                            ) {
+                                                when (val content = detailPaneContent) {
+                                                    is DetailPaneContent.Thread -> DetailThreadPane(
+                                                        timelineViewModel = timelineViewModel,
+                                                        settingsState = settingsState,
+                                                        isRefreshing = detailRefreshing.value,
+                                                        onProfileTap = expandedOnProfileTap,
+                                                        onReplyTap = onReplyTap,
+                                                        onSeeMoreTap = expandedOnSeeMoreTap,
+                                                        onClose = { detailPaneContent = DetailPaneContent.Empty },
+                                                    )
+                                                    is DetailPaneContent.Profile -> DetailProfilePane(
+                                                        did = content.did,
+                                                        timelineViewModel = timelineViewModel,
+                                                        settingsState = settingsState,
+                                                        onProfileTap = expandedOnProfileTap,
+                                                        onThreadTap = expandedOnSeeMoreTap,
+                                                        onReplyTap = onReplyTap,
+                                                        onSettingsTap = onSettingsTap,
+                                                        onClose = { detailPaneContent = DetailPaneContent.Empty },
+                                                    )
+                                                    is DetailPaneContent.Empty -> Box(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentAlignment = Alignment.Center,
+                                                    ) {
+                                                        Column(
+                                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Default.Forum,
+                                                                contentDescription = null,
+                                                                modifier = Modifier.size(48.dp),
+                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            )
+                                                            Spacer(modifier = Modifier.height(16.dp))
+                                                            Text(
+                                                                "Tap a post to view the thread",
+                                                                style = MaterialTheme.typography.bodyLarge,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
                                     Column(modifier = Modifier.fillMaxSize()) {
                                         SecondaryScrollableTabRow(
                                             selectedTabIndex = pagerState.currentPage.coerceIn(0, (feedItems.size - 1).coerceAtLeast(0)),
@@ -913,113 +1055,35 @@ private fun InnerTimelineView(
 
                                         Spacer(modifier = Modifier.height(2.dp))
 
-                                        if (isExpandedScreen) {
-                                            Row(modifier = Modifier.fillMaxSize()) {
-                                                Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
-                                                    HorizontalPager(
-                                                        state = pagerState,
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        beyondViewportPageCount = 0,
-                                                        contentPadding = PaddingValues(horizontal = 0.dp),
-                                                    ) { page ->
-                                                        val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
-                                                        val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
-                                                        val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
-                                                        val pageListState = rememberLazyListState()
-                                                        pagerListStates[page] = pageListState
-                                                        ShowSkeets(
-                                                            viewModel = timelineViewModel,
-                                                            settingsState = settingsState,
-                                                            state = pageListState,
-                                                            onReplyTap = onReplyTap,
-                                                            data = pageData,
-                                                            isLoading = notYetLoaded || (timelineViewModel.isFetchingMoreTimeline && page == pagerState.settledPage),
-                                                            isScrollEnabled = isScrollEnabled,
-                                                            onSeeMoreTap = expandedOnSeeMoreTap,
-                                                            onProfileTap = expandedOnProfileTap,
-                                                            shouldFetchMoreData = page == pagerState.settledPage,
-                                                            searchFilter = timelineSearchQuery,
-                                                        )
-                                                    }
-                                                }
-
-                                                VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
-
-                                                Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
-                                                    when (val content = detailPaneContent) {
-                                                        is DetailPaneContent.Thread -> DetailThreadPane(
-                                                            timelineViewModel = timelineViewModel,
-                                                            settingsState = settingsState,
-                                                            isRefreshing = detailRefreshing.value,
-                                                            onProfileTap = expandedOnProfileTap,
-                                                            onReplyTap = onReplyTap,
-                                                            onSeeMoreTap = expandedOnSeeMoreTap,
-                                                            onClose = { detailPaneContent = DetailPaneContent.Empty },
-                                                        )
-                                                        is DetailPaneContent.Profile -> DetailProfilePane(
-                                                            did = content.did,
-                                                            timelineViewModel = timelineViewModel,
-                                                            settingsState = settingsState,
-                                                            onProfileTap = expandedOnProfileTap,
-                                                            onThreadTap = expandedOnSeeMoreTap,
-                                                            onReplyTap = onReplyTap,
-                                                            onSettingsTap = onSettingsTap,
-                                                            onClose = { detailPaneContent = DetailPaneContent.Empty },
-                                                        )
-                                                        is DetailPaneContent.Empty -> Box(
-                                                            modifier = Modifier.fillMaxSize(),
-                                                            contentAlignment = Alignment.Center,
-                                                        ) {
-                                                            Column(
-                                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                            ) {
-                                                                Icon(
-                                                                    Icons.Default.Forum,
-                                                                    contentDescription = null,
-                                                                    modifier = Modifier.size(48.dp),
-                                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                )
-                                                                Spacer(modifier = Modifier.height(16.dp))
-                                                                Text(
-                                                                    "Tap a post to view the thread",
-                                                                    style = MaterialTheme.typography.bodyLarge,
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            HorizontalPager(
-                                                state = pagerState,
-                                                modifier = Modifier.fillMaxSize(),
-                                                beyondViewportPageCount = 0,
-                                            ) { page ->
-                                                val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
-                                                val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
-                                                val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
-                                                val pageListState = rememberLazyListState()
-                                                pagerListStates[page] = pageListState
-                                                ShowSkeets(
-                                                    viewModel = timelineViewModel,
-                                                    settingsState = settingsState,
-                                                    state = pageListState,
-                                                    onReplyTap = onReplyTap,
-                                                    data = pageData,
-                                                    isLoading = notYetLoaded || (timelineViewModel.isFetchingMoreTimeline && page == pagerState.settledPage),
-                                                    isScrollEnabled = isScrollEnabled,
-                                                    onSeeMoreTap = onSeeMoreTap,
-                                                    onProfileTap = onProfileTap,
-                                                    shouldFetchMoreData = page == pagerState.settledPage,
-                                                    searchFilter = timelineSearchQuery,
-                                                )
-                                            }
+                                        HorizontalPager(
+                                            state = pagerState,
+                                            modifier = Modifier.fillMaxSize(),
+                                            beyondViewportPageCount = 0,
+                                        ) { page ->
+                                            val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
+                                            val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
+                                            val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
+                                            val pageListState = rememberLazyListState()
+                                            pagerListStates[page] = pageListState
+                                            ShowSkeets(
+                                                viewModel = timelineViewModel,
+                                                settingsState = settingsState,
+                                                state = pageListState,
+                                                onReplyTap = onReplyTap,
+                                                data = pageData,
+                                                isLoading = notYetLoaded || (timelineViewModel.isFetchingMoreTimeline && page == pagerState.settledPage),
+                                                isScrollEnabled = isScrollEnabled,
+                                                onSeeMoreTap = onSeeMoreTap,
+                                                onProfileTap = onProfileTap,
+                                                shouldFetchMoreData = page == pagerState.settledPage,
+                                                searchFilter = timelineSearchQuery,
+                                            )
                                         }
+                                    }
                                     }
                                 } else if (isExpandedScreen) {
                                     Row(modifier = Modifier.fillMaxSize()) {
-                                        Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
+                                        Box(modifier = Modifier.weight(0.45f).fillMaxHeight()) {
                                             ShowSkeets(
                                                 viewModel = timelineViewModel,
                                                 settingsState = settingsState,
@@ -1032,11 +1096,37 @@ private fun InnerTimelineView(
                                                 onProfileTap = expandedOnProfileTap,
                                                 searchFilter = timelineSearchQuery,
                                             )
+                                            Column(
+                                                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                            ) {
+                                                SmallFloatingActionButton(
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        val feedUri = feedItems.getOrNull(pagerState.settledPage)?.uri ?: "following"
+                                                        mediaFeedPosts = timelineViewModel.feedSkeets[feedUri] ?: timelineViewModel.skeets
+                                                    },
+                                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                ) {
+                                                    Icon(Icons.Default.ViewStream, "Media scroll")
+                                                }
+                                                FloatingActionButton(
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        fobOnClick()
+                                                    }
+                                                ) {
+                                                    Icon(Icons.Filled.Create, "Post")
+                                                }
+                                            }
                                         }
 
                                         VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
 
-                                        Box(modifier = Modifier.weight(0.5f).fillMaxHeight()) {
+                                        Box(
+                                            modifier = Modifier.weight(0.55f).fillMaxHeight(),
+                                        ) {
                                             when (val content = detailPaneContent) {
                                                 is DetailPaneContent.Thread -> DetailThreadPane(
                                                     timelineViewModel = timelineViewModel,

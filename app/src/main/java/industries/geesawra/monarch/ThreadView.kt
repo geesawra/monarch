@@ -121,10 +121,8 @@ fun ThreadView(
                         onProfileTap = onProfileTap,
                         onReplyTap = onReplyTap,
                         onSeeMoreTap = { tapped ->
-                            if (tapped.uri != tappedPostUri) {
-                                timelineViewModel.setThread(tapped)
-                                onThreadTap()
-                            }
+                            timelineViewModel.setThread(tapped)
+                            onThreadTap()
                         },
                     )
                 }

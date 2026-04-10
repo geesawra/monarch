@@ -323,15 +323,16 @@ fun ShowSkeets(
 
                             parent?.let {
                                 if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
+                                    val threadLineWidth = avatarSize()
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(IntrinsicSize.Min)
-                                            .padding(start = 16.dp)
+                                            .padding(start = postHorizontalPadding())
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .width(40.dp)
+                                                .width(threadLineWidth)
                                                 .fillMaxHeight(),
                                             contentAlignment = Alignment.Center
                                         ) {
