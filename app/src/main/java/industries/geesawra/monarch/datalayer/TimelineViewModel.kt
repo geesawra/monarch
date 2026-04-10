@@ -436,14 +436,20 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun fetchAllNewData(then: () -> Unit = {}) {
-        fetchTimeline(fresh = true)
-        fetchNotifications(fresh = true)
-        fetchMutedWords()
-        val fsJob = fetchSelf()
-        val fJob = feeds()
-
         viewModelScope.launch {
-            joinAll(timelineFetchJob!!, notificationsFetchJob!!, fsJob, fJob)
+            bskyConn.fetchSelf().onFailure {
+                handleError(it)
+            }.onSuccess { fetched ->
+                updateSession { it.copy(user = fetched) }
+                saveCurrentAccount()
+            }
+
+            fetchTimeline(fresh = true)
+            fetchNotifications(fresh = true)
+            fetchMutedWords()
+            val fJob = feeds()
+
+            joinAll(timelineFetchJob!!, notificationsFetchJob!!, fJob)
             then()
         }
     }

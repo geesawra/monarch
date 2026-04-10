@@ -355,11 +355,16 @@ class BlueskyConn(val context: Context) {
         if (first.isSuccess) return first
         val err = first.exceptionOrNull() ?: return first
         val msg = err.message ?: return first
-        if (!msg.contains("DPoP", ignoreCase = true) && !msg.contains("use_dpop_nonce")) {
+        val isDpop = msg.contains("DPoP", ignoreCase = true) || msg.contains("use_dpop_nonce")
+        val isAuthRefresh = msg.contains("invalid_grant", ignoreCase = true)
+                || msg.contains("invalid_token", ignoreCase = true)
+                || msg.contains("refresh token", ignoreCase = true)
+                || msg.contains("ExpiredToken", ignoreCase = true)
+        if (!isDpop && !isAuthRefresh) {
             return first
         }
-        Log.d("BlueskyAuth", "Retrying after DPoP hiccup: $msg")
-        delay(150)
+        Log.d("BlueskyAuth", "Retrying after transient auth error: $msg")
+        delay(if (isAuthRefresh) 300 else 150)
         return block()
     }
 
