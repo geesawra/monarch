@@ -739,6 +739,27 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    private suspend inline fun <reified T : Any> apiCall(
+        errorMsg: String,
+        crossinline block: suspend () -> AtpResponse<T>
+    ): Result<T> = runCatching {
+        create().getOrThrow()
+        when (val ret = block()) {
+            is AtpResponse.Failure<*> -> throw Exception("$errorMsg: ${ret.error?.message}")
+            is AtpResponse.Success -> ret.response
+        }
+    }
+
+    private suspend fun uploadImageBlob(uri: Uri, label: String): Blob {
+        val compressor = Compressor(context)
+        val compressed = compressor.compressImage(uri, MAX_IMAGE_SIZE_BYTES)
+        val uploaded = pdsClient!!.uploadBlob(compressed.data)
+        return when (uploaded) {
+            is AtpResponse.Failure<*> -> throw Exception("Failed uploading $label: ${uploaded.error}")
+            is AtpResponse.Success<UploadBlobResponse> -> uploaded.response.blob
+        }
+    }
+
     suspend fun create(): Result<Unit> {
         createMutex.lock()
         try {
@@ -785,42 +806,15 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun fetchFeed(feed: String, cursor: String? = null): Result<Timeline> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val timeline = client!!.getFeed(
-                GetFeedQueryParams(
-                    feed = AtUri(feed),
-                    limit = 25,
-                    cursor = cursor
-                )
-            )
-            val resp = when (timeline) {
-                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch timeline: ${timeline.error}")
-                is AtpResponse.Success<GetFeedResponse> -> timeline.response
-            }
-            Timeline(resp.cursor, resp.feed)
-        }
+        apiCall("Failed to fetch feed") {
+            client!!.getFeed(GetFeedQueryParams(feed = AtUri(feed), limit = 25, cursor = cursor))
+        }.map { Timeline(it.cursor, it.feed) }
     }
 
-    suspend fun fetchTimeline(
-        cursor: String? = null
-    ): Result<Timeline> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val timeline = client!!.getTimeline(
-                GetTimelineQueryParams(
-                    limit = 25,
-                    cursor = cursor
-                )
-            )
-            val resp = when (timeline) {
-                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch timeline: ${timeline.error}")
-                is AtpResponse.Success<GetTimelineResponse> -> timeline.response
-            }
-            Timeline(resp.cursor, resp.feed)
-        }
+    suspend fun fetchTimeline(cursor: String? = null): Result<Timeline> = retryOnDpopHiccup {
+        apiCall("Failed to fetch timeline") {
+            client!!.getTimeline(GetTimelineQueryParams(limit = 25, cursor = cursor))
+        }.map { Timeline(it.cursor, it.feed) }
     }
 
     suspend fun post(
@@ -1140,30 +1134,14 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun fetchActor(did: Did): Result<ProfileViewDetailed> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = client!!.getProfile(
-                GetProfileQueryParams(
-                    actor = did
-                )
-            )
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Failed fetching record: ${ret.error}")
-                is AtpResponse.Success<GetProfileResponse> -> ret.response
-            }
+        apiCall("Failed fetching profile") {
+            client!!.getProfile(GetProfileQueryParams(actor = did))
         }
     }
 
     suspend fun fetchSelf(): Result<ProfileViewDetailed> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-
-            return fetchActor(session!!.did)
-        }
+        create().onFailure { return Result.failure(it) }
+        return fetchActor(session!!.did)
     }
 
 
@@ -1457,14 +1435,12 @@ class BlueskyConn(val context: Context) {
                 )
             )
 
-            val asd = when (res) {
+            val response = when (res) {
                 is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed to fetch subscribed labelers: ${res.error}"))
-                is AtpResponse.Success<GetServicesResponse> -> {
-                    res
-                }
+                is AtpResponse.Success<GetServicesResponse> -> res
             }
 
-            val kek = asd.response.views.associate {
+            val labelerMap = response.response.views.associate {
                 when (it) {
                     is GetServicesResponseViewUnion.LabelerView -> it.value.uri.did() to null
                     is GetServicesResponseViewUnion.LabelerViewDetailed -> it.value.uri.did() to it
@@ -1472,7 +1448,7 @@ class BlueskyConn(val context: Context) {
                 }
             }.filter { it.value != null && it.key != null }
 
-            return Result.success(kek)
+            return Result.success(labelerMap)
         }
     }
 
@@ -1511,88 +1487,31 @@ class BlueskyConn(val context: Context) {
     suspend fun notifications(
         cursor: String? = null,
     ): Result<ListNotificationsResponse> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = client!!.listNotifications(
-                ListNotificationsQueryParams(
-                    cursor = cursor,
-                )
-            )
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch notifications: ${ret.error}")
-                is AtpResponse.Success<ListNotificationsResponse> -> ret.response
-            }
+        apiCall("Failed to fetch notifications") {
+            client!!.listNotifications(ListNotificationsQueryParams(cursor = cursor))
         }
     }
 
-    suspend fun updateSeenNotifications(): Result<Unit> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-
-            val ret = pdsClient!!.updateSeen(
-                UpdateSeenRequest(
-                    seenAt = Clock.System.now(),
-                )
-            )
-
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to update seen notifications: ${ret.error}"))
-                is AtpResponse.Success<*> -> Result.success(Unit)
-            }
-        }
+    suspend fun updateSeenNotifications(): Result<Unit> = apiCall("Failed to update seen notifications") {
+        pdsClient!!.updateSeen(UpdateSeenRequest(seenAt = Clock.System.now()))
     }
 
-    suspend fun getLikes(uri: AtUri, cursor: String? = null): Result<GetLikesResponse> {
-        return runCatching {
-            create().onFailure { return Result.failure(it) }
-            val ret = client!!.getLikes(GetLikesQueryParams(uri = uri, cursor = cursor))
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch likes: ${ret.error}"))
-                is AtpResponse.Success<GetLikesResponse> -> Result.success(ret.response)
-            }
-        }
+    suspend fun getLikes(uri: AtUri, cursor: String? = null) = apiCall("Failed to fetch likes") {
+        client!!.getLikes(GetLikesQueryParams(uri = uri, cursor = cursor))
     }
 
-    suspend fun getRepostedBy(uri: AtUri, cursor: String? = null): Result<GetRepostedByResponse> {
-        return runCatching {
-            create().onFailure { return Result.failure(it) }
-            val ret = client!!.getRepostedBy(GetRepostedByQueryParams(uri = uri, cursor = cursor))
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch reposts: ${ret.error}"))
-                is AtpResponse.Success<GetRepostedByResponse> -> Result.success(ret.response)
-            }
-        }
+    suspend fun getRepostedBy(uri: AtUri, cursor: String? = null) = apiCall("Failed to fetch reposts") {
+        client!!.getRepostedBy(GetRepostedByQueryParams(uri = uri, cursor = cursor))
     }
 
-    suspend fun getQuotes(uri: AtUri, cursor: String? = null): Result<GetQuotesResponse> {
-        return runCatching {
-            create().onFailure { return Result.failure(it) }
-            val ret = client!!.getQuotes(GetQuotesQueryParams(uri = uri, cursor = cursor))
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed to fetch quotes: ${ret.error}"))
-                is AtpResponse.Success<GetQuotesResponse> -> Result.success(ret.response)
-            }
-        }
+    suspend fun getQuotes(uri: AtUri, cursor: String? = null) = apiCall("Failed to fetch quotes") {
+        client!!.getQuotes(GetQuotesQueryParams(uri = uri, cursor = cursor))
     }
 
     suspend fun getPosts(uri: List<AtUri>): Result<List<PostView>> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = client!!.getPosts(
-                GetPostsQueryParams(
-                    uris = uri,
-                )
-            )
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch posts: ${ret.error}")
-                is AtpResponse.Success<GetPostsResponse> -> ret.response.posts
-            }
-        }
+        apiCall("Failed to fetch posts") {
+            client!!.getPosts(GetPostsQueryParams(uris = uri))
+        }.map { it.posts }
     }
 
     suspend fun like(uri: AtUri, cid: Cid): Result<RKey> {
@@ -1619,10 +1538,7 @@ class BlueskyConn(val context: Context) {
 
             return when (likeRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not like post: ${likeRes.error?.message}"))
-                is AtpResponse.Success<CreateRecordResponse> -> Result.success(
-                    RKey(likeRes.response.uri.atUri.toUri().lastPathSegment
-                        ?: return Result.failure(Exception("Missing path segment in like response URI")))
-                )
+                is AtpResponse.Success<CreateRecordResponse> -> Result.success(likeRes.response.uri.rkey())
             }
         }
     }
@@ -1633,26 +1549,25 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(it)
             }
 
-            val like = BlueskyJson.encodeAsJsonContent(
+            val record = BlueskyJson.encodeAsJsonContent(
                 Repost(
                     subject = StrongRef(uri, cid),
                     createdAt = Clock.System.now(),
                 )
             )
 
-
-            val likeRes = pdsClient!!.createRecord(
+            val res = pdsClient!!.createRecord(
                 CreateRecordRequest(
                     repo = session!!.handle,
                     collection = Nsid("app.bsky.feed.repost"),
-                    record = like,
+                    record = record,
                 )
             )
 
-            return when (likeRes) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not repost: ${likeRes.error?.message}"))
+            return when (res) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not repost: ${res.error?.message}"))
                 is AtpResponse.Success<CreateRecordResponse> -> Result.success(
-                    likeRes.response.uri.rkey()
+                    res.response.uri.rkey()
                 )
             }
         }
@@ -1671,66 +1586,24 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun getThread(uri: AtUri, parentHeight: Long = 80): Result<GetPostThreadResponse> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val res = client!!.getPostThread(
-                GetPostThreadQueryParams(
-                    uri = uri,
-                    depth = 50,
-                    parentHeight = parentHeight,
-                )
-            )
-
-            when (res) {
-                is AtpResponse.Failure<*> -> throw Exception("Could not get thread: ${res.error?.message}")
-                is AtpResponse.Success<GetPostThreadResponse> -> res.response
-            }
+        apiCall("Could not get thread") {
+            client!!.getPostThread(GetPostThreadQueryParams(uri = uri, depth = 50, parentHeight = parentHeight))
         }
     }
 
-    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-
-            val res = client!!.searchActorsTypeahead(
-                SearchActorsTypeaheadQueryParams(
-                    q = query,
-                    limit = 5,
-                )
-            )
-
-            return when (res) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Typeahead search failed: ${res.error?.message}"))
-                is AtpResponse.Success<SearchActorsTypeaheadResponse> -> Result.success(res.response.actors)
-            }
-        }
-    }
+    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> =
+        apiCall("Typeahead search failed") {
+            client!!.searchActorsTypeahead(SearchActorsTypeaheadQueryParams(q = query, limit = 5))
+        }.map { it.actors }
 
     suspend fun getAuthorFeed(
         did: Did,
         cursor: String? = null,
         filter: app.bsky.feed.GetAuthorFeedFilter? = null,
     ): Result<Timeline> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = client!!.getAuthorFeed(
-                app.bsky.feed.GetAuthorFeedQueryParams(
-                    actor = did,
-                    limit = 25,
-                    cursor = cursor,
-                    filter = filter,
-                )
-            )
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Failed to fetch author feed: ${ret.error}")
-                is AtpResponse.Success<app.bsky.feed.GetAuthorFeedResponse> -> Timeline(ret.response.cursor, ret.response.feed)
-            }
-        }
+        apiCall("Failed to fetch author feed") {
+            client!!.getAuthorFeed(app.bsky.feed.GetAuthorFeedQueryParams(actor = did, limit = 25, cursor = cursor, filter = filter))
+        }.map { Timeline(it.cursor, it.feed) }
     }
 
     suspend fun follow(did: Did): Result<RKey> {
@@ -1756,10 +1629,7 @@ class BlueskyConn(val context: Context) {
 
             return when (followRes) {
                 is AtpResponse.Failure<*> -> Result.failure(Exception("Could not follow: ${followRes.error?.message}"))
-                is AtpResponse.Success<CreateRecordResponse> -> Result.success(
-                    RKey(followRes.response.uri.atUri.toUri().lastPathSegment
-                        ?: return Result.failure(Exception("Missing path segment in follow response URI")))
-                )
+                is AtpResponse.Success<CreateRecordResponse> -> Result.success(followRes.response.uri.rkey())
             }
         }
     }
@@ -1768,81 +1638,24 @@ class BlueskyConn(val context: Context) {
         return deleteRecord(followUri.rkey(), "app.bsky.graph.follow")
     }
 
-    suspend fun getFollowers(did: Did, cursor: String? = null): Result<app.bsky.graph.GetFollowersResponse> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-            val res = client!!.getFollowers(
-                app.bsky.graph.GetFollowersQueryParams(
-                    actor = did,
-                    cursor = cursor,
-                )
-            )
-            return when (res) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get followers: ${res.error?.message}"))
-                is AtpResponse.Success -> Result.success(res.response)
-            }
+    suspend fun getFollowers(did: Did, cursor: String? = null) =
+        apiCall("Could not get followers") {
+            client!!.getFollowers(app.bsky.graph.GetFollowersQueryParams(actor = did, cursor = cursor))
         }
+
+    suspend fun getFollows(did: Did, cursor: String? = null) =
+        apiCall("Could not get follows") {
+            client!!.getFollows(app.bsky.graph.GetFollowsQueryParams(actor = did, cursor = cursor))
+        }
+
+    suspend fun muteActor(did: Did): Result<Unit> = apiCall("Could not mute") {
+        pdsClient!!.muteActor(app.bsky.graph.MuteActorRequest(actor = did))
     }
 
-    suspend fun getFollows(did: Did, cursor: String? = null): Result<app.bsky.graph.GetFollowsResponse> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-            val res = client!!.getFollows(
-                app.bsky.graph.GetFollowsQueryParams(
-                    actor = did,
-                    cursor = cursor,
-                )
-            )
-            return when (res) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not get follows: ${res.error?.message}"))
-                is AtpResponse.Success -> Result.success(res.response)
-            }
-        }
-    }
-
-    suspend fun muteActor(did: Did): Result<Unit> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-
-            val ret = pdsClient!!.muteActor(
-                app.bsky.graph.MuteActorRequest(actor = did)
-            )
-
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not mute: ${ret.error?.message}"))
-                is AtpResponse.Success<*> -> Result.success(Unit)
-            }
-        }
-    }
-
-    suspend fun getProfileRecord(): Result<Profile> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-
-            val ret = pdsClient!!.getRecord(
-                GetRecordQueryParams(
-                    repo = session!!.did,
-                    collection = Nsid("app.bsky.actor.profile"),
-                    rkey = RKey("self"),
-                )
-            )
-
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed fetching profile record: ${ret.error}"))
-                is AtpResponse.Success<GetRecordResponse> -> Result.success(
-                    ret.response.value.decodeAs()
-                )
-            }
-        }
-    }
+    suspend fun getProfileRecord(): Result<Profile> =
+        apiCall("Failed fetching profile record") {
+            pdsClient!!.getRecord(GetRecordQueryParams(repo = session!!.did, collection = Nsid("app.bsky.actor.profile"), rkey = RKey("self")))
+        }.map { it.value.decodeAs() }
 
     suspend fun updateProfile(
         displayName: String?,
@@ -1859,28 +1672,8 @@ class BlueskyConn(val context: Context) {
             // First get the current profile to preserve fields we don't change
             val currentProfile = getProfileRecord().getOrThrow()
 
-            var avatarBlob = currentProfile.avatar
-            var bannerBlob = currentProfile.banner
-
-            if (avatarUri != null) {
-                val compressor = Compressor(context)
-                val compressed = compressor.compressImage(avatarUri, MAX_IMAGE_SIZE_BYTES)
-                val uploaded = pdsClient!!.uploadBlob(compressed.data)
-                avatarBlob = when (uploaded) {
-                    is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading avatar: ${uploaded.error}"))
-                    is AtpResponse.Success<UploadBlobResponse> -> uploaded.response.blob
-                }
-            }
-
-            if (bannerUri != null) {
-                val compressor = Compressor(context)
-                val compressed = compressor.compressImage(bannerUri, MAX_IMAGE_SIZE_BYTES)
-                val uploaded = pdsClient!!.uploadBlob(compressed.data)
-                bannerBlob = when (uploaded) {
-                    is AtpResponse.Failure<*> -> return Result.failure(Exception("Failed uploading banner: ${uploaded.error}"))
-                    is AtpResponse.Success<UploadBlobResponse> -> uploaded.response.blob
-                }
-            }
+            val avatarBlob = if (avatarUri != null) uploadImageBlob(avatarUri, "avatar") else currentProfile.avatar
+            val bannerBlob = if (bannerUri != null) uploadImageBlob(bannerUri, "banner") else currentProfile.banner
 
             val updatedProfile = Profile(
                 displayName = displayName ?: currentProfile.displayName,
@@ -1917,63 +1710,22 @@ class BlueskyConn(val context: Context) {
         cursor: String? = null,
         author: Did? = null,
     ): Result<Pair<List<PostView>, String?>> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = client!!.searchPosts(
-                app.bsky.feed.SearchPostsQueryParams(
-                    q = query,
-                    sort = sort,
-                    limit = 25,
-                    cursor = cursor,
-                    author = author,
-                )
-            )
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Search failed: ${ret.error}")
-                is AtpResponse.Success<app.bsky.feed.SearchPostsResponse> -> ret.response.posts to ret.response.cursor
-            }
-        }
+        apiCall("Search failed") {
+            client!!.searchPosts(app.bsky.feed.SearchPostsQueryParams(q = query, sort = sort, limit = 25, cursor = cursor, author = author))
+        }.map { it.posts to it.cursor }
     }
 
     suspend fun searchActors(
         query: String,
         cursor: String? = null,
     ): Result<Pair<List<app.bsky.actor.ProfileView>, String?>> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = client!!.searchActors(
-                SearchActorsQueryParams(
-                    q = query,
-                    limit = 25,
-                    cursor = cursor,
-                )
-            )
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Search failed: ${ret.error}")
-                is AtpResponse.Success<SearchActorsResponse> -> ret.response.actors to ret.response.cursor
-            }
-        }
+        apiCall("Search failed") {
+            client!!.searchActors(SearchActorsQueryParams(q = query, limit = 25, cursor = cursor))
+        }.map { it.actors to it.cursor }
     }
 
-    suspend fun unmuteActor(did: Did): Result<Unit> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-
-            val ret = pdsClient!!.unmuteActor(
-                app.bsky.graph.UnmuteActorRequest(actor = did)
-            )
-
-            return when (ret) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not unmute: ${ret.error?.message}"))
-                is AtpResponse.Success<*> -> Result.success(Unit)
-            }
-        }
+    suspend fun unmuteActor(did: Did): Result<Unit> = apiCall("Could not unmute") {
+        pdsClient!!.unmuteActor(app.bsky.graph.UnmuteActorRequest(actor = did))
     }
 
     private suspend fun getOrCreateDeviceId(): String {
@@ -2037,78 +1789,33 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun createDraft(draft: Draft): Result<String> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = pdsClient!!.createDraft(CreateDraftRequest(draft = draft))
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Could not create draft: ${ret.error?.message}")
-                is AtpResponse.Success<CreateDraftResponse> -> ret.response.id
-            }
-        }
+        apiCall("Could not create draft") {
+            pdsClient!!.createDraft(CreateDraftRequest(draft = draft))
+        }.map { it.id }
     }
 
     suspend fun getDrafts(cursor: String? = null, limit: Long = 50): Result<GetDraftsResponse> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = pdsClient!!.getDrafts(GetDraftsQueryParams(limit = limit, cursor = cursor))
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Could not fetch drafts: ${ret.error?.message}")
-                is AtpResponse.Success<GetDraftsResponse> -> ret.response
-            }
+        apiCall("Could not fetch drafts") {
+            pdsClient!!.getDrafts(GetDraftsQueryParams(limit = limit, cursor = cursor))
         }
     }
 
     suspend fun updateDraft(id: Tid, draft: Draft): Result<Unit> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = pdsClient!!.updateDraft(UpdateDraftRequest(draft = DraftWithId(id = id, draft = draft)))
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Could not update draft: ${ret.error?.message}")
-                is AtpResponse.Success<*> -> Unit
-            }
+        apiCall("Could not update draft") {
+            pdsClient!!.updateDraft(UpdateDraftRequest(draft = DraftWithId(id = id, draft = draft)))
         }
     }
 
     suspend fun deleteDraft(id: Tid): Result<Unit> = retryOnDpopHiccup {
-        runCatching {
-            create().getOrThrow()
-
-            val ret = pdsClient!!.deleteDraft(DeleteDraftRequest(id = id))
-
-            when (ret) {
-                is AtpResponse.Failure<*> -> throw Exception("Could not delete draft: ${ret.error?.message}")
-                is AtpResponse.Success<*> -> Unit
-            }
+        apiCall("Could not delete draft") {
+            pdsClient!!.deleteDraft(DeleteDraftRequest(id = id))
         }
     }
 
     suspend fun deviceId(): String = getOrCreateDeviceId()
 
-    private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> {
-        return runCatching {
-            create().onFailure {
-                return Result.failure(it)
-            }
-
-            val delRes = pdsClient!!.deleteRecord(
-                DeleteRecordRequest(
-                    repo = session!!.handle,
-                    collection = Nsid(collection),
-                    rkey = rKey,
-                )
-            )
-
-            return when (delRes) {
-                is AtpResponse.Failure<*> -> Result.failure(Exception("Could not delete record: ${delRes.error?.message}"))
-                is AtpResponse.Success<*> -> Result.success(Unit)
-            }
-
-        }
-    }
+    private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> =
+        apiCall("Could not delete record") {
+            pdsClient!!.deleteRecord(DeleteRecordRequest(repo = session!!.handle, collection = Nsid(collection), rkey = rKey))
+        }.map { }
 }

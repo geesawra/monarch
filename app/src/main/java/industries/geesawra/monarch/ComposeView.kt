@@ -88,7 +88,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -144,6 +143,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import java.net.URI
 
+private const val MAX_POST_CHARS = 300
+private const val KEYBOARD_SHOW_DELAY_MS = 100L
+private const val MENTION_SEARCH_DEBOUNCE_MS = 300L
+private const val LINK_PREVIEW_FETCH_DEBOUNCE_MS = 500L
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ComposeView(
@@ -168,8 +172,7 @@ fun ComposeView(
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val charCount = remember { mutableIntStateOf(0) }
-    val maxChars = 300
+    val maxChars = MAX_POST_CHARS
     val facets = remember { mutableListOf<Facet>() }
     val mentionResults = remember { mutableStateOf(listOf<ProfileViewBasic>()) }
     val showMentionDropdown = remember { mutableStateOf(false) }
@@ -186,7 +189,6 @@ fun ComposeView(
                 focusManager.clearFocus()
                 if (!wasEdited.value) {
                     textfieldState.clearText()
-                    charCount.intValue = 0
                     inReplyTo.value = null
                     isQuotePost.value = false
                     mediaSelected.value = listOf()
@@ -211,7 +213,7 @@ fun ComposeView(
                     }
                     mentionDids.putAll(initialMentions)
                 }
-                delay(100)
+                delay(KEYBOARD_SHOW_DELAY_MS)
                 focusRequester.requestFocus()
                 keyboardController?.show()
             }
@@ -338,7 +340,6 @@ fun ComposeView(
                 LaunchedEffect(Unit) {
                     snapshotFlow { textfieldState.text.toString() to mediaSelected.value }
                         .collect { (text, media) ->
-                            charCount.intValue = text.length
                             wasEdited.value = text.isNotEmpty() || media.isNotEmpty()
                         }
                 }
@@ -376,7 +377,7 @@ fun ComposeView(
                         return@LaunchedEffect
                     }
 
-                    delay(300)
+                    delay(MENTION_SEARCH_DEBOUNCE_MS)
 
                     timelineViewModel.searchActorsTypeahead(query)
                         .onSuccess {
@@ -419,8 +420,7 @@ fun ComposeView(
                         return@LaunchedEffect
                     }
 
-                    // Debounce 500ms
-                    delay(500)
+                    delay(LINK_PREVIEW_FETCH_DEBOUNCE_MS)
 
                     linkPreviewLoading.value = true
                     val preview = LinkPreviewFetcher.fetch(normalizedUrl)
@@ -1124,39 +1124,9 @@ private fun ThreadgateSettings(
                 ) { Text("Nobody") }
             }
 
-            ListItem(
-                headlineContent = { Text("Your followers") },
-                leadingContent = {
-                    Checkbox(
-                        checked = followers,
-                        onCheckedChange = { followers = it },
-                        enabled = !nobody,
-                    )
-                },
-                modifier = Modifier.clickable(enabled = !nobody) { followers = !followers }
-            )
-            ListItem(
-                headlineContent = { Text("People you follow") },
-                leadingContent = {
-                    Checkbox(
-                        checked = following,
-                        onCheckedChange = { following = it },
-                        enabled = !nobody,
-                    )
-                },
-                modifier = Modifier.clickable(enabled = !nobody) { following = !following }
-            )
-            ListItem(
-                headlineContent = { Text("People you mention") },
-                leadingContent = {
-                    Checkbox(
-                        checked = mentions,
-                        onCheckedChange = { mentions = it },
-                        enabled = !nobody,
-                    )
-                },
-                modifier = Modifier.clickable(enabled = !nobody) { mentions = !mentions }
-            )
+            ThreadgateRuleItem("Your followers", followers, { followers = it }, !nobody)
+            ThreadgateRuleItem("People you follow", following, { following = it }, !nobody)
+            ThreadgateRuleItem("People you mention", mentions, { mentions = it }, !nobody)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1178,4 +1148,24 @@ private fun ThreadgateSettings(
             ) { Text("Done") }
         }
     }
+}
+
+@Composable
+private fun ThreadgateRuleItem(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean,
+) {
+    ListItem(
+        headlineContent = { Text(label) },
+        leadingContent = {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+            )
+        },
+        modifier = Modifier.clickable(enabled = enabled) { onCheckedChange(!checked) }
+    )
 }

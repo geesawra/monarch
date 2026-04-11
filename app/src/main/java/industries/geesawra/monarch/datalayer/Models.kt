@@ -66,31 +66,24 @@ enum class CDNImageSize(
     Thumb("feed_thumbnail")
 }
 
-private fun cdnBlobURL(authorDid: Did, blob: Blob?, size: CDNImageSize): Uri? {
-    val id = when (blob) {
-        is Blob.LegacyBlob -> blob.cid
-        is Blob.StandardBlob -> blob.ref.link
-        null -> return null
-    }
+private fun Blob?.blobId(): String? = when (this) {
+    is Blob.LegacyBlob -> cid.toString()
+    is Blob.StandardBlob -> ref.link.toString()
+    null -> null
+}
 
+private fun cdnBlobURL(authorDid: Did, blob: Blob?, size: CDNImageSize): Uri? {
+    val id = blob.blobId() ?: return null
     return Uri("https://cdn.bsky.app/img/${size.size}/plain/${authorDid.did}/${id}@jpeg")
 }
 
 private fun cdnVideoThumb(authorDid: Did, blob: Blob?): Uri? {
-    val id = when (blob) {
-        is Blob.LegacyBlob -> blob.cid
-        is Blob.StandardBlob -> blob.ref.link
-        null -> return null
-    }
+    val id = blob.blobId() ?: return null
     return Uri("https://video.cdn.bsky.app/hls/${authorDid.did}/${id}/thumbnail.jpg")
 }
 
 private fun cdnVideoPlaylist(authorDid: Did, blob: Blob?): Uri? {
-    val id = when (blob) {
-        is Blob.LegacyBlob -> blob.cid
-        is Blob.StandardBlob -> blob.ref.link
-        null -> return null
-    }
+    val id = blob.blobId() ?: return null
     return Uri("https://video.cdn.bsky.app/hls/${authorDid.did}/${id}/playlist.m3u8")
 }
 
@@ -419,50 +412,50 @@ data class SkeetData(
             }
         }
 
-        fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileView): SkeetData {
-            return SkeetData(
-                cid = parent.first,
-                uri = parent.second,
-                authorAvatarURL = author.avatar?.uri,
-                authorName = author.displayName,
-                authorHandle = author.handle,
-                authorPronouns = author.pronouns,
-                authorLabels = author.labels.orEmpty(),
-                verified = author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
-                did = author.did,
-                content = post.text,
-                embed = transformEmbed(post.embed, author.did, parent.first),
-                createdAt = post.createdAt,
-                facets = post.facets.orEmpty(),
-            )
-        }
+        private fun fromPostCommon(
+            parent: Pair<Cid, AtUri>,
+            post: Post,
+            avatarUri: String?,
+            displayName: String?,
+            handle: Handle,
+            pronouns: String?,
+            labels: List<Label>,
+            verified: Boolean,
+            did: Did,
+        ) = SkeetData(
+            cid = parent.first,
+            uri = parent.second,
+            authorAvatarURL = avatarUri,
+            authorName = displayName,
+            authorHandle = handle,
+            authorPronouns = pronouns,
+            authorLabels = labels,
+            verified = verified,
+            did = did,
+            content = post.text,
+            embed = transformEmbed(post.embed, did, parent.first),
+            createdAt = post.createdAt,
+            facets = post.facets.orEmpty(),
+        )
 
-        fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileViewBasic): SkeetData {
-            return SkeetData(
-                cid = parent.first,
-                uri = parent.second,
-                authorAvatarURL = author.avatar?.uri,
-                authorName = author.displayName,
-                authorHandle = author.handle,
-                authorPronouns = author.pronouns,
-                authorLabels = author.labels.orEmpty(),
-                verified = author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
-                content = post.text,
-                embed = transformEmbed(post.embed, author.did, parent.first),
-                createdAt = post.createdAt,
-                facets = post.facets.orEmpty(),
-                did = author.did,
-            )
-        }
+        fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileView) = fromPostCommon(
+            parent, post, author.avatar?.uri, author.displayName, author.handle,
+            author.pronouns, author.labels.orEmpty(),
+            author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid, author.did,
+        )
+
+        fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileViewBasic) = fromPostCommon(
+            parent, post, author.avatar?.uri, author.displayName, author.handle,
+            author.pronouns, author.labels.orEmpty(),
+            author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid, author.did,
+        )
 
         fun fromPost(
             parent: Pair<Cid, AtUri>,
             post: Post,
             author: ProfileView,
             embed: PostViewEmbedUnion?
-        ): SkeetData {
-            return fromPost(parent, post, author).copy(embed = embed)
-        }
+        ) = fromPost(parent, post, author).copy(embed = embed)
 
 
         fun fromRecordView(post: RecordViewRecord): SkeetData {

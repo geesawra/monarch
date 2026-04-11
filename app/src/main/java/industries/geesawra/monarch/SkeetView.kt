@@ -328,33 +328,13 @@ private fun SkeetHeaderSection(
     onAvatarTap: ((Did) -> Unit)?,
 ) {
     val minSize = avatarSize()
-    val context = LocalContext.current
-    val avatarRequest = remember(skeet.authorAvatarURL) {
-        ImageRequest.Builder(context)
-            .data(skeet.authorAvatarURL)
-            .crossfade(true)
-            .build()
-    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp),
         verticalAlignment = Alignment.Top
     ) {
-        AsyncImage(
-            model = avatarRequest,
-            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            contentDescription = "Avatar",
-            modifier = Modifier
-                .size(minSize)
-                .clip(avatarShape)
-                .then(
-                    if (onAvatarTap != null && skeet.did != null)
-                        Modifier.clickable { onAvatarTap(skeet.did) }
-                    else Modifier
-                )
-        )
+        AvatarImage(skeet.authorAvatarURL, minSize, avatarShape, skeet.did, onAvatarTap)
 
         SkeetHeader(
             modifier = Modifier.padding(start = avatarTextGap()),
@@ -369,6 +349,37 @@ private fun SkeetHeaderSection(
 }
 
 @Composable
+private fun AvatarImage(
+    url: String?,
+    size: Dp,
+    shape: Shape,
+    did: Did?,
+    onTap: ((Did) -> Unit)?,
+) {
+    val context = LocalContext.current
+    val request = remember(url) {
+        ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(true)
+            .build()
+    }
+    AsyncImage(
+        model = request,
+        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+        contentDescription = "Avatar",
+        modifier = Modifier
+            .size(size)
+            .clip(shape)
+            .then(
+                if (onTap != null && did != null)
+                    Modifier.clickable { onTap(did) }
+                else Modifier
+            )
+    )
+}
+
+@Composable
 private fun SkeetThreadLine(
     skeet: SkeetData,
     avatarShape: Shape,
@@ -377,33 +388,13 @@ private fun SkeetThreadLine(
     overrideAvatarSize: Dp? = null,
 ) {
     val minSize = overrideAvatarSize ?: avatarSize()
-    val context = LocalContext.current
-    val avatarRequest = remember(skeet.authorAvatarURL) {
-        ImageRequest.Builder(context)
-            .data(skeet.authorAvatarURL)
-            .crossfade(true)
-            .build()
-    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(minSize)
             .fillMaxHeight()
     ) {
-        AsyncImage(
-            model = avatarRequest,
-            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            contentDescription = "Avatar",
-            modifier = Modifier
-                .size(minSize)
-                .clip(avatarShape)
-                .then(
-                    if (onAvatarTap != null && skeet.did != null)
-                        Modifier.clickable { onAvatarTap(skeet.did) }
-                    else Modifier
-                )
-        )
+        AvatarImage(skeet.authorAvatarURL, minSize, avatarShape, skeet.did, onAvatarTap)
         if (inThread) {
             VerticalDivider(
                 thickness = 3.dp,
