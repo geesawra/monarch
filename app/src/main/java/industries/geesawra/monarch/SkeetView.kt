@@ -191,7 +191,7 @@ fun SkeetView(
                 .clip(MaterialTheme.shapes.medium)
                 .clickable { onShowThread(skeet) }
                 .padding(top = 8.dp, start = postHorizontalPadding(), end = postHorizontalPadding(), bottom = if (inThread) 0.dp else 8.dp)
-                .height(IntrinsicSize.Max)
+                .then(if (inThread) Modifier.height(IntrinsicSize.Min) else Modifier)
         ) {
             SkeetThreadLine(
                 skeet = skeet,
