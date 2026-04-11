@@ -499,6 +499,13 @@ class MainActivity : ComponentActivity() {
                         val notifId = ni.getIntExtra("notification_id", -1)
 
                         when (kind) {
+                            "group_summary" -> {
+                                timelineViewModel.pendingNotificationsTab = true
+                                navController.navigate(ViewList.Main.name) {
+                                    popUpTo(ViewList.Main.name) { inclusive = false }
+                                    launchSingleTop = true
+                                }
+                            }
                             "app.bsky.graph.follow" -> {
                                 val did = notifAuthorDid ?: return@LaunchedEffect
                                 navController.navigate("Profile/$did")

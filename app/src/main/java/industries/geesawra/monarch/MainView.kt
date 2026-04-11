@@ -457,6 +457,13 @@ private fun InnerTimelineView(
     var currentDestination by rememberSaveable { mutableStateOf(TabBarDestinations.TIMELINE) }
     var timelineSearchQuery by rememberSaveable { mutableStateOf("") }
     var isTimelineSearchActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(timelineViewModel.pendingNotificationsTab) {
+        if (timelineViewModel.pendingNotificationsTab) {
+            currentDestination = TabBarDestinations.NOTIFICATIONS
+            timelineViewModel.pendingNotificationsTab = false
+        }
+    }
     val adaptiveInfo = currentWindowAdaptiveInfo()
     val isExpandedScreen = !settingsState.forceCompactLayout &&
         adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)

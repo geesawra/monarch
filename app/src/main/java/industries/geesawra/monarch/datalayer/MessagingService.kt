@@ -224,12 +224,20 @@ class MessagingService : FirebaseMessagingService() {
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(notificationId, builder.build())
 
+        val summaryIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("notification_kind", "group_summary")
+        }
+        val summaryPendingIntent = PendingIntent.getActivity(
+            this, SUMMARY_ID, summaryIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val summaryBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setGroup(GROUP_KEY)
             .setGroupSummary(true)
             .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(summaryPendingIntent)
         notificationManager.notify(SUMMARY_ID, summaryBuilder.build())
     }
 }

@@ -194,6 +194,7 @@ class TimelineViewModel @AssistedInject constructor(
     var publicationsState by mutableStateOf(PublicationsState()); private set
     var draftsState by mutableStateOf(DraftsState()); private set
     var redraftText by mutableStateOf<String?>(null); private set
+    var pendingNotificationsTab by mutableStateOf(false)
 
     fun setRedraft(text: String?) { redraftText = text }
 
