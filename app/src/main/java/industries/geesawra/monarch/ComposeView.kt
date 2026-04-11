@@ -1,6 +1,7 @@
 package industries.geesawra.monarch
 
 import android.content.Context
+import androidx.compose.material.icons.filled.ArrowUpward
 import android.net.Uri
 import android.webkit.URLUtil
 import android.widget.Toast
@@ -321,6 +322,9 @@ fun ComposeView(
                 ActionRow(
                     context,
                     uploadingPost,
+                    pickMedia,
+                    takePicture,
+                    cameraImageUri,
                     textfieldState.text.toString(),
                     mediaSelected,
                     mediaSelectedIsVideo,
@@ -335,6 +339,7 @@ fun ComposeView(
                     linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
                     threadgateRules = threadgateRules,
                     wasEdited = wasEdited,
+                    onDraftsClick = onDraftsClick,
                 )
 
                 LaunchedEffect(Unit) {
@@ -540,35 +545,14 @@ fun ComposeView(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
+                    horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(
-                        onClick = {
-                            pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                        }
-                    ) {
-                        Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
-                    }
-                    TextButton(
-                        onClick = {
-                            val cacheDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
-                            val file = File.createTempFile("capture_", ".jpg", cacheDir)
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                            cameraImageUri.value = uri
-                            takePicture.launch(uri)
-                        }
-                    ) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = "Take photo")
-                    }
                     TextButton(onClick = { showThreadgateSheet = true }) {
                         Icon(
                             Icons.Default.Shield,
                             contentDescription = "Reply settings",
                             tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
                         )
-                    }
-                    TextButton(onClick = onDraftsClick) {
-                        Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
                     }
                 }
 
@@ -669,6 +653,9 @@ fun ComposeView(
 fun ActionRow(
     context: Context,
     uploadingPost: MutableState<Boolean>,
+    pickMedia: ManagedActivityResultLauncher<PickVisualMediaRequest, List<@JvmSuppressWildcards Uri>>,
+    takePicture: ManagedActivityResultLauncher<Uri, Boolean>,
+    cameraImageUri: MutableState<Uri?>,
     postText: String,
     mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
@@ -683,6 +670,7 @@ fun ActionRow(
     linkPreview: LinkPreviewData? = null,
     threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
+    onDraftsClick: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -690,25 +678,37 @@ fun ActionRow(
             .padding(
                 vertical = 8.dp,
             ),
-        horizontalArrangement = Arrangement.End,
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Row {
+            TextButton(
+                onClick = {
+                    pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                }
+            ) {
+                Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
+            }
+            TextButton(
+                onClick = {
+                    val cacheDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
+                    val file = File.createTempFile("capture_", ".jpg", cacheDir)
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    cameraImageUri.value = uri
+                    takePicture.launch(uri)
+                }
+            ) {
+                Icon(Icons.Default.CameraAlt, contentDescription = "Take photo")
+            }
+            TextButton(onClick = onDraftsClick) {
+                Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
+            }
+        }
         val postButtonEnabled = remember(postText, mediaSelected.value) {
             (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars
         }
 
         val haptic = LocalHapticFeedback.current
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-        if (postText.isNotEmpty()) {
-            Text(
-                text = "${maxChars - postText.length}",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (postText.length > maxChars) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         if (uploadingPost.value) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularWavyProgressIndicator()
@@ -782,11 +782,18 @@ fun ActionRow(
                     }
                 },
                 modifier = Modifier.padding(end = 8.dp),
-                enabled = postButtonEnabled && !uploadingPost.value // Disable while uploading
+                enabled = postButtonEnabled && !uploadingPost.value,
+                colors = if (postText.length > maxChars) ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ) else ButtonDefaults.buttonColors(),
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
+                Icon(Icons.Filled.ArrowUpward, contentDescription = "Post")
+                if (postText.isNotEmpty()) {
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("${maxChars - postText.length}")
+                }
             }
-        }
         }
     }
 }
