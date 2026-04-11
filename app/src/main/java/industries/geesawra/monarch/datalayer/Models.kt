@@ -270,9 +270,8 @@ data class SkeetData(
 
                 is ReplyRefParentUnion.PostView -> {
                     val content: Post = (rawParent.value.record.decodeAs())
-                    fromPostView(
-                        rawParent.value, rawParent.value.author
-                    ) to content.reply?.parent
+                    val parent = fromPostView(rawParent.value, rawParent.value.author)
+                    parent.copy(replies = maxOf(parent.replies ?: 0, 1)) to content.reply?.parent
                 }
 
                 else -> null to null
@@ -294,7 +293,10 @@ data class SkeetData(
                     notFound = rawRoot.value.notFound
                 )
 
-                is ReplyRefRootUnion.PostView -> fromPostView(rawRoot.value, rawRoot.value.author)
+                is ReplyRefRootUnion.PostView -> {
+                    val root = fromPostView(rawRoot.value, rawRoot.value.author)
+                    root.copy(replies = maxOf(root.replies ?: 0, 1))
+                }
 
                 else -> null
             }

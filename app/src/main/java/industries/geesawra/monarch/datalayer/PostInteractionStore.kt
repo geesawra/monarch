@@ -34,6 +34,17 @@ class PostInteractionStore @Inject constructor() {
     private val states = mutableMapOf<Cid, MutableState<PostInteraction>>()
 
     fun getState(cid: Cid, initial: PostInteraction): MutableState<PostInteraction> {
+        val existing = states[cid]
+        if (existing != null) {
+            existing.value = existing.value.copy(
+                likes = initial.likes,
+                reposts = initial.reposts,
+                replies = initial.replies,
+                likeRkey = initial.likeRkey,
+                repostRkey = initial.repostRkey,
+            )
+            return existing
+        }
         return states.getOrPut(cid) { mutableStateOf(initial) }
     }
 

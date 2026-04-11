@@ -68,9 +68,23 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val posts = conn.getPosts(listOf(AtUri(postUri))).getOrNull()
                 val post = posts?.firstOrNull() ?: return@launch
 
+                val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0)
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
                 when (intent.action) {
                     ACTION_LIKE -> {
-                        conn.like(post.uri, post.cid)
+                        val result = conn.like(post.uri, post.cid)
+                        if (result.isSuccess) {
+                            nm.cancel(notificationId)
+                        } else {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Failed to like post",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
                     }
                     ACTION_REPLY -> {
                         val remoteInput = RemoteInput.getResultsFromIntent(intent)
@@ -85,8 +99,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
                             replyRef = replyRef,
                         )
 
-                        val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0)
-                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         nm.cancel(notificationId)
 
                         val prefs = context.settingsDataStore.data.first()

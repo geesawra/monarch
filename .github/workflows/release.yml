@@ -1,0 +1,110 @@
+name: Release APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'beepboop/**'
+      - '**.md'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.HOME }}/android-sdk
+          key: android-sdk-36-build-tools-36.1.0
+
+      - name: Set up Android SDK
+        run: |
+          source install-android-sdk.sh
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Extract OZONE_REF
+        id: ozone-ref
+        run: |
+          ref=$(grep '^OZONE_REF=' scripts/publish-ozone-local.sh | head -1 | cut -d'"' -f2)
+          echo "ref=$ref" >> $GITHUB_OUTPUT
+
+      - name: Cache ozone build
+        id: ozone-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            libs/ozone-artifacts
+            ~/.cache/monarch-ozone-src
+            ~/.local/share/monarch/ozone-publish-key
+          key: ozone-build-${{ steps.ozone-ref.outputs.ref }}-v1
+
+      - name: Publish ozone artifacts locally
+        if: steps.ozone-cache.outputs.cache-hit != 'true'
+        run: scripts/publish-ozone-local.sh
+
+      - name: Decode google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+
+      - name: Decrypt keystore
+        env:
+          AGE_KEY: ${{ secrets.AGE_KEY }}
+        run: |
+          sudo apt-get install -y age
+          echo "$AGE_KEY" > age-key.txt
+          age --decrypt -i age-key.txt -o app/keystore.jks keystore.jks.age
+          rm age-key.txt
+
+      - name: Determine next version
+        id: version
+        run: |
+          latest=$(git tag --list 'v0.0.*' --sort=-version:refname | head -1)
+          if [ -z "$latest" ]; then
+            next=1
+          else
+            current=${latest##*.}
+            next=$((current + 1))
+          fi
+          echo "tag=v0.0.$next" >> "$GITHUB_OUTPUT"
+          echo "name=0.0.$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create version tag
+        run: |
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          sed -i '/toolchainVendor/d' gradle/gradle-daemon-jvm.properties
+          ./gradlew assembleRelease --no-daemon -Dorg.gradle.java.installations.auto-download=false
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/monarch-${{ steps.version.outputs.name }}.apk
+          gh release create ${{ steps.version.outputs.tag }} \
+            app/build/outputs/apk/release/monarch-${{ steps.version.outputs.name }}.apk \
+            --title "Monarch ${{ steps.version.outputs.name }}" \
+            --generate-notes \
+            --latest

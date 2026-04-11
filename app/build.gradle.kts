@@ -8,6 +8,24 @@ plugins {
     alias(libs.plugins.baselineprofile)
 }
 
+val gitVersionName: String by lazy {
+    val result = providers.exec {
+        commandLine("git", "describe", "--tags", "--match", "v*", "--abbrev=0")
+        isIgnoreExitValue = true
+    }
+    val tag = result.standardOutput.asText.get().trim().removePrefix("v")
+    tag.ifEmpty { "0.0.0" }
+}
+
+val gitVersionCode: Int by lazy {
+    maxOf(gitVersionName.split(".").lastOrNull()?.toIntOrNull() ?: 1, 1)
+}
+
+val gitCommitSha: String by lazy {
+    providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }
+        .standardOutput.asText.get().trim()
+}
+
 android {
     namespace = "industries.geesawra.monarch"
     compileSdk = 36
@@ -16,9 +34,10 @@ android {
         applicationId = "industries.geesawra.monarch"
         minSdk = 36
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = gitVersionCode
+        versionName = gitVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GIT_COMMIT_SHA", "\"$gitCommitSha\"")
     }
 
     signingConfigs {

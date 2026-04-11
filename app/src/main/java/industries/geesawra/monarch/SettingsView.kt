@@ -658,6 +658,18 @@ fun SettingsView(
             ) {
                 Text("Log out")
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Monarch v${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT_SHA})",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
         }
         }
     }
