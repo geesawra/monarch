@@ -117,6 +117,7 @@ fun ThreadView(
                         data = threadData,
                         shouldFetchMoreData = false,
                         isShowingThread = true,
+                        isLoading = isRefreshing.value,
                         settingsState = settingsState,
                         onProfileTap = onProfileTap,
                         onReplyTap = onReplyTap,

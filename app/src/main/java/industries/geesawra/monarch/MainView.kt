@@ -1375,6 +1375,7 @@ private fun DetailThreadPane(
                 data = timelineViewModel.currentlyShownThread.flatten(),
                 shouldFetchMoreData = false,
                 isShowingThread = true,
+                isLoading = isRefreshing,
                 settingsState = settingsState,
                 onProfileTap = onProfileTap,
                 onReplyTap = onReplyTap,
