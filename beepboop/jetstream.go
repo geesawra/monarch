@@ -617,15 +617,19 @@ func mediaForPost(p *bsky.FeedPost, authorDid, size string) string {
 		return ""
 	}
 
-	if p.Embed.EmbedImages == nil {
+	var images []*bsky.EmbedImages_Image
+	if p.Embed.EmbedImages != nil {
+		images = p.Embed.EmbedImages.Images
+	} else if p.Embed.EmbedRecordWithMedia != nil &&
+		p.Embed.EmbedRecordWithMedia.Media != nil &&
+		p.Embed.EmbedRecordWithMedia.Media.EmbedImages != nil {
+		images = p.Embed.EmbedRecordWithMedia.Media.EmbedImages.Images
+	}
+
+	if len(images) == 0 {
 		return ""
 	}
 
-	if len(p.Embed.EmbedImages.Images) == 0 {
-		return ""
-	}
-
-	img := p.Embed.EmbedImages.Images[0]
-
+	img := images[0]
 	return fmt.Sprintf("https://cdn.bsky.app/img/%s/plain/%s/%s@webp", size, authorDid, img.Image.Ref.String())
 }
