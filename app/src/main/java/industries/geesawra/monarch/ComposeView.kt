@@ -319,9 +319,6 @@ fun ComposeView(
                 ActionRow(
                     context,
                     uploadingPost,
-                    pickMedia,
-                    takePicture,
-                    cameraImageUri,
                     textfieldState.text.toString(),
                     mediaSelected,
                     mediaSelectedIsVideo,
@@ -336,7 +333,6 @@ fun ComposeView(
                     linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
                     threadgateRules = threadgateRules,
                     wasEdited = wasEdited,
-                    onDraftsClick = onDraftsClick,
                 )
 
                 LaunchedEffect(Unit) {
@@ -529,6 +525,53 @@ fun ComposeView(
                     )
                 }
 
+                var showThreadgateSheet by remember { mutableStateOf(false) }
+
+                if (showThreadgateSheet) {
+                    ThreadgateSettings(
+                        currentRules = threadgateRules.value,
+                        onDismiss = { showThreadgateSheet = false },
+                        onApply = { rules ->
+                            threadgateRules.value = rules
+                            showThreadgateSheet = false
+                        }
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                ) {
+                    TextButton(
+                        onClick = {
+                            pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                        }
+                    ) {
+                        Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
+                    }
+                    TextButton(
+                        onClick = {
+                            val cacheDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
+                            val file = File.createTempFile("capture_", ".jpg", cacheDir)
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            cameraImageUri.value = uri
+                            takePicture.launch(uri)
+                        }
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = "Take photo")
+                    }
+                    TextButton(onClick = { showThreadgateSheet = true }) {
+                        Icon(
+                            Icons.Default.Shield,
+                            contentDescription = "Reply settings",
+                            tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                        )
+                    }
+                    TextButton(onClick = onDraftsClick) {
+                        Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
+                    }
+                }
+
                 HorizontalDivider(
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -626,9 +669,6 @@ fun ComposeView(
 fun ActionRow(
     context: Context,
     uploadingPost: MutableState<Boolean>,
-    pickMedia: ManagedActivityResultLauncher<PickVisualMediaRequest, List<@JvmSuppressWildcards Uri>>,
-    takePicture: ManagedActivityResultLauncher<Uri, Boolean>,
-    cameraImageUri: MutableState<Uri?>,
     postText: String,
     mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
@@ -643,61 +683,16 @@ fun ActionRow(
     linkPreview: LinkPreviewData? = null,
     threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
-    onDraftsClick: () -> Unit = {},
 ) {
-    var showThreadgateSheet by remember { mutableStateOf(false) }
-
-    if (showThreadgateSheet) {
-        ThreadgateSettings(
-            currentRules = threadgateRules.value,
-            onDismiss = { showThreadgateSheet = false },
-            onApply = { rules ->
-                threadgateRules.value = rules
-                showThreadgateSheet = false
-            }
-        )
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
                 vertical = 8.dp,
             ),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row {
-            TextButton(
-                onClick = {
-                    pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                }
-            ) {
-                Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
-            }
-            TextButton(
-                onClick = {
-                    val cacheDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
-                    val file = File.createTempFile("capture_", ".jpg", cacheDir)
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    cameraImageUri.value = uri
-                    takePicture.launch(uri)
-                }
-            ) {
-                Icon(Icons.Default.CameraAlt, contentDescription = "Take photo")
-            }
-            TextButton(onClick = { showThreadgateSheet = true }) {
-                Icon(
-                    Icons.Default.Shield,
-                    contentDescription = "Reply settings",
-                    tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                )
-            }
-            TextButton(onClick = onDraftsClick) {
-                Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
-            }
-        }
-
         val postButtonEnabled = remember(postText, mediaSelected.value) {
             (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars
         }
@@ -790,8 +785,6 @@ fun ActionRow(
                 enabled = postButtonEnabled && !uploadingPost.value // Disable while uploading
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text("Skeet")
             }
         }
         }
