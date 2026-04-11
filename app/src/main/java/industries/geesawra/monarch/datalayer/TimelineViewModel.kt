@@ -474,6 +474,7 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun fetchAllNewData(then: () -> Unit = {}) {
+        updateTimeline { it.copy(isFetchingMoreTimeline = true) }
         viewModelScope.launch {
             bskyConn.fetchSelf().onFailure {
                 handleError(it)

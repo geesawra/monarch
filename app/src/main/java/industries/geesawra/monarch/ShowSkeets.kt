@@ -140,7 +140,7 @@ fun ShowSkeets(
             .padding(horizontal = feedHorizontalPadding()),
         verticalArrangement = if (isShowingThread) Arrangement.spacedBy(0.dp) else Arrangement.spacedBy(feedItemSpacing()),
     ) {
-        if (isLoading && data.isEmpty()) {
+        if (isLoading && (data.isEmpty() || (isShowingThread && data.size <= 1))) {
             items(8, key = { "skeleton_$it" }) {
                 SkeletonPost()
             }
