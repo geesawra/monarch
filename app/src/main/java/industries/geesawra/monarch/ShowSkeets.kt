@@ -142,7 +142,7 @@ fun ShowSkeets(
     ) {
         if (isLoading && (data.isEmpty() || (isShowingThread && data.size <= 1))) {
             items(8, key = { "skeleton_$it" }) {
-                SkeletonPost()
+                SkeletonPost(Modifier.padding(bottom = feedItemSpacing()))
             }
             return@LazyColumn
         }
@@ -474,8 +474,9 @@ fun ShowSkeets(
 }
 
 @Composable
-private fun SkeletonPost() {
+private fun SkeletonPost(modifier: Modifier = Modifier) {
     Card(
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
