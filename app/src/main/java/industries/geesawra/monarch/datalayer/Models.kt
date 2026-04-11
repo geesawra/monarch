@@ -147,6 +147,10 @@ data class SkeetData(
             val computedRoot = computeRoot(reply, computedParent)
 
             val replyToNotFollowing = run {
+                val (parentPost, _) = computedParent
+                if (parentPost?.notFound == true || parentPost?.blocked == true) return@run true
+                if (computedRoot?.notFound == true || computedRoot?.blocked == true) return@run true
+
                 if (replyFilterMode == ReplyFilterMode.None) return@run false
                 if (currentUserDid != null && did == currentUserDid) return@run false
 

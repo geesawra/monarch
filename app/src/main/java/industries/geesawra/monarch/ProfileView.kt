@@ -131,6 +131,16 @@ import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import sh.christian.ozone.api.Did
 import kotlin.time.ExperimentalTime
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.platform.LocalUriHandler
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -502,6 +512,7 @@ internal fun ProfileContent(
                 profile = profile,
                 timelineViewModel = timelineViewModel,
                 avatarShape = avatarClipShape,
+                onProfileTap = onProfileTap,
                 onFollowersTap = {
                     onFollowersTap(true, profile.displayName ?: profile.handle.handle)
                 },
@@ -596,6 +607,7 @@ internal fun ProfileHeader(
     profile: ProfileViewDetailed,
     timelineViewModel: TimelineViewModel,
     avatarShape: Shape = CircleShape,
+    onProfileTap: (Did) -> Unit = {},
     onFollowersTap: () -> Unit = {},
     onFollowingTap: () -> Unit = {},
 ) {
@@ -713,11 +725,32 @@ internal fun ProfileHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = "@${profile.handle.handle}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                val handle = profile.handle.handle
+                val isCustomDomain = !handle.endsWith(".bsky.social")
+                if (isCustomDomain) {
+                    val primaryColor = MaterialTheme.colorScheme.primary
+                    val linkStyles = TextLinkStyles(style = SpanStyle(color = primaryColor))
+                    val uriHandler = LocalUriHandler.current
+                    Text(
+                        text = buildAnnotatedString {
+                            withLink(LinkAnnotation.Clickable(
+                                tag = "handle",
+                                styles = linkStyles,
+                                linkInteractionListener = { uriHandler.openUri("https://$handle") },
+                            )) {
+                                append("@$handle")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        text = "@$handle",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (!profile.pronouns.isNullOrBlank()) {
                     Text(
                         text = profile.pronouns!!,
@@ -746,11 +779,17 @@ internal fun ProfileHeader(
             // Bio
             if (!profile.description.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = profile.description.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                val primaryColor = MaterialTheme.colorScheme.primary
+                val bioAnnotated = remember(profile.description, primaryColor) {
+                    buildBioAnnotatedString(profile.description.orEmpty(), primaryColor, onProfileTap)
+                }
+                SelectionContainer {
+                    Text(
+                        text = bioAnnotated,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
 
             // Stats row
@@ -1072,3 +1111,49 @@ private val profileNavTabs = listOf(
     ProfileTab("Video", Icons.Default.Videocam, GetAuthorFeedFilter.PostsWithVideo),
     ProfileTab("Blogs", Icons.AutoMirrored.Filled.MenuBook, null, isPublications = true),
 )
+
+private val bioTokenPattern = Regex(
+    """(https?://[^\s\p{Cntrl})\]}>""]+)""" +
+    """|([@#][\w][\w.-]*[\w])""",
+)
+
+private fun buildBioAnnotatedString(
+    text: String,
+    primary: Color,
+    onProfileTap: (Did) -> Unit,
+): AnnotatedString {
+    val linkStyles = TextLinkStyles(style = SpanStyle(color = primary))
+    val accentStyle = SpanStyle(color = primary)
+
+    return buildAnnotatedString {
+        var cursor = 0
+        for (match in bioTokenPattern.findAll(text)) {
+            if (match.range.first > cursor) {
+                append(text.substring(cursor, match.range.first))
+            }
+            val token = match.value
+            when {
+                token.startsWith("http") -> withLink(
+                    LinkAnnotation.Url(token, linkStyles)
+                ) { append(token) }
+
+                token.startsWith("@") -> {
+                    val handle = token.removePrefix("@")
+                    withLink(LinkAnnotation.Clickable(
+                        tag = "mention:$handle",
+                        styles = linkStyles,
+                        linkInteractionListener = { onProfileTap(Did(handle)) },
+                    )) { append(token) }
+                }
+
+                token.startsWith("#") -> withStyle(accentStyle) { append(token) }
+
+                else -> append(token)
+            }
+            cursor = match.range.last + 1
+        }
+        if (cursor < text.length) {
+            append(text.substring(cursor))
+        }
+    }
+}
