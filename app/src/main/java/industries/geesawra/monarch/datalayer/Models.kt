@@ -123,6 +123,7 @@ data class SkeetData(
     val embed: PostViewEmbedUnion? = null,
     val reason: FeedViewPostReasonUnion? = null,
     val reply: ReplyRef? = null,
+    val recordReply: PostReplyRef? = null,
     val createdAt: Instant? = null,
     val facets: List<Facet> = listOf(),
     val postLabels: List<Label> = listOf(),
@@ -247,6 +248,7 @@ data class SkeetData(
                 embed = post.post.embed,
                 reason = reason,
                 reply = reply,
+                recordReply = content.reply,
                 facets = content.facets.orEmpty(),
                 createdAt = content.createdAt,
                 following = following,
@@ -353,6 +355,7 @@ data class SkeetData(
                 content = content.text,
                 facets = content.facets.orEmpty(),
                 embed = post.embed,
+                recordReply = content.reply,
                 createdAt = content.createdAt,
                 following = author.viewer?.following != null,
                 follower = author.viewer?.followedBy != null,
@@ -444,6 +447,7 @@ data class SkeetData(
             embed = transformEmbed(post.embed, did, parent.first),
             createdAt = post.createdAt,
             facets = post.facets.orEmpty(),
+            recordReply = post.reply,
         )
 
         fun fromPost(parent: Pair<Cid, AtUri>, post: Post, author: ProfileView) = fromPostCommon(
@@ -504,6 +508,7 @@ data class SkeetData(
                 embed = embed,
                 reason = null,
                 reply = null,
+                recordReply = content.reply,
                 createdAt = content.createdAt,
                 facets = content.facets.orEmpty(),
                 did = post.author.did,
@@ -609,18 +614,16 @@ data class SkeetData(
     fun replyRef(): PostReplyRef {
         val thisPostRef = StrongRef(this.uri, this.cid)
 
-        val maybeRoot = this.reply?.root
-        val rootRef = when (maybeRoot) {
-            is ReplyRefRootUnion.BlockedPost -> null
-            is ReplyRefRootUnion.NotFoundPost -> null
+        val rootFromRecord = this.recordReply?.root
+
+        val rootFromHydrated = when (val maybeRoot = this.reply?.root) {
             is ReplyRefRootUnion.PostView -> StrongRef(maybeRoot.value.uri, maybeRoot.value.cid)
-            is ReplyRefRootUnion.Unknown -> null
-            null -> null
+            else -> null
         }
 
         return PostReplyRef(
             parent = thisPostRef,
-            root = rootRef ?: thisPostRef
+            root = rootFromRecord ?: rootFromHydrated ?: thisPostRef
         )
     }
 
