@@ -82,13 +82,19 @@ fun VideoPlayer(
             .build().apply {
                 setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).build())
                 volume = 0f
-                playWhenReady = true
-                prepare()
             }
     }
+    var prepared by remember { mutableStateOf(false) }
 
     LaunchedEffect(isVisible) {
-        if (isVisible) player.play() else player.pause()
+        if (isVisible) {
+            if (!prepared) {
+                player.playWhenReady = true
+                player.prepare()
+                prepared = true
+            }
+            player.play()
+        } else player.pause()
     }
 
     DisposableEffect(Unit) {
@@ -452,13 +458,19 @@ fun GifViewer(
             setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.VIDEO_WEBM).build())
             volume = 0f
             repeatMode = Player.REPEAT_MODE_ALL
-            playWhenReady = true
-            prepare()
         }
     }
+    var prepared by remember { mutableStateOf(false) }
 
     LaunchedEffect(isVisible) {
-        if (isVisible) player.play() else player.pause()
+        if (isVisible) {
+            if (!prepared) {
+                player.playWhenReady = true
+                player.prepare()
+                prepared = true
+            }
+            player.play()
+        } else player.pause()
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -516,10 +528,9 @@ fun MediaFeedVideoPlayer(
                 setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).build())
                 volume = if (isMuted) 0f else 1f
                 repeatMode = Player.REPEAT_MODE_ONE
-                playWhenReady = true
-                prepare()
             }
     }
+    var prepared by remember { mutableStateOf(false) }
 
     LaunchedEffect(player) {
         onPlayerReady { fraction ->
@@ -543,7 +554,14 @@ fun MediaFeedVideoPlayer(
     }
 
     LaunchedEffect(isVisible) {
-        if (isVisible) player.play() else player.pause()
+        if (isVisible) {
+            if (!prepared) {
+                player.playWhenReady = true
+                player.prepare()
+                prepared = true
+            }
+            player.play()
+        } else player.pause()
     }
 
     LaunchedEffect(isMuted) {
