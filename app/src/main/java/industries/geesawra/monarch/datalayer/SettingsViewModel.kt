@@ -62,6 +62,7 @@ data class SettingsState(
     val swipeableFeeds: Boolean = true,
     val autoLikeOnReply: Boolean = false,
     val autoLikeOnScroll: Boolean = false,
+    val aiAltTextEnabled: Boolean = true,
     val openLinksInBrowser: Boolean = false,
     val pushNotificationsEnabled: Boolean = false,
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
@@ -99,6 +100,7 @@ class SettingsViewModel @Inject constructor(
         private val SWIPEABLE_FEEDS = stringPreferencesKey("swipeable_feeds")
         private val AUTO_LIKE_ON_REPLY = stringPreferencesKey("auto_like_on_reply")
         private val AUTO_LIKE_ON_SCROLL = stringPreferencesKey("auto_like_on_scroll")
+        private val AI_ALT_TEXT_ENABLED = stringPreferencesKey("ai_alt_text_enabled")
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
         private val OPEN_LINKS_IN_BROWSER = stringPreferencesKey("open_links_in_browser")
         internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
@@ -130,6 +132,7 @@ class SettingsViewModel @Inject constructor(
                     swipeableFeeds = prefs[SWIPEABLE_FEEDS]?.toBooleanStrictOrNull() ?: !narrowScreen,
                     autoLikeOnReply = prefs[AUTO_LIKE_ON_REPLY]?.toBooleanStrictOrNull() ?: false,
                     autoLikeOnScroll = prefs[AUTO_LIKE_ON_SCROLL]?.toBooleanStrictOrNull() ?: false,
+                    aiAltTextEnabled = prefs[AI_ALT_TEXT_ENABLED]?.toBooleanStrictOrNull() ?: true,
                     openLinksInBrowser = prefs[OPEN_LINKS_IN_BROWSER]?.toBooleanStrictOrNull() ?: false,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
@@ -216,6 +219,12 @@ class SettingsViewModel @Inject constructor(
     fun setAutoLikeOnReply(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[AUTO_LIKE_ON_REPLY] = enabled.toString() }
+        }
+    }
+
+    fun setAiAltTextEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[AI_ALT_TEXT_ENABLED] = enabled.toString() }
         }
     }
 

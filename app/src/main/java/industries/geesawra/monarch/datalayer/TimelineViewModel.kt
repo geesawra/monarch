@@ -180,6 +180,7 @@ class TimelineViewModel @AssistedInject constructor(
     private val accountManager: AccountManager,
     private val pushNotificationManager: PushNotificationManager,
     val postInteractionStore: PostInteractionStore,
+    val altTextGenerator: AltTextGenerator,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -915,6 +916,7 @@ class TimelineViewModel @AssistedInject constructor(
         content: String,
         images: List<Uri>? = null,
         video: Uri? = null,
+        mediaAltTexts: Map<Uri, String> = emptyMap(),
         replyRef: PostReplyRef? = null,
         quotePostRef: StrongRef? = null,
         facets: List<Facet> = listOf(),
@@ -925,9 +927,10 @@ class TimelineViewModel @AssistedInject constructor(
             content,
             images,
             video,
-            replyRef,
-            quotePostRef,
-            facets,
+            mediaAltTexts = mediaAltTexts,
+            replyRef = replyRef,
+            quotePostRef = quotePostRef,
+            facets = facets,
             linkPreview = linkPreview,
             threadgateRules = threadgateRules,
             onVideoStatus = { status, progress ->

@@ -278,6 +278,7 @@ class MainActivity : ComponentActivity() {
                             val threadTextFieldState = rememberTextFieldState()
                             val threadMediaSelected = remember { mutableStateOf(listOf<android.net.Uri>()) }
                             val threadMediaSelectedIsVideo = remember { mutableStateOf(false) }
+                            val threadMediaAltTexts = remember { mutableStateOf(mapOf<android.net.Uri, String>()) }
                             val threadThreadgateRules = remember { mutableStateOf<List<app.bsky.feed.ThreadgateAllowUnion>?>(null) }
                             val threadLinkPreview = remember { mutableStateOf<industries.geesawra.monarch.datalayer.LinkPreviewData?>(null) }
 
@@ -299,6 +300,7 @@ class MainActivity : ComponentActivity() {
                                         textfieldState = threadTextFieldState,
                                         mediaSelected = threadMediaSelected,
                                         mediaSelectedIsVideo = threadMediaSelectedIsVideo,
+                                        mediaAltTexts = threadMediaAltTexts,
                                         threadgateRules = threadThreadgateRules,
                                         linkPreview = threadLinkPreview,
                                     )

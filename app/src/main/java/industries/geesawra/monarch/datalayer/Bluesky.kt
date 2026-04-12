@@ -823,6 +823,7 @@ class BlueskyConn(val context: Context) {
         content: String,
         images: List<Uri>? = null,
         video: Uri? = null,
+        mediaAltTexts: Map<Uri, String> = emptyMap(),
         replyRef: PostReplyRef? = null,
         quotePostRef: StrongRef? = null,
         facets: List<Facet> = listOf(),
@@ -841,11 +842,11 @@ class BlueskyConn(val context: Context) {
                 val blobs = uploadImages(images).getOrThrow()
                 mediaUnion = RecordWithMediaMediaUnion.Images(
                     value = Images(
-                        images = blobs.map {
+                        images = blobs.mapIndexed { index, uploaded ->
                             ImagesImage(
-                                image = it.blob,
-                                alt = "",
-                                aspectRatio = AspectRatio(it.width, it.height)
+                                image = uploaded.blob,
+                                alt = mediaAltTexts[images[index]].orEmpty(),
+                                aspectRatio = AspectRatio(uploaded.width, uploaded.height)
                             )
                         }
                     )
@@ -857,7 +858,7 @@ class BlueskyConn(val context: Context) {
                 mediaUnion = RecordWithMediaMediaUnion.Video(
                     value = Video(
                         video = blob.blob,
-                        alt = "",
+                        alt = mediaAltTexts[video].orEmpty(),
                         aspectRatio = AspectRatio(blob.width, blob.height)
                     )
                 )

@@ -46,12 +46,13 @@ data class Image(
 fun PostImageGallery(
     modifier: Modifier = Modifier,
     images: List<Image>,
-    onCrossClick: ((Int) -> Unit)? = null
+    onCrossClick: ((Int) -> Unit)? = null,
+    onImageClick: ((Int) -> Unit)? = null,
 ) {
     val baselineMode = LocalBaselineProfileMode.current
     val galleryVisible = remember { mutableStateOf<Int?>(null) }
 
-    if (!baselineMode) galleryVisible.value?.let {
+    if (!baselineMode && onImageClick == null) galleryVisible.value?.let {
         if (it < images.size) {
             GalleryViewer(
                 imageUrls = images, // Pass the full list to the viewer
@@ -62,6 +63,7 @@ fun PostImageGallery(
         }
     }
 
+    val onClick: (Int) -> Unit = onImageClick ?: { galleryVisible.value = it }
     val imagesToDisplay = images.take(MAX_DISPLAY_IMAGES)
 
     if (imagesToDisplay.isEmpty()) {
@@ -83,7 +85,7 @@ fun PostImageGallery(
                 image = img,
                 originalIndex = 0,
                 onCrossClick = onCrossClick,
-                onMediaClick = { galleryVisible.value = 0 },
+                onMediaClick = onClick,
                 aspectRatio = aspectRatio
             )
         }
@@ -101,14 +103,14 @@ fun PostImageGallery(
                     image = imagesToDisplay[0],
                     originalIndex = 0,
                     onCrossClick = onCrossClick,
-                    onMediaClick = { galleryVisible.value = it })
+                    onMediaClick = onClick)
                 DeletableImageView(
                     modifier = Modifier.weight(1f),
 
                     image = imagesToDisplay[1],
                     originalIndex = 1,
                     onCrossClick = onCrossClick,
-                    onMediaClick = { galleryVisible.value = it })
+                    onMediaClick = onClick)
             }
         }
 
@@ -129,13 +131,13 @@ fun PostImageGallery(
                         image = imagesToDisplay[0],
                         originalIndex = 0,
                         onCrossClick = onCrossClick,
-                        onMediaClick = { galleryVisible.value = it })
+                        onMediaClick = onClick)
                     DeletableImageView(
                         modifier = Modifier.weight(1f),
                         image = imagesToDisplay[1],
                         originalIndex = 1,
                         onCrossClick = onCrossClick,
-                        onMediaClick = { galleryVisible.value = it })
+                        onMediaClick = onClick)
                 }
                 DeletableImageView(
                     modifier = Modifier.fillMaxWidth(),
@@ -143,7 +145,7 @@ fun PostImageGallery(
                     originalIndex = 2,
                     aspectRatio = 2f,
                     onCrossClick = onCrossClick,
-                    onMediaClick = { galleryVisible.value = it }
+                    onMediaClick = onClick
                 )
             }
         }
@@ -165,13 +167,13 @@ fun PostImageGallery(
                         image = imagesToDisplay[0],
                         originalIndex = 0,
                         onCrossClick = onCrossClick,
-                        onMediaClick = { galleryVisible.value = it })
+                        onMediaClick = onClick)
                     DeletableImageView(
                         modifier = Modifier.weight(1f),
                         image = imagesToDisplay[1],
                         originalIndex = 1,
                         onCrossClick = onCrossClick,
-                        onMediaClick = { galleryVisible.value = it })
+                        onMediaClick = onClick)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -182,13 +184,13 @@ fun PostImageGallery(
                         image = imagesToDisplay[2],
                         originalIndex = 2,
                         onCrossClick = onCrossClick,
-                        onMediaClick = { galleryVisible.value = it })
+                        onMediaClick = onClick)
                     DeletableImageView(
                         modifier = Modifier.weight(1f),
                         image = imagesToDisplay[3],
                         originalIndex = 3,
                         onCrossClick = onCrossClick,
-                        onMediaClick = { galleryVisible.value = it })
+                        onMediaClick = onClick)
                 }
             }
         }

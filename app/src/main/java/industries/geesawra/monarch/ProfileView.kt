@@ -188,6 +188,7 @@ fun ProfileView(
     val isQuotePost = remember { mutableStateOf(false) }
     val profileTextFieldState = rememberTextFieldState()
     val profileMediaSelected = remember { mutableStateOf(listOf<android.net.Uri>()) }
+    val profileMediaAltTexts = remember { mutableStateOf(mapOf<android.net.Uri, String>()) }
     val profileMediaSelectedIsVideo = remember { mutableStateOf(false) }
     val profileThreadgateRules = remember { mutableStateOf<List<app.bsky.feed.ThreadgateAllowUnion>?>(null) }
     val profileLinkPreview = remember { mutableStateOf<industries.geesawra.monarch.datalayer.LinkPreviewData?>(null) }
@@ -248,6 +249,7 @@ fun ProfileView(
                 textfieldState = profileTextFieldState,
                 mediaSelected = profileMediaSelected,
                 mediaSelectedIsVideo = profileMediaSelectedIsVideo,
+                mediaAltTexts = profileMediaAltTexts,
                 threadgateRules = profileThreadgateRules,
                 linkPreview = profileLinkPreview,
             )

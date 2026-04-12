@@ -273,6 +273,17 @@ fun SettingsView(
             )
 
             ListItem(
+                headlineContent = { Text("AI alt text") },
+                supportingContent = { Text("Show a Generate button in the alt text editor that drafts a description using on-device AI (requires a supported device)") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.aiAltTextEnabled,
+                        onCheckedChange = { settingsViewModel.setAiAltTextEnabled(it) }
+                    )
+                },
+            )
+
+            ListItem(
                 headlineContent = { Text("@psingletary.com mode") },
                 supportingContent = { Text("Auto-like posts as you scroll past them") },
                 trailingContent = {

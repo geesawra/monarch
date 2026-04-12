@@ -166,6 +166,7 @@ fun ComposeView(
     textfieldState: TextFieldState,
     mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
+    mediaAltTexts: MutableState<Map<Uri, String>>,
     threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
     linkPreview: MutableState<LinkPreviewData?>,
     onDraftsClick: () -> Unit = {},
@@ -194,6 +195,7 @@ fun ComposeView(
                     isQuotePost.value = false
                     mediaSelected.value = listOf()
                     mediaSelectedIsVideo.value = false
+                    mediaAltTexts.value = emptyMap()
                     threadgateRules.value = null
                     mentionResults.value = listOf()
                     showMentionDropdown.value = false
@@ -291,6 +293,7 @@ fun ComposeView(
         }
 
     val uploadingPost = remember { mutableStateOf(false) }
+    val altEditorUri = remember { mutableStateOf<Uri?>(null) }
 
     val sheetScrollConnection = remember(scrollState) {
         object : NestedScrollConnection {
@@ -328,6 +331,7 @@ fun ComposeView(
                     textfieldState.text.toString(),
                     mediaSelected,
                     mediaSelectedIsVideo,
+                    mediaAltTexts,
                     coroutineScope,
                     maxChars,
                     timelineViewModel,
@@ -635,16 +639,35 @@ fun ComposeView(
                 MediaSelectionSection(
                     mediaSelected = mediaSelected.value,
                     mediaSelectedIsVideo = mediaSelectedIsVideo.value,
+                    mediaAltTexts = mediaAltTexts.value,
                     onImageRemove = { index ->
                         val toDelUri = mediaSelected.value[index]
                         mediaSelected.value = mediaSelected.value.filter { uri -> uri != toDelUri }
+                        mediaAltTexts.value = mediaAltTexts.value - toDelUri
                     },
-                    onVideoRemove = { mediaSelected.value = listOf() },
+                    onVideoRemove = {
+                        mediaAltTexts.value = mediaAltTexts.value - mediaSelected.value.toSet()
+                        mediaSelected.value = listOf()
+                    },
+                    onEditAlt = { index -> altEditorUri.value = mediaSelected.value[index] },
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    altEditorUri.value?.let { uri ->
+        AltTextEditorSheet(
+            uri = uri,
+            initialText = mediaAltTexts.value[uri].orEmpty(),
+            generator = timelineViewModel.altTextGenerator,
+            aiEnabled = settingsState.aiAltTextEnabled,
+            onDismiss = { altEditorUri.value = null },
+            onSave = { text ->
+                mediaAltTexts.value = mediaAltTexts.value + (uri to text)
+            },
+        )
     }
 }
 
@@ -659,6 +682,7 @@ fun ActionRow(
     postText: String,
     mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
+    mediaAltTexts: MutableState<Map<Uri, String>>,
     coroutineScope: CoroutineScope,
     maxChars: Int,
     timelineViewModel: TimelineViewModel,
@@ -739,6 +763,7 @@ fun ActionRow(
                             images = if (!mediaSelectedIsVideo.value) mediaSelected.value
                                 .ifEmpty { null } else null,
                             video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
+                            mediaAltTexts = mediaAltTexts.value,
                             replyRef = if (!isQuotePost) {
                                 inReplyToData?.replyRef()
                             } else {
@@ -1036,8 +1061,10 @@ private fun LinkPreviewCard(
 private fun MediaSelectionSection(
     mediaSelected: List<Uri>,
     mediaSelectedIsVideo: Boolean,
+    mediaAltTexts: Map<Uri, String>,
     onImageRemove: (Int) -> Unit,
     onVideoRemove: () -> Unit,
+    onEditAlt: (Int) -> Unit,
 ) {
     if (mediaSelected.isNotEmpty()) {
         Card(
@@ -1051,15 +1078,20 @@ private fun MediaSelectionSection(
                         .fillMaxWidth()
                         .padding(8.dp),
                     images = mediaSelected.map { uri ->
-                        Image(url = uri.toString(), alt = "Selected media")
+                        val alt = mediaAltTexts[uri].orEmpty()
+                        Image(
+                            url = uri.toString(),
+                            alt = alt.ifEmpty { "Tap to add alt text" },
+                        )
                     },
-                    onCrossClick = { onImageRemove(it) }
+                    onCrossClick = { onImageRemove(it) },
+                    onImageClick = { onEditAlt(it) },
                 )
 
                 true -> DeletableMediaView(
                     originalIndex = 0,
                     onCrossClick = { onVideoRemove() },
-                    onMediaClick = { }
+                    onMediaClick = { onEditAlt(0) }
                 ) {
                     AsyncImage(
                         model = mediaSelected.first(),

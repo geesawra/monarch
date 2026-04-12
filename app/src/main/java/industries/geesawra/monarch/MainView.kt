@@ -229,6 +229,7 @@ fun MainView(
     val composeTextFieldState = rememberTextFieldState()
     val composeMediaSelected = remember { mutableStateOf(listOf<Uri>()) }
     val composeMediaSelectedIsVideo = remember { mutableStateOf(false) }
+    val composeMediaAltTexts = remember { mutableStateOf(mapOf<Uri, String>()) }
     val composeThreadgateRules = remember { mutableStateOf<List<ThreadgateAllowUnion>?>(null) }
     val composeLinkPreview = remember { mutableStateOf<LinkPreviewData?>(null) }
 
@@ -375,6 +376,7 @@ fun MainView(
                 textfieldState = composeTextFieldState,
                 mediaSelected = composeMediaSelected,
                 mediaSelectedIsVideo = composeMediaSelectedIsVideo,
+                mediaAltTexts = composeMediaAltTexts,
                 threadgateRules = composeThreadgateRules,
                 linkPreview = composeLinkPreview,
                 onDraftsClick = { showDraftsSheet = true },
