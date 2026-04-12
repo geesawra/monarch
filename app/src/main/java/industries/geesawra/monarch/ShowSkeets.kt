@@ -148,10 +148,11 @@ fun ShowSkeets(
         }
         itemsIndexed(
             items = filteredData,
-            key = { _, skeet -> skeet.rkey },
+            key = { _, skeet -> skeet.lazyListKey() },
             contentType = { _, skeet -> if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0 },
         ) { idx, skeet ->
-            val isVisible = visibleKeys.contains(skeet.rkey)
+            val skeetKey = skeet.lazyListKey()
+            val isVisible = visibleKeys.contains(skeetKey)
 
             val connectors = skeet.threadConnectors
             val hasConnectors = isShowingThread && connectors.isNotEmpty()
@@ -460,9 +461,9 @@ fun ShowSkeets(
                 layoutInfo.visibleItemsInfo.minByOrNull {
                     kotlin.math.abs((it.offset + it.size / 2) - viewportCenter)
                 }?.key as? String
-            }.distinctUntilChanged().collectLatest { rkey ->
-                if (rkey == null) return@collectLatest
-                val skeet = filteredData.find { it.rkey == rkey } ?: return@collectLatest
+            }.distinctUntilChanged().collectLatest { key ->
+                if (key == null) return@collectLatest
+                val skeet = filteredData.find { it.lazyListKey() == key } ?: return@collectLatest
                 if (skeet.didLike) return@collectLatest
                 if (skeet.cid in autoLikedCids) return@collectLatest
                 if (skeet.root() != null || skeet.parent().first != null) return@collectLatest

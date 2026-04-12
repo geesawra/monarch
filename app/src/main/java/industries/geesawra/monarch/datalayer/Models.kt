@@ -658,6 +658,14 @@ data class SkeetData(
 
     fun key(): String = rkey
 
+    fun lazyListKey(): String {
+        val reasonSuffix = when (val r = reason) {
+            is FeedViewPostReasonUnion.ReasonRepost -> "|rp:${r.value.by.did.did}:${r.value.indexedAt}"
+            else -> ""
+        }
+        return "${uri.atUri}${reasonSuffix}"
+    }
+
     fun shareURL(): String {
         val u = "https://bsky.app/profile/${this.authorHandle}/post/${
             this.uri.split(
