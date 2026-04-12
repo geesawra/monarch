@@ -71,6 +71,7 @@ android {
         create("profile") {
             initWith(getByName("release"))
             isProfileable = true
+            isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
@@ -100,6 +101,9 @@ kotlin {
 }
 
 composeCompiler {
+    stabilityConfigurationFiles.add(
+        rootProject.layout.projectDirectory.file("app/compose_stability_config.conf")
+    )
     if (providers.gradleProperty("monarch.composeMetrics").getOrElse("false").toBoolean()) {
         reportsDestination = layout.buildDirectory.dir("compose_compiler")
         metricsDestination = layout.buildDirectory.dir("compose_compiler")
@@ -156,6 +160,7 @@ dependencies {
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.runtime.tracing)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
