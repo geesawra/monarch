@@ -66,7 +66,7 @@ internal suspend fun Context.updateStoredAccountOAuthToken(did: String, oauthTok
 
 @Singleton
 class AccountManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     suspend fun getAccounts(): List<StoredAccount> {
         val json = context.accountsDataStore.data.map { it[ACCOUNTS_LIST_KEY] ?: "[]" }.first()

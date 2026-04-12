@@ -77,7 +77,7 @@ val APPVIEW_PROXY_OPTIONS = listOf(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     companion object {

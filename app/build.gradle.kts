@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization")
     id("com.google.gms.google-services")
+    alias(libs.plugins.firebase.crashlytics)
     alias(libs.plugins.baselineprofile)
 }
 
@@ -69,7 +70,7 @@ android {
         }
         create("profile") {
             initWith(getByName("release"))
-            isDebuggable = true
+            isProfileable = true
             applicationIdSuffix = ".debug"
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
@@ -93,6 +94,7 @@ kotlin {
 dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.splashscreen)

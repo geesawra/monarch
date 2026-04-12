@@ -1173,7 +1173,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             }
             if (showPronouns && !skeet.authorPronouns.isNullOrBlank()) {
                 Text(
-                    text = skeet.authorPronouns!!,
+                    text = skeet.authorPronouns,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier

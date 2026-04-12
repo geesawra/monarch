@@ -12,13 +12,9 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Preserve line number information for deobfuscated stack traces (Crashlytics, Play Vitals).
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 -dontwarn io.ktor.**
 -keep class androidx.media3.** { *; }
 # Please add these rules to your existing keep rules in order to suppress warnings.

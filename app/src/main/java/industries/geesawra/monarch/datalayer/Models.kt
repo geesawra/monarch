@@ -67,8 +67,8 @@ enum class CDNImageSize(
 }
 
 private fun Blob?.blobId(): String? = when (this) {
-    is Blob.LegacyBlob -> cid.toString()
-    is Blob.StandardBlob -> ref.link.toString()
+    is Blob.LegacyBlob -> cid
+    is Blob.StandardBlob -> ref.link.cid
     null -> null
 }
 
@@ -174,6 +174,7 @@ data class SkeetData(
                         }
 
                         when (replyFilterMode) {
+                            ReplyFilterMode.None -> return@run false
                             ReplyFilterMode.OnlyFilterDeepThreads -> {
                                 if (root == null) return@run false
 
@@ -213,8 +214,6 @@ data class SkeetData(
                                 }
                                 return@run !(isFollowedOrSelf(root) && grandfatherFollowed)
                             }
-
-                            else -> return@run false
                         }
                     }
                 }
