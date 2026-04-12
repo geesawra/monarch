@@ -142,7 +142,12 @@ fun ShowSkeets(
     ) {
         if (isLoading && (data.isEmpty() || (isShowingThread && data.size <= 1))) {
             items(8, key = { "skeleton_$it" }) {
-                SkeletonPost(Modifier.padding(bottom = feedItemSpacing()))
+                val skeletonModifier = if (isShowingThread) {
+                    Modifier.padding(bottom = feedItemSpacing())
+                } else {
+                    Modifier
+                }
+                SkeletonPost(skeletonModifier)
             }
             return@LazyColumn
         }
