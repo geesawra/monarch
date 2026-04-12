@@ -260,11 +260,12 @@ fun ShowSkeets(
                             }
                     )
 
-                    Card(
-                        modifier = Modifier.weight(1f).padding(top = 4.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        ),
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = 4.dp)
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
                         SkeetView(
                             viewModel = viewModel,
@@ -290,12 +291,10 @@ fun ShowSkeets(
                         color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
-                Card(
-                    shape = threadCardShape,
-                    elevation = if (isShowingThread) CardDefaults.cardElevation(defaultElevation = 0.dp) else CardDefaults.cardElevation(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
+                Column(
+                    modifier = Modifier
+                        .clip(threadCardShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 ) {
                     val isRepost = when (skeet.reason) {
                         is FeedViewPostReasonUnion.ReasonRepost -> true
@@ -482,11 +481,10 @@ fun ShowSkeets(
 
 @Composable
 private fun SkeletonPost(modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
+    Column(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Row(
             modifier = Modifier

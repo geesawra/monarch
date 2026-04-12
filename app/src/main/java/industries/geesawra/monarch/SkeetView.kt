@@ -6,6 +6,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -530,8 +531,11 @@ fun Embeds(
                 return@run
             }
 
-            OutlinedCard(
-                modifier = Modifier.padding(top = 4.dp)
+            Column(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
             ) {
                 RecordView(
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
@@ -560,8 +564,11 @@ fun Embeds(
             Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels)
 
             if (!nested) {
-                OutlinedCard(
-                    modifier = Modifier.padding(top = 4.dp)
+                Column(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
                 ) {
                     RecordWithMediaView(
                         modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
@@ -582,9 +589,11 @@ fun Embeds(
 
 @Composable
 private fun ImageView(img: List<ImagesViewImage>) {
-    OutlinedCard(
+    Column(
         modifier = Modifier
-            .padding(top = 8.dp, bottom = 8.dp),
+            .padding(top = 8.dp, bottom = 8.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
     ) {
         PostImageGallery(
             modifier = Modifier
@@ -611,10 +620,12 @@ fun VideoView(uri: Uri, thumbnailUri: String? = null, aspectRatio: Float? = null
     else
         Modifier.heightIn(max = 500.dp)
 
-    OutlinedCard(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 8.dp),
+            .padding(top = 8.dp, bottom = 8.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
     ) {
         if (playing) {
             val activeVideoKey = LocalActiveVideoKey.current
@@ -759,9 +770,11 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
 
     val domain = runCatching { ev.uri.uri.toUri().host }.getOrNull() ?: ""
 
-    OutlinedCard(
+    Column(
         modifier = Modifier
             .padding(top = 4.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
     ) {
         Column(
             modifier = Modifier
@@ -1337,10 +1350,12 @@ private fun ContentWarningCard(
     }
 
     if (wrapWithCard) {
-        OutlinedCard(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
         ) {
             content()
         }

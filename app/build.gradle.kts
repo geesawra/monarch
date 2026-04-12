@@ -111,6 +111,8 @@ composeCompiler {
 }
 
 dependencies {
+    implementation("androidx.compose.runtime:runtime-tracing:1.10.6")
+
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.crashlytics)

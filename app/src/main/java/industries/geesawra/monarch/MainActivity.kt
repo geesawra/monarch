@@ -70,11 +70,15 @@ import java.net.URLEncoder
 
 @HiltAndroidApp
 class Application : Application(), SingletonImageLoader.Factory {
+    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
     override fun onCreate() {
         super.onCreate()
         industries.geesawra.monarch.datalayer.MessagingService.createNotificationChannel(this)
+        androidx.compose.runtime.tracing.ComposeTracingInitializer().create(this)
+        androidx.compose.ui.contentcapture.ContentCaptureManager.isEnabled = false
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components {
@@ -92,6 +96,8 @@ class Application : Application(), SingletonImageLoader.Factory {
                     .maxSizePercent(0.15)
                     .build()
             }
+            .fetcherCoroutineContext(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(8))
+            .decoderCoroutineContext(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(4))
             .build()
 }
 
@@ -123,8 +129,6 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.decorView.importantForContentCapture =
-            android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         currentIntent.value = intent
 
         val baselineProfileMode = intent.getBooleanExtra("baseline_profile_mode", false)
