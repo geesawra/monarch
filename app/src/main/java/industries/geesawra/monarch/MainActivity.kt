@@ -41,6 +41,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil3.ImageLoader
+import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.disk.directory
@@ -68,11 +69,30 @@ import java.net.URLEncoder
 
 
 @HiltAndroidApp
-class Application : Application() {
+class Application : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         industries.geesawra.monarch.datalayer.MessagingService.createNotificationChannel(this)
     }
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
+        ImageLoader.Builder(context)
+            .components {
+                add(OkHttpNetworkFetcherFactory())
+                add(coil3.gif.GifDecoder.Factory())
+            }
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(context, 0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("image_cache"))
+                    .maxSizePercent(0.15)
+                    .build()
+            }
+            .build()
 }
 
 enum class ViewList() {
@@ -103,6 +123,8 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        window.decorView.importantForContentCapture =
+            android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         currentIntent.value = intent
 
         val baselineProfileMode = intent.getBooleanExtra("baseline_profile_mode", false)
@@ -125,27 +147,7 @@ class MainActivity : ComponentActivity() {
                 appTheme = settings.appTheme,
             ) {
                 val context = LocalContext.current
-                SingletonImageLoader.setSafe {
-                    ImageLoader.Builder(context)
-                        .components {
-                            add(OkHttpNetworkFetcherFactory())
-                            add(coil3.gif.GifDecoder.Factory())
-                        }
-                        .memoryCache {
-                            MemoryCache.Builder()
-                                .maxSizePercent(context, 0.25)
-                                .build()
-                        }
-                        .diskCache {
-                            DiskCache.Builder()
-                                .directory(context.cacheDir.resolve("image_cache"))
-                                .maxSizePercent(0.15)
-                                .build()
-                        }
-                        .build()
-                }
-
-                val conn = BlueskyConn(LocalContext.current)
+                val conn = BlueskyConn(context)
                 val timelineViewModel = hiltViewModel<TimelineViewModel, TimelineViewModel.Factory>(
                     creationCallback = { factory ->
                         factory.create(conn)
