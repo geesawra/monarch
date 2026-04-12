@@ -74,7 +74,7 @@ class Application : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         industries.geesawra.monarch.datalayer.MessagingService.createNotificationChannel(this)
-        androidx.compose.runtime.tracing.ComposeTracingInitializer().create(this)
+        // androidx.compose.runtime.tracing.ComposeTracingInitializer().create(this) // composition tracing - enable for profiling
         androidx.compose.ui.contentcapture.ContentCaptureManager.isEnabled = false
     }
 

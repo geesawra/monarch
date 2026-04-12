@@ -111,7 +111,7 @@ composeCompiler {
 }
 
 dependencies {
-    implementation("androidx.compose.runtime:runtime-tracing:1.10.6")
+    // implementation("androidx.compose.runtime:runtime-tracing:1.10.6") // composition tracing - enable for profiling
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
@@ -162,7 +162,7 @@ dependencies {
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.compose.runtime.tracing)
+    // implementation(libs.androidx.compose.runtime.tracing) // composition tracing - enable for profiling
     implementation(libs.mlkit.genai.image.description)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.core.ktx)
