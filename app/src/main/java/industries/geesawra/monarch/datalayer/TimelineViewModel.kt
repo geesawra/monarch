@@ -3,10 +3,17 @@
 package industries.geesawra.monarch.datalayer
 
 import android.net.Uri
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.util.fastForEach
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toImmutableMap
+import kotlinx.collections.immutable.toPersistentList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.bsky.actor.MutedWordActorTarget
@@ -77,17 +84,17 @@ data class TimelineState(
     val selectedFeed: String = "following",
     val feedName: String = "",
     val feedAvatar: String? = null,
-    val feeds: List<GeneratorView> = listOf(),
-    val skeets: List<SkeetData> = listOf(),
-    val feedSkeets: Map<String, List<SkeetData>> = mapOf(),
-    val feedCursors: Map<String, String?> = mapOf(),
+    val feeds: ImmutableList<GeneratorView> = persistentListOf(),
+    val skeets: ImmutableList<SkeetData> = persistentListOf(),
+    val feedSkeets: ImmutableMap<String, ImmutableList<SkeetData>> = persistentMapOf(),
+    val feedCursors: ImmutableMap<String, String?> = persistentMapOf(),
     val timelineCursor: String? = null,
     val isFetchingMoreTimeline: Boolean = false,
-    val mutedWords: List<MutedWord> = listOf(),
+    val mutedWords: ImmutableList<MutedWord> = persistentListOf(),
 )
 
 data class NotificationsState(
-    val notifications: List<Notification> = listOf(),
+    val notifications: ImmutableList<Notification> = persistentListOf(),
     val notificationsCursor: String? = null,
     val isFetchingMoreNotifications: Boolean = false,
     val unreadNotificationsAmt: Int = 0,
@@ -95,14 +102,14 @@ data class NotificationsState(
 )
 
 data class ThreadState(
-    val threadStack: List<ThreadPost> = listOf(),
+    val threadStack: ImmutableList<ThreadPost> = persistentListOf(),
 ) {
     val currentlyShownThread: ThreadPost get() = threadStack.lastOrNull() ?: ThreadPost()
 }
 
 data class ProfileState(
     val profileUser: ProfileViewDetailed? = null,
-    val profilePosts: List<SkeetData> = listOf(),
+    val profilePosts: ImmutableList<SkeetData> = persistentListOf(),
     val profileFeedCursor: String? = null,
     val profileFeedFilter: GetAuthorFeedFilter? = null,
     val isFetchingProfile: Boolean = false,
@@ -113,8 +120,8 @@ data class ProfileState(
 data class FollowersState(
     val followersListDid: Did? = null,
     val followersListName: String? = null,
-    val profileFollowers: List<ProfileView> = listOf(),
-    val profileFollows: List<ProfileView> = listOf(),
+    val profileFollowers: ImmutableList<ProfileView> = persistentListOf(),
+    val profileFollows: ImmutableList<ProfileView> = persistentListOf(),
     val profileFollowersCursor: String? = null,
     val profileFollowsCursor: String? = null,
     val showFollowersTab: Boolean = true,
@@ -122,8 +129,8 @@ data class FollowersState(
 
 data class SearchState(
     val searchQuery: String = "",
-    val searchPostResults: List<SkeetData> = listOf(),
-    val searchActorResults: List<ProfileView> = listOf(),
+    val searchPostResults: ImmutableList<SkeetData> = persistentListOf(),
+    val searchActorResults: ImmutableList<ProfileView> = persistentListOf(),
     val searchPostsCursor: String? = null,
     val searchActorsCursor: String? = null,
     val searchPostsSort: SearchPostsSort = SearchPostsSort.Latest,
@@ -136,12 +143,12 @@ data class SearchState(
 
 data class PublicationsState(
     val publicationsDid: Did? = null,
-    val publications: List<PublicationRecord> = emptyList(),
+    val publications: ImmutableList<PublicationRecord> = persistentListOf(),
     val hasPublications: Boolean = false,
     val isTabActive: Boolean = false,
     val isFetchingPublications: Boolean = false,
     val selectedPublication: PublicationRecord? = null,
-    val documents: List<DocumentRecord> = emptyList(),
+    val documents: ImmutableList<DocumentRecord> = persistentListOf(),
     val isFetchingDocuments: Boolean = false,
     val selectedDocument: DocumentRecord? = null,
 )
@@ -152,7 +159,7 @@ data class VideoUploadState(
 )
 
 data class DraftsState(
-    val drafts: List<app.bsky.draft.DraftView> = emptyList(),
+    val drafts: ImmutableList<app.bsky.draft.DraftView> = persistentListOf(),
     val cursor: String? = null,
     val isLoading: Boolean = false,
     val activeDraftId: sh.christian.ozone.api.Tid? = null,
@@ -166,6 +173,7 @@ object NotificationBadge {
     fun clear() { count.value = 0 }
 }
 
+@Stable
 @HiltViewModel(assistedFactory = TimelineViewModel.Factory::class)
 class TimelineViewModel @AssistedInject constructor(
     @Assisted private val bskyConn: BlueskyConn,
@@ -208,25 +216,25 @@ class TimelineViewModel @AssistedInject constructor(
     val selectedFeed: String get() = timelineState.selectedFeed
     val feedName: String get() = timelineState.feedName
     val feedAvatar: String? get() = timelineState.feedAvatar
-    val feeds: List<GeneratorView> get() = timelineState.feeds
-    val skeets: List<SkeetData> get() = timelineState.skeets
-    val feedSkeets: Map<String, List<SkeetData>> get() = timelineState.feedSkeets
-    val feedCursors: Map<String, String?> get() = timelineState.feedCursors
+    val feeds: ImmutableList<GeneratorView> get() = timelineState.feeds
+    val skeets: ImmutableList<SkeetData> get() = timelineState.skeets
+    val feedSkeets: ImmutableMap<String, ImmutableList<SkeetData>> get() = timelineState.feedSkeets
+    val feedCursors: ImmutableMap<String, String?> get() = timelineState.feedCursors
     val timelineCursor: String? get() = timelineState.timelineCursor
     val isFetchingMoreTimeline: Boolean get() = timelineState.isFetchingMoreTimeline
-    val mutedWords: List<MutedWord> get() = timelineState.mutedWords
+    val mutedWords: ImmutableList<MutedWord> get() = timelineState.mutedWords
 
-    val notifications: List<Notification> get() = notificationsState.notifications
+    val notifications: ImmutableList<Notification> get() = notificationsState.notifications
     val notificationsCursor: String? get() = notificationsState.notificationsCursor
     val isFetchingMoreNotifications: Boolean get() = notificationsState.isFetchingMoreNotifications
     val unreadNotificationsAmt: Int get() = notificationsState.unreadNotificationsAmt
     private val seenNotificationsAt: Instant? get() = notificationsState.seenNotificationsAt
 
-    val threadStack: List<ThreadPost> get() = threadState.threadStack
+    val threadStack: ImmutableList<ThreadPost> get() = threadState.threadStack
     val currentlyShownThread: ThreadPost get() = threadState.currentlyShownThread
 
     val profileUser: ProfileViewDetailed? get() = profileState.profileUser
-    val profilePosts: List<SkeetData> get() = profileState.profilePosts
+    val profilePosts: ImmutableList<SkeetData> get() = profileState.profilePosts
     val profileFeedCursor: String? get() = profileState.profileFeedCursor
     val profileFeedFilter: GetAuthorFeedFilter? get() = profileState.profileFeedFilter
     val isFetchingProfile: Boolean get() = profileState.isFetchingProfile
@@ -235,15 +243,15 @@ class TimelineViewModel @AssistedInject constructor(
 
     val followersListDid: Did? get() = followersState.followersListDid
     val followersListName: String? get() = followersState.followersListName
-    val profileFollowers: List<ProfileView> get() = followersState.profileFollowers
-    val profileFollows: List<ProfileView> get() = followersState.profileFollows
+    val profileFollowers: ImmutableList<ProfileView> get() = followersState.profileFollowers
+    val profileFollows: ImmutableList<ProfileView> get() = followersState.profileFollows
     val profileFollowersCursor: String? get() = followersState.profileFollowersCursor
     val profileFollowsCursor: String? get() = followersState.profileFollowsCursor
     val showFollowersTab: Boolean get() = followersState.showFollowersTab
 
     val searchQuery: String get() = searchState.searchQuery
-    val searchPostResults: List<SkeetData> get() = searchState.searchPostResults
-    val searchActorResults: List<ProfileView> get() = searchState.searchActorResults
+    val searchPostResults: ImmutableList<SkeetData> get() = searchState.searchPostResults
+    val searchActorResults: ImmutableList<ProfileView> get() = searchState.searchActorResults
     val searchPostsCursor: String? get() = searchState.searchPostsCursor
     val searchActorsCursor: String? get() = searchState.searchActorsCursor
     val searchPostsSort: SearchPostsSort get() = searchState.searchPostsSort
@@ -524,7 +532,7 @@ class TimelineViewModel @AssistedInject constructor(
                 )
             }.onSuccess { response ->
                 val feedKey = selectedFeed
-                val existingFeedSkeets = feedSkeets[feedKey] ?: listOf()
+                val existingFeedSkeets: List<SkeetData> = feedSkeets[feedKey] ?: persistentListOf()
                 val currentMutedWords = mutedWords
                 val newSkeets = if (fresh) {
                     response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
@@ -540,8 +548,8 @@ class TimelineViewModel @AssistedInject constructor(
                 updateTimeline { t ->
                     t.copy(
                         skeets = newSkeets,
-                        feedSkeets = t.feedSkeets + (feedKey to newFeedSkeets),
-                        feedCursors = t.feedCursors + (feedKey to response.cursor),
+                        feedSkeets = (t.feedSkeets + (feedKey to newFeedSkeets)).toImmutableMap(),
+                        feedCursors = (t.feedCursors + (feedKey to response.cursor)).toImmutableMap(),
                         timelineCursor = response.cursor,
                         isFetchingMoreTimeline = false,
                     )
@@ -601,10 +609,10 @@ class TimelineViewModel @AssistedInject constructor(
             val processed = processGroupedNotifications(notifs, grouped)
 
             if (fresh) {
-                updateNotifications { it.copy(notifications = listOf()) }
+                updateNotifications { it.copy(notifications = persistentListOf()) }
             }
 
-            val merged = (notifications + processed).distinctBy { it.uniqueKey() }
+            val merged = (notifications + processed).distinctBy { it.uniqueKey() }.toPersistentList()
 
             updateNotifications {
                 it.copy(
@@ -934,7 +942,7 @@ class TimelineViewModel @AssistedInject constructor(
                     val newSkeet = posts.firstOrNull()?.let { SkeetData.fromPostView(it, it.author) }
                     if (newSkeet != null) {
                         postInteractionStore.seed(newSkeet)
-                        updateTimeline { it.copy(skeets = listOf(newSkeet) + it.skeets) }
+                        updateTimeline { it.copy(skeets = it.skeets.toPersistentList().add(0, newSkeet)) }
                     }
                 }
             }
@@ -947,7 +955,7 @@ class TimelineViewModel @AssistedInject constructor(
             bskyConn.feeds().onFailure {
                 handleError(it)
             }.onSuccess { fetched ->
-                updateTimeline { it.copy(feeds = fetched) }
+                updateTimeline { it.copy(feeds = fetched.toPersistentList()) }
             }
         }
     }
@@ -958,7 +966,7 @@ class TimelineViewModel @AssistedInject constructor(
                 selectedFeed = uri,
                 feedName = displayName,
                 feedAvatar = avatar,
-                skeets = it.feedSkeets[uri] ?: listOf(),
+                skeets = it.feedSkeets[uri] ?: persistentListOf(),
                 timelineCursor = it.feedCursors[uri],
             )
         }
@@ -1002,8 +1010,8 @@ class TimelineViewModel @AssistedInject constructor(
             bskyConn.deletePost(uri.rkey()).onFailure {
                 handleError(it)
             }.onSuccess {
-                updateTimeline { t -> t.copy(skeets = t.skeets.filter { it.uri != uri }) }
-                updateProfile { p -> p.copy(profilePosts = p.profilePosts.filter { it.uri != uri }) }
+                updateTimeline { t -> t.copy(skeets = t.skeets.filter { it.uri != uri }.toPersistentList()) }
+                updateProfile { p -> p.copy(profilePosts = p.profilePosts.filter { it.uri != uri }.toPersistentList()) }
                 then()
             }
         }
@@ -1021,7 +1029,7 @@ class TimelineViewModel @AssistedInject constructor(
             bskyConn.getDrafts(cursor = cursor).onSuccess { response ->
                 updateDrafts {
                     it.copy(
-                        drafts = if (fresh) response.drafts else it.drafts + response.drafts,
+                        drafts = if (fresh) response.drafts.toPersistentList() else (it.drafts + response.drafts).toPersistentList(),
                         cursor = response.cursor,
                         isLoading = false,
                     )
@@ -1070,7 +1078,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun deleteDraft(id: sh.christian.ozone.api.Tid, then: () -> Unit = {}) {
         viewModelScope.launch {
             bskyConn.deleteDraft(id).onSuccess {
-                updateDrafts { it.copy(drafts = it.drafts.filter { d -> d.id != id }) }
+                updateDrafts { it.copy(drafts = it.drafts.filter { d -> d.id != id }.toPersistentList()) }
                 if (draftsState.activeDraftId == id) {
                     updateDrafts { it.copy(activeDraftId = null) }
                 }
@@ -1122,25 +1130,25 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun startThread(tappedElement: SkeetData) {
-        updateThread { ThreadState(threadStack = listOf(ThreadPost(post = tappedElement))) }
+        updateThread { ThreadState(threadStack = persistentListOf(ThreadPost(post = tappedElement))) }
     }
 
     fun setThread(tappedElement: SkeetData) {
-        updateThread { it.copy(threadStack = it.threadStack + ThreadPost(post = tappedElement)) }
+        updateThread { it.copy(threadStack = it.threadStack.toPersistentList().add(ThreadPost(post = tappedElement))) }
     }
 
     fun popThread() {
         if (threadStack.size > 1) {
-            updateThread { it.copy(threadStack = it.threadStack.dropLast(1)) }
+            updateThread { it.copy(threadStack = it.threadStack.dropLast(1).toPersistentList()) }
         }
     }
 
     private fun reapplyMuteFlags(words: List<MutedWord>) {
         updateTimeline { t ->
             t.copy(
-                mutedWords = words,
+                mutedWords = words.toPersistentList(),
                 skeets = t.skeets.withMuteFlags(words),
-                feedSkeets = t.feedSkeets.mapValues { (_, list) -> list.withMuteFlags(words) },
+                feedSkeets = t.feedSkeets.mapValues { (_, list) -> list.withMuteFlags(words) }.toImmutableMap(),
             )
         }
         updateProfile { p -> p.copy(profilePosts = p.profilePosts.withMuteFlags(words)) }
@@ -1197,7 +1205,7 @@ class TimelineViewModel @AssistedInject constructor(
         viewModelScope.launch {
             val cursor = if (fresh) null else profileFollowersCursor
             bskyConn.getFollowers(did, cursor).onSuccess { res ->
-                val updated = if (fresh) res.followers else profileFollowers + res.followers
+                val updated = if (fresh) res.followers.toPersistentList() else (profileFollowers + res.followers).toPersistentList()
                 val name = res.subject.displayName ?: res.subject.handle.handle
                 updateFollowers {
                     it.copy(
@@ -1216,7 +1224,7 @@ class TimelineViewModel @AssistedInject constructor(
         viewModelScope.launch {
             val cursor = if (fresh) null else profileFollowsCursor
             bskyConn.getFollows(did, cursor).onSuccess { res ->
-                val updated = if (fresh) res.follows else profileFollows + res.follows
+                val updated = if (fresh) res.follows.toPersistentList() else (profileFollows + res.follows).toPersistentList()
                 updateFollowers {
                     it.copy(
                         profileFollows = updated,
@@ -1314,7 +1322,7 @@ class TimelineViewModel @AssistedInject constructor(
                 handleError(it)
             }.onSuccess {
                 val asd = readThread(it.thread)
-                updateThread { t -> t.copy(threadStack = t.threadStack.dropLast(1) + asd) }
+                updateThread { t -> t.copy(threadStack = (t.threadStack.dropLast(1) + asd).toPersistentList()) }
                 asd.flatten().forEach { postInteractionStore.seed(it) }
                 then()
             }
@@ -1356,13 +1364,13 @@ class TimelineViewModel @AssistedInject constructor(
             }
             val allDocs = bskyConn.listDocuments(did).getOrDefault(emptyList())
             val docSites = allDocs.mapNotNull { it.document.site }.toSet()
-            val pubs = allPubs.filter { it.uri.atUri in docSites }
+            val pubs = allPubs.filter { it.uri.atUri in docSites }.toPersistentList()
             updatePublications { it.copy(publications = pubs, isFetchingPublications = false) }
         }
     }
 
     fun fetchDocuments(publication: PublicationRecord) {
-        updatePublications { it.copy(selectedPublication = publication, isFetchingDocuments = true, documents = emptyList(), selectedDocument = null) }
+        updatePublications { it.copy(selectedPublication = publication, isFetchingDocuments = true, documents = persistentListOf(), selectedDocument = null) }
         viewModelScope.launch {
             val did = publicationsState.publicationsDid ?: return@launch
             bskyConn.listDocuments(did).onFailure {
@@ -1370,6 +1378,7 @@ class TimelineViewModel @AssistedInject constructor(
             }.onSuccess { docs ->
                 val filtered = docs.filter { it.document.site == publication.uri.atUri }
                     .sortedByDescending { it.document.publishedAt }
+                    .toPersistentList()
                 updatePublications { it.copy(documents = filtered, isFetchingDocuments = false) }
             }
         }
@@ -1399,7 +1408,7 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun clearSelectedPublication() {
-        updatePublications { it.copy(selectedPublication = null, documents = emptyList(), selectedDocument = null) }
+        updatePublications { it.copy(selectedPublication = null, documents = persistentListOf(), selectedDocument = null) }
     }
 
     fun fetchProfileFeed(did: Did? = null, fresh: Boolean = false) {
@@ -1439,7 +1448,7 @@ class TimelineViewModel @AssistedInject constructor(
         updateProfile {
             it.copy(
                 profileFeedFilter = filter,
-                profilePosts = listOf(),
+                profilePosts = persistentListOf(),
                 profileFeedCursor = null,
             )
         }
@@ -1582,8 +1591,8 @@ class TimelineViewModel @AssistedInject constructor(
             }.onSuccess { (actors, cursor) ->
                 updateSearch { s ->
                     s.copy(
-                        searchActorResults = if (fresh) actors
-                            else (s.searchActorResults + actors).distinctBy { it.did },
+                        searchActorResults = if (fresh) actors.toPersistentList()
+                            else (s.searchActorResults + actors).distinctBy { it.did }.toPersistentList(),
                         searchActorsCursor = cursor,
                         isSearchingActors = false,
                     )

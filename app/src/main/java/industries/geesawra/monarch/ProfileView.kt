@@ -88,6 +88,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -167,7 +169,7 @@ fun ProfileView(
     val wasEdited = remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isMediaFeedMode by remember { mutableStateOf(false) }
-    var mediaFeedSnapshot by remember { mutableStateOf<List<SkeetData>?>(null) }
+    var mediaFeedSnapshot by remember { mutableStateOf<ImmutableList<SkeetData>?>(null) }
     val isPublicationsTab = timelineViewModel.publicationsState.isTabActive
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
@@ -403,9 +405,9 @@ fun ProfileView(
             }
 
             if (isMediaFeedMode) {
-                val posts = mediaFeedSnapshot!! + timelineViewModel.profilePosts.filter { post ->
+                val posts = (mediaFeedSnapshot!! + timelineViewModel.profilePosts.filter { post ->
                     mediaFeedSnapshot!!.none { it.cid == post.cid }
-                }
+                }).toPersistentList()
                 Dialog(
                     onDismissRequest = { isMediaFeedMode = false },
                     properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),

@@ -1,6 +1,7 @@
 package industries.geesawra.monarch.datalayer
 
 import android.content.Context
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -75,6 +76,7 @@ val APPVIEW_PROXY_OPTIONS = listOf(
     "Blacksky" to BLACKSKY_APPVIEW_DID,
 )
 
+@Stable
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context

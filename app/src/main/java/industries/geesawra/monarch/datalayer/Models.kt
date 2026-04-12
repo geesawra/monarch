@@ -4,6 +4,9 @@ package industries.geesawra.monarch.datalayer
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toPersistentList
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -816,14 +819,14 @@ data class ThreadPost(
         private const val MAX_NESTING = 5
     }
 
-    fun flatten(): List<SkeetData> {
+    fun flatten(): ImmutableList<SkeetData> {
         val out = mutableListOf<SkeetData>()
         flattenInner(out, activeConnectors = mutableListOf(), parentDid = null, effectiveLevel = 0)
         val focusIdx = out.indexOfLast { it.nestingLevel == 0 && it.threadConnectors.isEmpty() }
         if (focusIdx >= 0) {
             out[focusIdx] = out[focusIdx].copy(isFocused = true)
         }
-        return out
+        return out.toPersistentList()
     }
 
     private fun flattenInner(
@@ -976,9 +979,10 @@ data class DocumentRecord(
     val authorDid: Did,
 )
 
-fun List<SkeetData>.withMuteFlags(mutedWords: List<app.bsky.actor.MutedWord>): List<SkeetData> {
+fun List<SkeetData>.withMuteFlags(mutedWords: List<app.bsky.actor.MutedWord>): ImmutableList<SkeetData> {
     if (mutedWords.isEmpty()) {
-        return if (any { it.isMuted }) map { it.copy(isMuted = false) } else this
+        val out = if (any { it.isMuted }) map { it.copy(isMuted = false) } else this
+        return out.toImmutableList()
     }
     val now = Clock.System.now()
     return map { skeet ->
@@ -987,5 +991,5 @@ fun List<SkeetData>.withMuteFlags(mutedWords: List<app.bsky.actor.MutedWord>): L
         val rootMuted = skeet.cachedRoot?.let { matchesMutedWord(it, mutedWords, now) } == true
         val muted = self || parentMuted || rootMuted
         if (muted != skeet.isMuted) skeet.copy(isMuted = muted) else skeet
-    }
+    }.toPersistentList()
 }

@@ -154,6 +154,8 @@ import industries.geesawra.monarch.datalayer.NotificationBadge
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import sh.christian.ozone.api.Did
@@ -495,7 +497,7 @@ private fun InnerTimelineView(
         }
     }
 
-    var mediaFeedPosts by remember { mutableStateOf<List<SkeetData>?>(null) }
+    var mediaFeedPosts by remember { mutableStateOf<ImmutableList<SkeetData>?>(null) }
 
     if (mediaFeedPosts != null) {
         Dialog(
@@ -1032,7 +1034,7 @@ private fun InnerTimelineView(
                                                         contentPadding = PaddingValues(horizontal = 0.dp),
                                                     ) { page ->
                                                         val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
-                                                        val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
+                                                        val pageData = timelineViewModel.feedSkeets[feedUri] ?: persistentListOf()
                                                         val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
                                                         val pageListState = rememberLazyListState()
                                                         pagerListStates[page] = pageListState
@@ -1170,7 +1172,7 @@ private fun InnerTimelineView(
                                             beyondViewportPageCount = 0,
                                         ) { page ->
                                             val feedUri = feedItems.getOrNull(page)?.uri ?: return@HorizontalPager
-                                            val pageData = timelineViewModel.feedSkeets[feedUri] ?: listOf()
+                                            val pageData = timelineViewModel.feedSkeets[feedUri] ?: persistentListOf()
                                             val notYetLoaded = feedUri !in timelineViewModel.feedSkeets
                                             val pageListState = rememberLazyListState()
                                             pagerListStates[page] = pageListState

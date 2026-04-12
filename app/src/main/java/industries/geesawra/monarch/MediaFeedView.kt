@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.draw.clip
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,7 +121,7 @@ fun extractMedia(posts: List<SkeetData>): List<MediaItem> {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MediaFeedView(
-    posts: List<SkeetData>,
+    posts: ImmutableList<SkeetData>,
     isLoading: Boolean = false,
     onLoadMore: () -> Unit = {},
     onProfileTap: ((Did) -> Unit)? = null,

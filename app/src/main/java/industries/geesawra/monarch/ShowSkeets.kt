@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
@@ -74,7 +75,7 @@ fun ShowSkeets(
     viewModel: TimelineViewModel,
     isScrollEnabled: Boolean,
     state: LazyListState = rememberLazyListState(),
-    data: List<SkeetData>,
+    data: ImmutableList<SkeetData>,
     isShowingThread: Boolean = false,
     shouldFetchMoreData: Boolean = true,
     isLoading: Boolean = false,

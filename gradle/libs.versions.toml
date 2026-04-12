@@ -37,6 +37,7 @@ telephoto = "0.18.0"
 browser = "1.10.0"
 kotlinxDatetime = "0.7.1-0.6.x-compat"
 humanReadable = "1.12.3"
+kotlinxCollectionsImmutable = "0.3.8"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -103,6 +104,7 @@ telephoto-zoomable-image-coil3 = { group = "me.saket.telephoto", name = "zoomabl
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
 human-readable = { group = "nl.jacobras", name = "Human-Readable", version.ref = "humanReadable" }
+kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

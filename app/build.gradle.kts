@@ -76,6 +76,14 @@ android {
             buildConfigField("String", "PUSH_SERVER_URL", "\"http://10.0.2.2:9999/subscribe\"")
         }
     }
+
+    afterEvaluate {
+        android.buildTypes.findByName("benchmarkRelease")?.apply {
+            applicationIdSuffix = ".benchmark"
+        }
+        tasks.matching { it.name == "uploadCrashlyticsMappingFileBenchmarkRelease" }
+            .configureEach { enabled = false }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -89,6 +97,13 @@ android {
 
 kotlin {
     jvmToolchain(21)
+}
+
+composeCompiler {
+    if (providers.gradleProperty("monarch.composeMetrics").getOrElse("false").toBoolean()) {
+        reportsDestination = layout.buildDirectory.dir("compose_compiler")
+        metricsDestination = layout.buildDirectory.dir("compose_compiler")
+    }
 }
 
 dependencies {
@@ -128,6 +143,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.datastore)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.collections.immutable)
     implementation(libs.paging.compose)
     implementation(libs.telephoto.zoomable)
     implementation(libs.telephoto.zoomable.image.coil3)

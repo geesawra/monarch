@@ -7,6 +7,7 @@ import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toLowerCase
 import androidx.core.net.toUri
@@ -193,6 +194,7 @@ data class Timeline(
     val feed: List<FeedViewPost>,
 )
 
+@Stable
 class BlueskyConn(val context: Context) {
     companion object {
         const val MAX_IMAGE_SIZE_BYTES = 950_000L
