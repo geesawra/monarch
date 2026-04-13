@@ -72,6 +72,7 @@ data class SettingsState(
     val autoLikeOnScroll: Boolean = false,
     val aiEnabled: Boolean = true,
     val aiAltTextEnabled: Boolean = true,
+    val requireAltText: Boolean = false,
     val translationEnabled: Boolean = true,
     val targetTranslationLanguage: String = "en",
     val openLinksInBrowser: Boolean = false,
@@ -113,6 +114,7 @@ class SettingsViewModel @Inject constructor(
         private val AUTO_LIKE_ON_SCROLL = stringPreferencesKey("auto_like_on_scroll")
         private val AI_ENABLED = stringPreferencesKey("ai_enabled")
         private val AI_ALT_TEXT_ENABLED = stringPreferencesKey("ai_alt_text_enabled")
+        private val REQUIRE_ALT_TEXT = stringPreferencesKey("require_alt_text")
         private val TRANSLATION_ENABLED = stringPreferencesKey("translation_enabled")
         private val TARGET_TRANSLATION_LANGUAGE = stringPreferencesKey("target_translation_language")
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
@@ -148,6 +150,7 @@ class SettingsViewModel @Inject constructor(
                     autoLikeOnScroll = prefs[AUTO_LIKE_ON_SCROLL]?.toBooleanStrictOrNull() ?: false,
                     aiEnabled = prefs[AI_ENABLED]?.toBooleanStrictOrNull() ?: true,
                     aiAltTextEnabled = prefs[AI_ALT_TEXT_ENABLED]?.toBooleanStrictOrNull() ?: true,
+                    requireAltText = prefs[REQUIRE_ALT_TEXT]?.toBooleanStrictOrNull() ?: false,
                     translationEnabled = prefs[TRANSLATION_ENABLED]?.toBooleanStrictOrNull() ?: true,
                     targetTranslationLanguage = prefs[TARGET_TRANSLATION_LANGUAGE] ?: "en",
                     openLinksInBrowser = prefs[OPEN_LINKS_IN_BROWSER]?.toBooleanStrictOrNull() ?: false,
@@ -248,6 +251,12 @@ class SettingsViewModel @Inject constructor(
     fun setAiAltTextEnabled(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[AI_ALT_TEXT_ENABLED] = enabled.toString() }
+        }
+    }
+
+    fun setRequireAltText(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[REQUIRE_ALT_TEXT] = enabled.toString() }
         }
     }
 

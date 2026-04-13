@@ -336,6 +336,7 @@ fun ComposeView(
                     maxChars,
                     timelineViewModel,
                     autoLikeOnReply = settingsState.autoLikeOnReply,
+                    requireAltText = settingsState.requireAltText,
                     scaffoldState,
                     inReplyTo.value,
                     isQuotePost.value,
@@ -689,6 +690,7 @@ fun ActionRow(
     maxChars: Int,
     timelineViewModel: TimelineViewModel,
     autoLikeOnReply: Boolean = false,
+    requireAltText: Boolean = false,
     scaffoldState: BottomSheetScaffoldState,
     inReplyToData: SkeetData? = null,
     isQuotePost: Boolean = false,
@@ -730,8 +732,13 @@ fun ActionRow(
                 Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
             }
         }
-        val postButtonEnabled = remember(postText, mediaSelected.value) {
-            (postText.isNotBlank() || mediaSelected.value.isNotEmpty()) && postText.length <= maxChars
+        val allMediaHasAlt = mediaSelected.value.isEmpty() ||
+            mediaSelected.value.all { uri -> mediaAltTexts.value[uri]?.isNotBlank() == true }
+        val postButtonEnabled = remember(postText, mediaSelected.value, mediaAltTexts.value, requireAltText) {
+            val hasContent = postText.isNotBlank() || mediaSelected.value.isNotEmpty()
+            val withinLimit = postText.length <= maxChars
+            val altTextOk = !requireAltText || allMediaHasAlt
+            hasContent && withinLimit && altTextOk
         }
 
         val haptic = LocalHapticFeedback.current

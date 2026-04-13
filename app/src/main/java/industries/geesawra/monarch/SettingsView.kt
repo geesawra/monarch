@@ -173,8 +173,19 @@ fun SettingsView(
                 },
             )
 
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
             ListItem(
                 headlineContent = { Text("Color scheme") },
+                supportingContent = {
+                    Text(
+                        text = "Themes by witchsky.app",
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            uriHandler.openUri("https://tangled.org/jollywhoppers.com/witchsky.app")
+                        },
+                    )
+                },
                 trailingContent = {
                     var expanded by remember { mutableStateOf(false) }
                     Box {
@@ -379,6 +390,17 @@ fun SettingsView(
                     Switch(
                         checked = settings.showPronounsInPosts,
                         onCheckedChange = { settingsViewModel.setShowPronounsInPosts(it) }
+                    )
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Require alt text") },
+                supportingContent = { Text("Prevent posting images without alt text") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.requireAltText,
+                        onCheckedChange = { settingsViewModel.setRequireAltText(it) }
                     )
                 },
             )
@@ -768,9 +790,19 @@ fun SettingsView(
                 text = "Monarch v${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT_SHA})",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+
+            val bottomUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            Text(
+                text = "Source code on GitHub",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                    .clickable { bottomUriHandler.openUri("https://github.com/geesawra/monarch") }
+                    .padding(top = 4.dp, bottom = 24.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
         }
