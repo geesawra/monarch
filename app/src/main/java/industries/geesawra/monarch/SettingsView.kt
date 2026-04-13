@@ -58,13 +58,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
+import android.app.Activity
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.ContextCompat
+import androidx.window.core.layout.WindowSizeClass
+import androidx.window.layout.FoldingFeature
+import androidx.window.layout.WindowInfoTracker
 import industries.geesawra.monarch.BuildConfig
 import industries.geesawra.monarch.datalayer.AltTextAvailability
 import industries.geesawra.monarch.datalayer.AltTextGenerator
@@ -98,6 +104,19 @@ fun SettingsView(
             it.availability() != AltTextAvailability.Unavailable
         }
     }
+
+    val adaptiveInfo = currentWindowAdaptiveInfo()
+    val isLargeScreen = adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(
+        WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
+    )
+
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val windowLayoutInfo = activity?.let {
+        WindowInfoTracker.getOrCreate(it).windowLayoutInfo(it)
+    }?.collectAsState(initial = null)?.value
+    val isFoldable = windowLayoutInfo?.displayFeatures?.any { it is FoldingFeature } == true
+    val showCompactLayoutOption = isLargeScreen || isFoldable
 
     Scaffold(
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
@@ -250,16 +269,18 @@ fun SettingsView(
                 },
             )
 
-            ListItem(
-                headlineContent = { Text("Force compact layout") },
-                supportingContent = { Text("Use phone layout on large screens") },
-                trailingContent = {
-                    Switch(
-                        checked = settings.forceCompactLayout,
-                        onCheckedChange = { settingsViewModel.setForceCompactLayout(it) }
-                    )
-                },
-            )
+            if (showCompactLayoutOption) {
+                ListItem(
+                    headlineContent = { Text("Force compact layout") },
+                    supportingContent = { Text("Use phone layout on large screens") },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.forceCompactLayout,
+                            onCheckedChange = { settingsViewModel.setForceCompactLayout(it) }
+                        )
+                    },
+                )
+            }
 
             ListItem(
                 headlineContent = { Text("Swipeable feeds") },
@@ -375,7 +396,6 @@ fun SettingsView(
             )
 
             if (pushNotificationManager != null && timelineViewModel != null) {
-                val context = LocalContext.current
                 val coroutineScope = rememberCoroutineScope()
                 var pushError by remember { mutableStateOf<String?>(null) }
 
