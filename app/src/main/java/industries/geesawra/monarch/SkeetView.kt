@@ -133,6 +133,7 @@ fun SkeetView(
     onAvatarTap: ((Did) -> Unit)? = null,
     isVisible: Boolean = true,
     overrideAvatarSize: Dp? = null,
+    translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
 ) {
     if (skeet.blocked) {
@@ -189,6 +190,7 @@ fun SkeetView(
                 avatarShape = avatarShape,
                 isVisible = isVisible,
                 showLabels = showLabels,
+                translationEnabled = translationEnabled,
                 targetTranslationLanguage = targetTranslationLanguage,
             )
         }
@@ -250,6 +252,7 @@ fun SkeetView(
                     avatarShape = avatarShape,
                     isVisible = isVisible,
                     showLabels = showLabels,
+                    translationEnabled = translationEnabled,
                     targetTranslationLanguage = targetTranslationLanguage,
                 )
             }
@@ -271,6 +274,7 @@ fun FocusedSkeetView(
     onShowThread: (SkeetData) -> Unit = {},
     onAvatarTap: ((Did) -> Unit)? = null,
     isVisible: Boolean = true,
+    translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
 ) {
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
@@ -304,6 +308,7 @@ fun FocusedSkeetView(
             avatarShape = avatarShape,
             isVisible = isVisible,
             showLabels = showLabels,
+            translationEnabled = translationEnabled,
             targetTranslationLanguage = targetTranslationLanguage,
         )
 
@@ -315,6 +320,7 @@ fun FocusedSkeetView(
             timelineViewModel = viewModel,
             skeet = skeet,
             inThread = true,
+            translationEnabled = translationEnabled,
             targetTranslationLanguage = targetTranslationLanguage,
         )
     }
@@ -438,6 +444,7 @@ private fun SkeetContentSection(
     avatarShape: Shape,
     isVisible: Boolean,
     showLabels: Boolean,
+    translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
 ) {
     if (warningLabel != null) {
@@ -460,6 +467,7 @@ private fun SkeetContentSection(
                 timelineViewModel = viewModel,
                 skeet = skeet,
                 inThread = inThread,
+                translationEnabled = translationEnabled,
                 targetTranslationLanguage = targetTranslationLanguage,
             )
         }
@@ -496,7 +504,7 @@ private fun SkeetContent(
         val showTranslated = translatedText != null && !translation.showOriginal && !translation.isTranslating
 
         Column {
-            if (showTranslated && translatedText != null) {
+            if (showTranslated) {
                 Text(
                     text = translatedText,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -546,16 +554,16 @@ private fun SkeetContent(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                showTranslated && translation != null && viewModel != null -> {
+                showTranslated && viewModel != null -> {
                     TranslationMetadata(
-                        detectedLanguage = translation.detectedLanguage,
+                        detectedLanguage = translation?.detectedLanguage,
                         onShowOriginal = { viewModel.toggleTranslationOriginal(skeet.cid) },
                         onWrongLanguage = { newSourceLang ->
                             viewModel.retranslatePost(skeet, targetTranslationLanguage, newSourceLang)
                         },
                     )
                 }
-                translatedText != null && translation != null && translation.showOriginal && viewModel != null -> {
+                translation?.showOriginal == true && viewModel != null -> {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

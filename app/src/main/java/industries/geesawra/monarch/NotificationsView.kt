@@ -199,6 +199,7 @@ private fun RenderNotification(
                         onShowThread = {
                             onProfileTap?.invoke(notification.follow.did)
                         },
+                        translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                         targetTranslationLanguage = settingsState.targetTranslationLanguage,
                     )
                 }
@@ -227,6 +228,7 @@ private fun RenderNotification(
             renderingMention = true,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
+            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
             targetTranslationLanguage = settingsState.targetTranslationLanguage,
         )
 
@@ -245,6 +247,7 @@ private fun RenderNotification(
             showPronouns = settingsState.showPronounsInPosts,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
+            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
             targetTranslationLanguage = settingsState.targetTranslationLanguage,
         )
 
@@ -263,6 +266,7 @@ private fun RenderNotification(
             renderingReplyNotif = false,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
+            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
             targetTranslationLanguage = settingsState.targetTranslationLanguage,
         )
 

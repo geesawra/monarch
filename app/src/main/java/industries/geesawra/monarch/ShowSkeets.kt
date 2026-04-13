@@ -281,6 +281,7 @@ fun ShowSkeets(
                             },
                             isVisible = isVisible,
                             overrideAvatarSize = replyAvatarSize(),
+                            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                             targetTranslationLanguage = settingsState.targetTranslationLanguage,
                         )
                     }
@@ -325,6 +326,7 @@ fun ShowSkeets(
                                         }
                                     },
                                     isVisible = isVisible,
+                                    translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                                     targetTranslationLanguage = settingsState.targetTranslationLanguage,
                                 )
                             }
@@ -383,6 +385,7 @@ fun ShowSkeets(
                                         }
                                     },
                                     isVisible = isVisible,
+                                    translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                                     targetTranslationLanguage = settingsState.targetTranslationLanguage,
                                 )
                             }
@@ -401,6 +404,7 @@ fun ShowSkeets(
                             onAvatarTap = onProfileTap,
                             onShowThread = {},
                             isVisible = isVisible,
+                            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                             targetTranslationLanguage = settingsState.targetTranslationLanguage,
                         )
                     } else {
@@ -422,6 +426,7 @@ fun ShowSkeets(
                             },
                             isVisible = isVisible,
                             overrideAvatarSize = if (isShowingThread && !skeet.isFocused) replyAvatarSize() else null,
+                            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                             targetTranslationLanguage = settingsState.targetTranslationLanguage,
                         )
                     }

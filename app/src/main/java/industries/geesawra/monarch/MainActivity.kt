@@ -50,6 +50,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import androidx.compose.foundation.isSystemInDarkTheme
+import industries.geesawra.monarch.datalayer.AltTextGenerator
 import industries.geesawra.monarch.datalayer.BlueskyConn
 import industries.geesawra.monarch.datalayer.PushNotificationManager
 import industries.geesawra.monarch.datalayer.SettingsState
@@ -117,6 +118,7 @@ enum class ViewList() {
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     @Inject lateinit var pushNotificationManager: PushNotificationManager
+    @Inject lateinit var altTextGenerator: AltTextGenerator
     private val currentIntent = mutableStateOf<Intent?>(null)
 
     override fun onNewIntent(intent: Intent) {
@@ -417,6 +419,7 @@ class MainActivity : ComponentActivity() {
                                 settingsViewModel = settingsViewModel,
                                 timelineViewModel = timelineViewModel,
                                 pushNotificationManager = pushNotificationManager,
+                                altTextGenerator = altTextGenerator,
                                 backButton = {
                                     navController.popBackStack()
                                 },

@@ -25,6 +25,14 @@ fun MonarchTheme(
         else -> when (appTheme) {
             AppTheme.Monarch -> if (darkTheme) DarkColorScheme else LightColorScheme
             AppTheme.Bluesky -> if (darkTheme) BlueskyDarkColorScheme else BlueskyLightColorScheme
+            AppTheme.Witchsky -> if (darkTheme) WitchskyDarkColorScheme else WitchskyLightColorScheme
+            AppTheme.Blacksky -> if (darkTheme) BlackskyDarkColorScheme else BlackskyLightColorScheme
+            AppTheme.Deer -> if (darkTheme) DeerDarkColorScheme else DeerLightColorScheme
+            AppTheme.Zeppelin -> if (darkTheme) ZeppelinDarkColorScheme else ZeppelinLightColorScheme
+            AppTheme.Kitty -> if (darkTheme) KittyDarkColorScheme else KittyLightColorScheme
+            AppTheme.Reddwarf -> if (darkTheme) ReddwarfDarkColorScheme else ReddwarfLightColorScheme
+            AppTheme.Catppuccin -> if (darkTheme) CatppuccinDarkColorScheme else CatppuccinLightColorScheme
+            AppTheme.Evergarden -> if (darkTheme) EvergardenDarkColorScheme else EvergardenLightColorScheme
         }
     }
 

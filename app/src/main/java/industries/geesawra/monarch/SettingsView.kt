@@ -62,15 +62,17 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.ContextCompat
 import industries.geesawra.monarch.BuildConfig
+import industries.geesawra.monarch.datalayer.AltTextAvailability
+import industries.geesawra.monarch.datalayer.AltTextGenerator
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.PushNotificationManager
 import industries.geesawra.monarch.datalayer.ReplyFilterMode
 import industries.geesawra.monarch.datalayer.SettingsViewModel
-import industries.geesawra.monarch.datalayer.APPVIEW_PROXY_OPTIONS
 import industries.geesawra.monarch.datalayer.AppTheme
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TRANSLATION_LANGUAGE_OPTIONS
@@ -83,11 +85,19 @@ fun SettingsView(
     settingsViewModel: SettingsViewModel,
     timelineViewModel: TimelineViewModel? = null,
     pushNotificationManager: PushNotificationManager? = null,
+    altTextGenerator: AltTextGenerator? = null,
     backButton: () -> Unit,
     onLogout: () -> Unit = {},
     onMutedWordsTap: () -> Unit = {},
 ) {
     val settings = settingsViewModel.settingsState
+
+    var altTextAvailable by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(altTextGenerator) {
+        altTextAvailable = altTextGenerator?.let {
+            it.availability() != AltTextAvailability.Unavailable
+        }
+    }
 
     Scaffold(
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
@@ -274,44 +284,6 @@ fun SettingsView(
             )
 
             ListItem(
-                headlineContent = { Text("AI alt text") },
-                supportingContent = { Text("Show a Generate button in the alt text editor that drafts a description using on-device AI (requires a supported device)") },
-                trailingContent = {
-                    Switch(
-                        checked = settings.aiAltTextEnabled,
-                        onCheckedChange = { settingsViewModel.setAiAltTextEnabled(it) }
-                    )
-                },
-            )
-
-            ListItem(
-                headlineContent = { Text("Translation language") },
-                supportingContent = { Text("Target language for post translations") },
-                trailingContent = {
-                    var expanded by remember { mutableStateOf(false) }
-                    val currentLabel = TRANSLATION_LANGUAGE_OPTIONS
-                        .firstOrNull { it.second == settings.targetTranslationLanguage }
-                        ?.first ?: "English"
-                    Box {
-                        TextButton(onClick = { expanded = true }) {
-                            Text(currentLabel)
-                        }
-                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                            TRANSLATION_LANGUAGE_OPTIONS.forEach { (label, code) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        settingsViewModel.setTargetTranslationLanguage(code)
-                                        expanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                },
-            )
-
-            ListItem(
                 headlineContent = { Text("@psingletary.com mode") },
                 supportingContent = { Text("Auto-like posts as you scroll past them") },
                 trailingContent = {
@@ -387,33 +359,6 @@ fun SettingsView(
                         checked = settings.showPronounsInPosts,
                         onCheckedChange = { settingsViewModel.setShowPronounsInPosts(it) }
                     )
-                },
-            )
-
-            ListItem(
-                headlineContent = { Text("Default appview") },
-                supportingContent = { Text("Used when adding a new account") },
-                trailingContent = {
-                    var expanded by remember { mutableStateOf(false) }
-                    val currentLabel = APPVIEW_PROXY_OPTIONS
-                        .firstOrNull { it.second == settings.defaultAppviewProxy }
-                        ?.first ?: "Bluesky"
-                    Box {
-                        TextButton(onClick = { expanded = true }) {
-                            Text(currentLabel)
-                        }
-                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                            APPVIEW_PROXY_OPTIONS.forEach { (label, did) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        settingsViewModel.setDefaultAppviewProxy(did)
-                                        expanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
                 },
             )
 
@@ -541,53 +486,152 @@ fun SettingsView(
                 }
             }
 
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            ListItem(
+                headlineContent = {
+                    Text(
+                        text = "AI Features",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                supportingContent = {
+                    Text("All AI features run on-device using local models. Your data is never sent to external servers.")
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Enable AI features") },
+                supportingContent = { Text("Master toggle for all AI-powered features") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.aiEnabled,
+                        onCheckedChange = { settingsViewModel.setAiEnabled(it) }
+                    )
+                },
+            )
+
+            if (settings.aiEnabled) {
+                if (altTextAvailable == true) {
+                    ListItem(
+                        headlineContent = { Text("Alt text generation") },
+                        supportingContent = { Text("Generate image descriptions when composing posts") },
+                        trailingContent = {
+                            Switch(
+                                checked = settings.aiAltTextEnabled,
+                                onCheckedChange = { settingsViewModel.setAiAltTextEnabled(it) }
+                            )
+                        },
+                    )
+                }
+
+                ListItem(
+                    headlineContent = { Text("Post translation") },
+                    supportingContent = { Text("Translate posts to your preferred language") },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.translationEnabled,
+                            onCheckedChange = { settingsViewModel.setTranslationEnabled(it) }
+                        )
+                    },
+                )
+
+                if (settings.translationEnabled) {
+                    ListItem(
+                        headlineContent = { Text("Translation language") },
+                        trailingContent = {
+                            var expanded by remember { mutableStateOf(false) }
+                            val currentLabel = TRANSLATION_LANGUAGE_OPTIONS
+                                .firstOrNull { it.second == settings.targetTranslationLanguage }
+                                ?.first ?: "English"
+                            Box {
+                                TextButton(onClick = { expanded = true }) {
+                                    Text(currentLabel)
+                                }
+                                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                    TRANSLATION_LANGUAGE_OPTIONS.forEach { (label, code) ->
+                                        DropdownMenuItem(
+                                            text = { Text(label) },
+                                            onClick = {
+                                                settingsViewModel.setTargetTranslationLanguage(code)
+                                                expanded = false
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+
             if (timelineViewModel != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                Text(
-                    text = "Network",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = "Network",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    supportingContent = {
+                        Text("AppViews process and display network data. Different AppViews offer unique moderation, algorithms, and features while your posts remain portable.")
+                    },
+                )
+
+                data class AppviewOption(
+                    val name: String,
+                    val did: String,
+                    val description: String,
                 )
 
                 val knownAppviews = listOf(
-                    "Bluesky" to "did:web:api.bsky.app#bsky_appview",
-                    "Blacksky" to "did:web:api.blacksky.community#bsky_appview",
+                    AppviewOption(
+                        name = "Bluesky",
+                        did = "did:web:api.bsky.app#bsky_appview",
+                        description = "The default AppView operated by Bluesky PBC",
+                    ),
+                    AppviewOption(
+                        name = "Blacksky",
+                        did = "did:web:api.blacksky.community#bsky_appview",
+                        description = "Self-governed community spaces with collective moderation",
+                    ),
                 )
                 var currentProxy by remember { mutableStateOf(timelineViewModel.appviewProxy() ?: "") }
                 var showCustomDialog by remember { mutableStateOf(false) }
 
-                knownAppviews.forEach { (name, did) ->
+                knownAppviews.forEach { appview ->
                     ListItem(
-                        headlineContent = { Text(name) },
-                        supportingContent = { Text(did) },
+                        headlineContent = { Text(appview.name) },
+                        supportingContent = { Text(appview.description) },
                         leadingContent = {
                             androidx.compose.material3.RadioButton(
-                                selected = currentProxy == did,
+                                selected = currentProxy == appview.did,
                                 onClick = {
-                                    if (currentProxy != did) {
-                                        currentProxy = did
-                                        timelineViewModel.changeAppview(did)
+                                    if (currentProxy != appview.did) {
+                                        currentProxy = appview.did
+                                        timelineViewModel.changeAppview(appview.did)
                                     }
                                 }
                             )
                         },
                         modifier = Modifier.clickable {
-                            if (currentProxy != did) {
-                                currentProxy = did
-                                timelineViewModel.changeAppview(did)
+                            if (currentProxy != appview.did) {
+                                currentProxy = appview.did
+                                timelineViewModel.changeAppview(appview.did)
                             }
                         }
                     )
                 }
 
-                val isCustom = currentProxy.isNotEmpty() && knownAppviews.none { it.second == currentProxy }
+                val isCustom = currentProxy.isNotEmpty() && knownAppviews.none { it.did == currentProxy }
                 ListItem(
                     headlineContent = { Text("Custom") },
                     supportingContent = {
-                        if (isCustom) Text(currentProxy)
-                        else Text("Use a custom appview")
+                        Text(if (isCustom) currentProxy else "Connect to a different AppView")
                     },
                     leadingContent = {
                         androidx.compose.material3.RadioButton(

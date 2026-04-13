@@ -274,6 +274,7 @@ fun LikeRepostRowView(
                 postTextSize = settingsState.postTextSize,
                 avatarShape = avatarClipShape,
                 onShowThread = onShowThread,
+                translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                 targetTranslationLanguage = settingsState.targetTranslationLanguage,
             )
         }

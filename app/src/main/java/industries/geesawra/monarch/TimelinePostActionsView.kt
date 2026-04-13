@@ -141,6 +141,7 @@ fun TimelinePostActionsView(
     onRedraft: (SkeetData) -> Unit = { s -> timelineViewModel?.setRedraft(s.content) },
     skeet: SkeetData,
     inThread: Boolean = false,
+    translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
 ) {
     val interactionState = timelineViewModel?.postInteractionStore?.getState(skeet.cid) {
@@ -394,7 +395,7 @@ fun TimelinePostActionsView(
                         clipboard.setPrimaryClip(ClipData.newPlainText("Post", skeet.content))
                     },
                 )
-                if (skeet.content.isNotEmpty()) {
+                if (translationEnabled && skeet.content.isNotEmpty()) {
                     DropdownMenuItem(
                         text = { Text("Translate") },
                         onClick = {

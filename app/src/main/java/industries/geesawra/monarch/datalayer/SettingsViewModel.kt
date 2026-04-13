@@ -28,6 +28,14 @@ enum class ThemeMode {
 enum class AppTheme {
     Monarch,
     Bluesky,
+    Witchsky,
+    Blacksky,
+    Deer,
+    Zeppelin,
+    Kitty,
+    Reddwarf,
+    Catppuccin,
+    Evergarden,
 }
 
 enum class PostTextSize {
@@ -62,7 +70,9 @@ data class SettingsState(
     val swipeableFeeds: Boolean = true,
     val autoLikeOnReply: Boolean = false,
     val autoLikeOnScroll: Boolean = false,
+    val aiEnabled: Boolean = true,
     val aiAltTextEnabled: Boolean = true,
+    val translationEnabled: Boolean = true,
     val targetTranslationLanguage: String = "en",
     val openLinksInBrowser: Boolean = false,
     val pushNotificationsEnabled: Boolean = false,
@@ -101,7 +111,9 @@ class SettingsViewModel @Inject constructor(
         private val SWIPEABLE_FEEDS = stringPreferencesKey("swipeable_feeds")
         private val AUTO_LIKE_ON_REPLY = stringPreferencesKey("auto_like_on_reply")
         private val AUTO_LIKE_ON_SCROLL = stringPreferencesKey("auto_like_on_scroll")
+        private val AI_ENABLED = stringPreferencesKey("ai_enabled")
         private val AI_ALT_TEXT_ENABLED = stringPreferencesKey("ai_alt_text_enabled")
+        private val TRANSLATION_ENABLED = stringPreferencesKey("translation_enabled")
         private val TARGET_TRANSLATION_LANGUAGE = stringPreferencesKey("target_translation_language")
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
         private val OPEN_LINKS_IN_BROWSER = stringPreferencesKey("open_links_in_browser")
@@ -134,7 +146,9 @@ class SettingsViewModel @Inject constructor(
                     swipeableFeeds = prefs[SWIPEABLE_FEEDS]?.toBooleanStrictOrNull() ?: !narrowScreen,
                     autoLikeOnReply = prefs[AUTO_LIKE_ON_REPLY]?.toBooleanStrictOrNull() ?: false,
                     autoLikeOnScroll = prefs[AUTO_LIKE_ON_SCROLL]?.toBooleanStrictOrNull() ?: false,
+                    aiEnabled = prefs[AI_ENABLED]?.toBooleanStrictOrNull() ?: true,
                     aiAltTextEnabled = prefs[AI_ALT_TEXT_ENABLED]?.toBooleanStrictOrNull() ?: true,
+                    translationEnabled = prefs[TRANSLATION_ENABLED]?.toBooleanStrictOrNull() ?: true,
                     targetTranslationLanguage = prefs[TARGET_TRANSLATION_LANGUAGE] ?: "en",
                     openLinksInBrowser = prefs[OPEN_LINKS_IN_BROWSER]?.toBooleanStrictOrNull() ?: false,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
@@ -225,9 +239,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setAiEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[AI_ENABLED] = enabled.toString() }
+        }
+    }
+
     fun setAiAltTextEnabled(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[AI_ALT_TEXT_ENABLED] = enabled.toString() }
+        }
+    }
+
+    fun setTranslationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[TRANSLATION_ENABLED] = enabled.toString() }
         }
     }
 
