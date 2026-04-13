@@ -6,25 +6,34 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.automirrored.filled.ReplyAll
+import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.ModeComment
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.ModeComment
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -58,36 +67,63 @@ import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.Nsid
 import sh.christian.ozone.api.RKey
 
+private fun formatCount(count: Long): String {
+    return when {
+        count < 1_000 -> count.toString()
+        count < 10_000 -> String.format("%.1fk", count / 1_000.0).replace(".0k", "k")
+        count < 1_000_000 -> "${count / 1_000}k"
+        count < 10_000_000 -> String.format("%.1fm", count / 1_000_000.0).replace(".0m", "m")
+        else -> "${count / 1_000_000}m"
+    }
+}
 
 @Composable
-private fun IconWithNumber(
-    imageVector: ImageVector,
+private fun ActionIcon(
+    icon: ImageVector,
     contentDescription: String,
-    number: Long,
+    count: Long,
     tint: Color,
     scale: Float = 1f,
+    isActive: Boolean = false,
+    activeContainerColor: Color = Color.Transparent,
 ) {
-    val iconSize = actionIconSize()
-    Row(
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+    val containerColor by animateColorAsState(
+        targetValue = if (isActive) activeContainerColor else Color.Transparent,
+        label = "containerColor"
+    )
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (isActive) 8.dp else 0.dp,
+        label = "pillPadding"
+    )
+
+    Box(
+        modifier = Modifier
+            .background(containerColor, RoundedCornerShape(50))
+            .padding(horizontal = horizontalPadding, vertical = 4.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector,
-            contentDescription = contentDescription,
-            modifier = Modifier
-                .size(iconSize)
-                .scale(scale),
-            tint = tint
-        )
-        Text(
-            modifier = Modifier.padding(start = 4.dp),
-            text = number.toString(),
-            color = tint,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = contentDescription,
+                modifier = Modifier
+                    .size(actionIconSize())
+                    .scale(scale),
+                tint = tint
+            )
+            if (count > 0) {
+                Text(
+                    modifier = Modifier.padding(start = 2.dp),
+                    text = formatCount(count),
+                    color = tint,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
     }
 }
 
@@ -176,73 +212,33 @@ fun TimelinePostActionsView(
     }
 
     Row(
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier,
+        modifier = modifier.defaultMinSize(minHeight = 48.dp),
     ) {
         val ctx = LocalContext.current
-
-        if (inThread) {
-            Spacer(Modifier.weight(1f))
-        }
-
-        IconButton(
-            onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                val sendIntent: Intent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, skeet.shareURL())
-                }
-                ctx.startActivity(
-                    Intent.createChooser(sendIntent, "Share Bluesky post")
-                )
-            }
-        ) {
-            Icon(
-                modifier = Modifier.size(actionIconSize()),
-                imageVector = Icons.Default.Share,
-                contentDescription = "Share",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        if (isOwnPost) {
-            LongPressIconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    showDeleteDialog = true
-                },
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showRedraftDialog = true
-                },
-            ) {
-                Icon(
-                    modifier = Modifier.size(actionIconSize()),
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete (long press to redraft)",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         val replyDisabled = skeet.replyDisabled && !isOwnPost
 
-        IconButton(
-            enabled = !replyDisabled,
-            onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onReplyTap(skeet, false)
-            }
+        Box(
+            modifier = Modifier
+                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = !replyDisabled,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onReplyTap(skeet, false)
+                    }
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            IconWithNumber(
-                imageVector = if (replies > 0) Icons.AutoMirrored.Filled.ReplyAll
-                else Icons.AutoMirrored.Filled.Reply,
+            ActionIcon(
+                icon = Icons.Outlined.ModeComment,
                 contentDescription = "Reply",
-                number = replies,
+                count = replies,
                 tint = if (replyDisabled) MaterialTheme.colorScheme.outlineVariant
-                else MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -266,22 +262,31 @@ fun TimelinePostActionsView(
             label = "likeColor"
         )
 
-        IconButton(
-            onClick = {
-                likeBounce = true
-                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                when (isLiked) {
-                    false -> timelineViewModel?.like(skeet.uri, skeet.cid)
-                    true -> timelineViewModel?.deleteLike(skeet.cid)
-                }
-            }
+        Box(
+            modifier = Modifier
+                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {
+                        likeBounce = true
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        when (isLiked) {
+                            false -> timelineViewModel?.like(skeet.uri, skeet.cid)
+                            true -> timelineViewModel?.deleteLike(skeet.cid)
+                        }
+                    }
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            IconWithNumber(
-                if (isLiked) HeartFilled else Heart,
+            ActionIcon(
+                icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = "Like",
-                number = likes,
+                count = likes,
                 tint = likeColor,
                 scale = likeScale,
+                isActive = isLiked,
+                activeContainerColor = MaterialTheme.colorScheme.errorContainer,
             )
         }
 
@@ -305,33 +310,83 @@ fun TimelinePostActionsView(
             label = "repostColor"
         )
 
-        LongPressIconButton(
-            onClick = {
-                repostBounce = true
-                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                when (isReposted) {
-                    false -> timelineViewModel?.repost(skeet.uri, skeet.cid)
-                    true -> timelineViewModel?.deleteRepost(skeet.cid)
-                }
-            },
-            onLongClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onReplyTap(skeet, true)
-            }
+        @OptIn(ExperimentalFoundationApi::class)
+        Box(
+            modifier = Modifier
+                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {
+                        repostBounce = true
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        when (isReposted) {
+                            false -> timelineViewModel?.repost(skeet.uri, skeet.cid)
+                            true -> timelineViewModel?.deleteRepost(skeet.cid)
+                        }
+                    },
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onReplyTap(skeet, true)
+                    }
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            IconWithNumber(
-                if (isReposted) Icons.Default.RepeatOn else Icons.Default.Repeat,
+            ActionIcon(
+                icon = Icons.Default.Autorenew,
                 contentDescription = "Repost",
-                number = reposts,
+                count = reposts,
                 tint = repostColor,
                 scale = repostScale,
+                isActive = isReposted,
+                activeContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            )
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        if (isOwnPost) {
+            LongPressIconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showDeleteDialog = true
+                },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showRedraftDialog = true
+                },
+            ) {
+                Icon(
+                    modifier = Modifier.size(actionIconSize()),
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete (long press to redraft)",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        IconButton(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                val sendIntent: Intent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, skeet.shareURL())
+                }
+                ctx.startActivity(
+                    Intent.createChooser(sendIntent, "Share Bluesky post")
+                )
+            }
+        ) {
+            Icon(
+                modifier = Modifier.size(actionIconSize()),
+                imageVector = Icons.Outlined.Share,
+                contentDescription = "Share",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
         var showMenu by remember { mutableStateOf(false) }
-        var showLikesSheet by remember { mutableStateOf(false) }
-        var showRepostsSheet by remember { mutableStateOf(false) }
-        var showQuotesSheet by remember { mutableStateOf(false) }
 
         Box {
             IconButton(onClick = { showMenu = true }) {
@@ -351,55 +406,7 @@ fun TimelinePostActionsView(
                         clipboard.setPrimaryClip(ClipData.newPlainText("Post", skeet.content))
                     },
                 )
-                DropdownMenuItem(
-                    text = { Text("Liked by") },
-                    onClick = { showMenu = false; showLikesSheet = true },
-                )
-                DropdownMenuItem(
-                    text = { Text("Reposted by") },
-                    onClick = { showMenu = false; showRepostsSheet = true },
-                )
-                DropdownMenuItem(
-                    text = { Text("Quotes") },
-                    onClick = { showMenu = false; showQuotesSheet = true },
-                )
             }
-        }
-
-        if (showLikesSheet) {
-            UserListSheet(
-                title = "Liked by",
-                onDismiss = { showLikesSheet = false },
-                fetchUsers = { cursor ->
-                    timelineViewModel?.getLikes(skeet.uri, cursor)?.getOrNull()?.let {
-                        it.likes.map { like -> like.actor } to it.cursor
-                    }
-                },
-            )
-        }
-
-        if (showRepostsSheet) {
-            UserListSheet(
-                title = "Reposted by",
-                onDismiss = { showRepostsSheet = false },
-                fetchUsers = { cursor ->
-                    timelineViewModel?.getRepostedBy(skeet.uri, cursor)?.getOrNull()?.let {
-                        it.repostedBy to it.cursor
-                    }
-                },
-            )
-        }
-
-        if (showQuotesSheet) {
-            QuotesSheet(
-                onDismiss = { showQuotesSheet = false },
-                fetchQuotes = { cursor ->
-                    timelineViewModel?.getQuotes(skeet.uri, cursor)?.getOrNull()?.let {
-                        it.posts.map { pv -> SkeetData.fromPostView(pv, pv.author) } to it.cursor
-                    }
-                },
-                timelineViewModel = timelineViewModel,
-            )
         }
     }
 }

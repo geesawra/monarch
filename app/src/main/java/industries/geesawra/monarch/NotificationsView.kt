@@ -5,12 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -94,17 +91,17 @@ fun NotificationsView(
                 ),
                 modifier = Modifier
             ) {
-                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+                Box {
                     Box(
                         modifier = Modifier
+                            .matchParentSize()
                             .width(4.dp)
-                            .fillMaxHeight()
                             .background(
                                 if (isUnread) MaterialTheme.colorScheme.primaryContainer
                                 else MaterialTheme.colorScheme.surfaceContainerLow
                             )
                     )
-                    Box(modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.padding(start = 4.dp)) {
                         RenderNotification(
                             viewModel = viewModel,
                             notification = notif,

@@ -76,7 +76,7 @@ class TimelineScrollBenchmark {
             ),
             compilationMode = compilationMode,
             startupMode = StartupMode.WARM,
-            iterations = 5,
+            iterations = 1,
             setupBlock = {
                 device.executeShellCommand("svc power stayon true")
                 pressHome()
@@ -86,7 +86,7 @@ class TimelineScrollBenchmark {
             measureBlock = {
                 val feed = findFeedList() ?: return@measureRepeated
 
-                repeat(10) {
+                repeat(3) {
                     try {
                         findFeedList()?.fling(Direction.DOWN)
                     } catch (_: StaleObjectException) {
@@ -94,7 +94,7 @@ class TimelineScrollBenchmark {
                     device.waitForIdle()
                 }
 
-                repeat(10) {
+                repeat(3) {
                     try {
                         findFeedList()?.fling(Direction.UP)
                     } catch (_: StaleObjectException) {

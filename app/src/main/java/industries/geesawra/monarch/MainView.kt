@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -22,6 +23,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -1131,8 +1133,14 @@ private fun InnerTimelineView(
                                             }
                                         }
                                     } else {
+                                    val collapsedFraction = scrollBehavior.state.collapsedFraction
+                                    val tabRowHeight = (48 * (1f - collapsedFraction)).dp
                                     Column(modifier = Modifier.fillMaxSize()) {
                                         SecondaryScrollableTabRow(
+                                            modifier = Modifier
+                                                .height(tabRowHeight)
+                                                .clipToBounds()
+                                                .graphicsLayer { alpha = 1f - collapsedFraction },
                                             selectedTabIndex = pagerState.currentPage.coerceIn(0, (feedItems.size - 1).coerceAtLeast(0)),
                                             edgePadding = 8.dp,
                                             divider = {},
@@ -1166,7 +1174,7 @@ private fun InnerTimelineView(
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Spacer(modifier = Modifier.height((2 * (1f - collapsedFraction)).dp))
 
                                         HorizontalPager(
                                             state = pagerState,
