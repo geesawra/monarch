@@ -981,25 +981,35 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun like(uri: AtUri, cid: Cid) {
+        if (postInteractionStore.peek(cid)?.didLike == true) return
+        postInteractionStore.update(cid) {
+            it.copy(didLike = true, likes = it.likes + 1)
+        }
         viewModelScope.launch {
             bskyConn.like(uri, cid).onFailure {
+                postInteractionStore.update(cid) {
+                    it.copy(didLike = false, likes = (it.likes - 1).coerceAtLeast(0), likeRkey = null)
+                }
                 handleError(it)
             }.onSuccess { rkey ->
-                postInteractionStore.update(cid) {
-                    it.copy(didLike = true, likes = it.likes + 1, likeRkey = rkey)
-                }
+                postInteractionStore.update(cid) { it.copy(likeRkey = rkey) }
             }
         }
     }
 
     fun repost(uri: AtUri, cid: Cid) {
+        if (postInteractionStore.peek(cid)?.didRepost == true) return
+        postInteractionStore.update(cid) {
+            it.copy(didRepost = true, reposts = it.reposts + 1)
+        }
         viewModelScope.launch {
             bskyConn.repost(uri, cid).onFailure {
+                postInteractionStore.update(cid) {
+                    it.copy(didRepost = false, reposts = (it.reposts - 1).coerceAtLeast(0), repostRkey = null)
+                }
                 handleError(it)
             }.onSuccess { rkey ->
-                postInteractionStore.update(cid) {
-                    it.copy(didRepost = true, reposts = it.reposts + 1, repostRkey = rkey)
-                }
+                postInteractionStore.update(cid) { it.copy(repostRkey = rkey) }
             }
         }
     }
@@ -1107,27 +1117,33 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun deleteLike(cid: Cid) {
-        val rkey = postInteractionStore.getState(cid, PostInteraction(0, 0, 0, false, false)).value.likeRkey ?: return
+        val snapshot = postInteractionStore.peek(cid) ?: return
+        val rkey = snapshot.likeRkey ?: return
+        postInteractionStore.update(cid) {
+            it.copy(didLike = false, likes = (it.likes - 1).coerceAtLeast(0), likeRkey = null)
+        }
         viewModelScope.launch {
             bskyConn.deleteLike(rkey).onFailure {
-                handleError(it)
-            }.onSuccess {
                 postInteractionStore.update(cid) {
-                    it.copy(didLike = false, likes = it.likes - 1, likeRkey = null)
+                    it.copy(didLike = true, likes = it.likes + 1, likeRkey = rkey)
                 }
+                handleError(it)
             }
         }
     }
 
     fun deleteRepost(cid: Cid) {
-        val rkey = postInteractionStore.getState(cid, PostInteraction(0, 0, 0, false, false)).value.repostRkey ?: return
+        val snapshot = postInteractionStore.peek(cid) ?: return
+        val rkey = snapshot.repostRkey ?: return
+        postInteractionStore.update(cid) {
+            it.copy(didRepost = false, reposts = (it.reposts - 1).coerceAtLeast(0), repostRkey = null)
+        }
         viewModelScope.launch {
             bskyConn.deleteRepost(rkey).onFailure {
-                handleError(it)
-            }.onSuccess {
                 postInteractionStore.update(cid) {
-                    it.copy(didRepost = false, reposts = it.reposts - 1, repostRkey = null)
+                    it.copy(didRepost = true, reposts = it.reposts + 1, repostRkey = rkey)
                 }
+                handleError(it)
             }
         }
     }

@@ -33,27 +33,24 @@ data class PostInteraction(
 class PostInteractionStore @Inject constructor() {
     private val states = mutableMapOf<Cid, MutableState<PostInteraction>>()
 
-    fun getState(cid: Cid, initial: PostInteraction): MutableState<PostInteraction> {
-        val existing = states[cid]
-        if (existing != null) {
-            existing.value = existing.value.copy(
-                likes = initial.likes,
-                reposts = initial.reposts,
-                replies = initial.replies,
-                likeRkey = initial.likeRkey,
-                repostRkey = initial.repostRkey,
-            )
-            return existing
-        }
-        return states.getOrPut(cid) { mutableStateOf(initial) }
+    fun getState(cid: Cid, initial: () -> PostInteraction): MutableState<PostInteraction> {
+        return states.getOrPut(cid) { mutableStateOf(initial()) }
     }
+
+    fun peek(cid: Cid): PostInteraction? = states[cid]?.value
 
     fun update(cid: Cid, transform: (PostInteraction) -> PostInteraction) {
         states[cid]?.let { it.value = transform(it.value) }
     }
 
     fun seed(skeet: SkeetData) {
-        getState(skeet.cid, PostInteraction.from(skeet))
+        val fresh = PostInteraction.from(skeet)
+        val existing = states[skeet.cid]
+        if (existing == null) {
+            states[skeet.cid] = mutableStateOf(fresh)
+        } else if (existing.value != fresh) {
+            existing.value = fresh
+        }
     }
 
     fun clear() {

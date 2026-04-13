@@ -33,13 +33,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,7 +63,7 @@ import sh.christian.ozone.api.RKey
 private fun IconWithNumber(
     imageVector: ImageVector,
     contentDescription: String,
-    number: MutableLongState,
+    number: Long,
     tint: Color,
     scale: Float = 1f,
 ) {
@@ -85,7 +82,7 @@ private fun IconWithNumber(
         )
         Text(
             modifier = Modifier.padding(start = 4.dp),
-            text = number.longValue.toString(),
+            text = number.toString(),
             color = tint,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
@@ -115,18 +112,15 @@ fun TimelinePostActionsView(
     skeet: SkeetData,
     inThread: Boolean = false,
 ) {
-    val interactionState = timelineViewModel?.postInteractionStore?.getState(
-        skeet.cid, PostInteraction.from(skeet)
-    )
-    val interaction = interactionState?.value
-    val likes = remember { mutableLongStateOf(interaction?.likes ?: skeet.likes ?: 0) }
-    val reposts = remember { mutableLongStateOf(interaction?.reposts ?: skeet.reposts ?: 0) }
-    val replies = remember { mutableLongStateOf(interaction?.replies ?: skeet.replies ?: 0) }
-    if (interaction != null) {
-        likes.longValue = interaction.likes
-        reposts.longValue = interaction.reposts
-        replies.longValue = interaction.replies
+    val interactionState = timelineViewModel?.postInteractionStore?.getState(skeet.cid) {
+        PostInteraction.from(skeet)
     }
+    val interaction = interactionState?.value
+    val likes = interaction?.likes ?: skeet.likes ?: 0
+    val reposts = interaction?.reposts ?: skeet.reposts ?: 0
+    val replies = interaction?.replies ?: skeet.replies ?: 0
+    val isLiked = interaction?.didLike ?: skeet.didLike
+    val isReposted = interaction?.didRepost ?: skeet.didRepost
     val haptic = LocalHapticFeedback.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRedraftDialog by remember { mutableStateOf(false) }
@@ -243,28 +237,15 @@ fun TimelinePostActionsView(
             }
         ) {
             IconWithNumber(
-                imageVector = {
-                    if (replies.longValue == 0.toLong()) {
-                        Icons.AutoMirrored.Filled.Reply
-                    }
-
-                    val r = replies
-                    if (r.longValue > 0) {
-                        Icons.AutoMirrored.Filled.ReplyAll
-                    } else {
-                        Icons.AutoMirrored.Filled.Reply
-                    }
-
-                }(),
+                imageVector = if (replies > 0) Icons.AutoMirrored.Filled.ReplyAll
+                else Icons.AutoMirrored.Filled.Reply,
                 contentDescription = "Reply",
                 number = replies,
-                if (replyDisabled) MaterialTheme.colorScheme.outlineVariant
+                tint = if (replyDisabled) MaterialTheme.colorScheme.outlineVariant
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
-        var isLiked by rememberSaveable { mutableStateOf(interaction?.didLike ?: skeet.didLike) }
-        if (interaction != null) { isLiked = interaction.didLike }
         var likeBounce by remember { mutableStateOf(false) }
         val likeScale by animateFloatAsState(
             targetValue = if (likeBounce) 1.3f else 1f,
@@ -304,8 +285,6 @@ fun TimelinePostActionsView(
             )
         }
 
-        var isReposted by rememberSaveable { mutableStateOf(interaction?.didRepost ?: skeet.didRepost) }
-        if (interaction != null) { isReposted = interaction.didRepost }
         var repostBounce by remember { mutableStateOf(false) }
         val repostScale by animateFloatAsState(
             targetValue = if (repostBounce) 1.3f else 1f,
