@@ -34,6 +34,10 @@ All your posts, likes, follows, and other Bluesky activity go directly to Bluesk
 
 Monarch is open source. You can review the code at [github.com/geesawra/monarch](https://github.com/geesawra/monarch).
 
+## Child safety
+
+Monarch's standards against child sexual abuse and exploitation (CSAE), including how to report violations, are published in [Child Safety Standards](child-safety-standards.md).
+
 ## Contact
 
 Questions or concerns? Open an issue on GitHub or reach out on Bluesky.
