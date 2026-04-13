@@ -73,6 +73,7 @@ import industries.geesawra.monarch.datalayer.SettingsViewModel
 import industries.geesawra.monarch.datalayer.APPVIEW_PROXY_OPTIONS
 import industries.geesawra.monarch.datalayer.AppTheme
 import industries.geesawra.monarch.datalayer.ThemeMode
+import industries.geesawra.monarch.datalayer.TRANSLATION_LANGUAGE_OPTIONS
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.launch
 
@@ -280,6 +281,33 @@ fun SettingsView(
                         checked = settings.aiAltTextEnabled,
                         onCheckedChange = { settingsViewModel.setAiAltTextEnabled(it) }
                     )
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Translation language") },
+                supportingContent = { Text("Target language for post translations") },
+                trailingContent = {
+                    var expanded by remember { mutableStateOf(false) }
+                    val currentLabel = TRANSLATION_LANGUAGE_OPTIONS
+                        .firstOrNull { it.second == settings.targetTranslationLanguage }
+                        ?.first ?: "English"
+                    Box {
+                        TextButton(onClick = { expanded = true }) {
+                            Text(currentLabel)
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            TRANSLATION_LANGUAGE_OPTIONS.forEach { (label, code) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        settingsViewModel.setTargetTranslationLanguage(code)
+                                        expanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
                 },
             )
 

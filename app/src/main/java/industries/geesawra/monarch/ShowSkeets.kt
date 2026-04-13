@@ -281,6 +281,7 @@ fun ShowSkeets(
                             },
                             isVisible = isVisible,
                             overrideAvatarSize = replyAvatarSize(),
+                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
                         )
                     }
                 }
@@ -324,6 +325,7 @@ fun ShowSkeets(
                                         }
                                     },
                                     isVisible = isVisible,
+                                    targetTranslationLanguage = settingsState.targetTranslationLanguage,
                                 )
                             }
 
@@ -381,6 +383,7 @@ fun ShowSkeets(
                                         }
                                     },
                                     isVisible = isVisible,
+                                    targetTranslationLanguage = settingsState.targetTranslationLanguage,
                                 )
                             }
                         }
@@ -398,6 +401,7 @@ fun ShowSkeets(
                             onAvatarTap = onProfileTap,
                             onShowThread = {},
                             isVisible = isVisible,
+                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
                         )
                     } else {
                         SkeetView(
@@ -418,6 +422,7 @@ fun ShowSkeets(
                             },
                             isVisible = isVisible,
                             overrideAvatarSize = if (isShowingThread && !skeet.isFocused) replyAvatarSize() else null,
+                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
                         )
                     }
                 }

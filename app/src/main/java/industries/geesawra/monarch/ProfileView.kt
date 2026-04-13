@@ -584,7 +584,8 @@ internal fun ProfileContent(
                         onShowThread = { s ->
                             timelineViewModel.startThread(s)
                             onThreadTap(s)
-                        }
+                        },
+                        targetTranslationLanguage = settingsState.targetTranslationLanguage,
                     )
                 }
             }

@@ -594,6 +594,7 @@ fun ComposeView(
                             showInReplyTo = false,
                             avatarShape = settingsState.avatarClipShape,
                             postTextSize = settingsState.postTextSize,
+                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
                         )
                     }
                 }

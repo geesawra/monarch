@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -91,17 +94,17 @@ fun NotificationsView(
                 ),
                 modifier = Modifier
             ) {
-                Box {
+                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
                     Box(
                         modifier = Modifier
-                            .matchParentSize()
+                            .fillMaxHeight()
                             .width(4.dp)
                             .background(
                                 if (isUnread) MaterialTheme.colorScheme.primaryContainer
                                 else MaterialTheme.colorScheme.surfaceContainerLow
                             )
                     )
-                    Box(modifier = Modifier.padding(start = 4.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
                         RenderNotification(
                             viewModel = viewModel,
                             notification = notif,
@@ -196,6 +199,7 @@ private fun RenderNotification(
                         onShowThread = {
                             onProfileTap?.invoke(notification.follow.did)
                         },
+                        targetTranslationLanguage = settingsState.targetTranslationLanguage,
                     )
                 }
             }
@@ -223,6 +227,7 @@ private fun RenderNotification(
             renderingMention = true,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
+            targetTranslationLanguage = settingsState.targetTranslationLanguage,
         )
 
         is Notification.Quote -> SkeetView(
@@ -240,6 +245,7 @@ private fun RenderNotification(
             showPronouns = settingsState.showPronounsInPosts,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
+            targetTranslationLanguage = settingsState.targetTranslationLanguage,
         )
 
         is Notification.Reply -> SkeetView(
@@ -257,6 +263,7 @@ private fun RenderNotification(
             renderingReplyNotif = false,
             onShowThread = onShowThread,
             onAvatarTap = onProfileTap,
+            targetTranslationLanguage = settingsState.targetTranslationLanguage,
         )
 
         is Notification.Repost -> LikeRepostRowView(

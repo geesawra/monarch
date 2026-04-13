@@ -180,7 +180,9 @@ class TimelineViewModel @AssistedInject constructor(
     private val accountManager: AccountManager,
     private val pushNotificationManager: PushNotificationManager,
     val postInteractionStore: PostInteractionStore,
+    val postTranslationStore: PostTranslationStore,
     val altTextGenerator: AltTextGenerator,
+    private val translationService: TranslationService,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -1032,6 +1034,58 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun isOwnPost(skeet: SkeetData): Boolean {
         return skeet.did == bskyConn.session?.did
+    }
+
+    fun translatePost(skeet: SkeetData, targetLanguage: String, sourceOverride: String? = null) {
+        if (skeet.content.isEmpty()) return
+        viewModelScope.launch {
+            postTranslationStore.setPhase(skeet.cid, skeet.content, TranslationPhase.DetectingLanguage)
+            val progressListener = object : TranslationProgressListener {
+                override fun onDetectingLanguage() {
+                    postTranslationStore.setPhase(skeet.cid, skeet.content, TranslationPhase.DetectingLanguage)
+                }
+                override fun onDownloadingModel() {
+                    postTranslationStore.setPhase(skeet.cid, skeet.content, TranslationPhase.DownloadingModel)
+                }
+                override fun onTranslating() {
+                    postTranslationStore.setPhase(skeet.cid, skeet.content, TranslationPhase.Translating)
+                }
+            }
+            translationService.translate(skeet.content, targetLanguage, sourceOverride, progressListener)
+                .onSuccess { result ->
+                    postTranslationStore.setTranslated(skeet.cid, result)
+                }
+                .onFailure { error ->
+                    postTranslationStore.setError(skeet.cid, error.message ?: "Translation failed")
+                }
+        }
+    }
+
+    fun toggleTranslationOriginal(cid: sh.christian.ozone.api.Cid) {
+        postTranslationStore.toggleShowOriginal(cid)
+    }
+
+    fun retranslatePost(skeet: SkeetData, targetLanguage: String, sourceLanguage: String) {
+        if (skeet.content.isEmpty()) return
+        viewModelScope.launch {
+            postTranslationStore.retranslate(skeet.cid)
+            val progressListener = object : TranslationProgressListener {
+                override fun onDetectingLanguage() {}
+                override fun onDownloadingModel() {
+                    postTranslationStore.setPhase(skeet.cid, skeet.content, TranslationPhase.DownloadingModel)
+                }
+                override fun onTranslating() {
+                    postTranslationStore.setPhase(skeet.cid, skeet.content, TranslationPhase.Translating)
+                }
+            }
+            translationService.translate(skeet.content, targetLanguage, sourceLanguage, progressListener)
+                .onSuccess { result ->
+                    postTranslationStore.setTranslated(skeet.cid, result)
+                }
+                .onFailure { error ->
+                    postTranslationStore.setError(skeet.cid, error.message ?: "Translation failed")
+                }
+        }
     }
 
     fun fetchDrafts(fresh: Boolean = true) {

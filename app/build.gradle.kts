@@ -164,6 +164,8 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     // implementation(libs.androidx.compose.runtime.tracing) // composition tracing - enable for profiling
     implementation(libs.mlkit.genai.image.description)
+    implementation(libs.mlkit.translate)
+    implementation(libs.mlkit.language.id)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

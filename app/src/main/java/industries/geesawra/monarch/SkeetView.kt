@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
@@ -102,6 +103,10 @@ import industries.geesawra.monarch.datalayer.toFloat
 import sh.christian.ozone.api.Did
 import nl.jacobras.humanreadable.HumanReadable
 import industries.geesawra.monarch.datalayer.PostInteraction
+import industries.geesawra.monarch.datalayer.TranslationPhase
+import industries.geesawra.monarch.datalayer.languageCodeToName
+import industries.geesawra.monarch.datalayer.TRANSLATION_LANGUAGE_OPTIONS
+import androidx.compose.material3.CircularProgressIndicator
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.Instant as JavaInstant
@@ -128,6 +133,7 @@ fun SkeetView(
     onAvatarTap: ((Did) -> Unit)? = null,
     isVisible: Boolean = true,
     overrideAvatarSize: Dp? = null,
+    targetTranslationLanguage: String = "en",
 ) {
     if (skeet.blocked) {
         SkeetBlockedPost(nested)
@@ -183,6 +189,7 @@ fun SkeetView(
                 avatarShape = avatarShape,
                 isVisible = isVisible,
                 showLabels = showLabels,
+                targetTranslationLanguage = targetTranslationLanguage,
             )
         }
     } else {
@@ -243,6 +250,7 @@ fun SkeetView(
                     avatarShape = avatarShape,
                     isVisible = isVisible,
                     showLabels = showLabels,
+                    targetTranslationLanguage = targetTranslationLanguage,
                 )
             }
         }
@@ -263,6 +271,7 @@ fun FocusedSkeetView(
     onShowThread: (SkeetData) -> Unit = {},
     onAvatarTap: ((Did) -> Unit)? = null,
     isVisible: Boolean = true,
+    targetTranslationLanguage: String = "en",
 ) {
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
     var contentRevealed by remember { mutableStateOf(warningLabel == null) }
@@ -295,6 +304,7 @@ fun FocusedSkeetView(
             avatarShape = avatarShape,
             isVisible = isVisible,
             showLabels = showLabels,
+            targetTranslationLanguage = targetTranslationLanguage,
         )
 
         TimelinePostActionsView(
@@ -305,6 +315,7 @@ fun FocusedSkeetView(
             timelineViewModel = viewModel,
             skeet = skeet,
             inThread = true,
+            targetTranslationLanguage = targetTranslationLanguage,
         )
     }
 }
@@ -427,6 +438,7 @@ private fun SkeetContentSection(
     avatarShape: Shape,
     isVisible: Boolean,
     showLabels: Boolean,
+    targetTranslationLanguage: String = "en",
 ) {
     if (warningLabel != null) {
         ContentWarningCard(
@@ -437,7 +449,7 @@ private fun SkeetContentSection(
         )
     }
     if (contentRevealed) {
-        SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onMentionClick, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels)
+        SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onMentionClick, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels, targetTranslationLanguage = targetTranslationLanguage)
 
         if (showActions) {
             TimelinePostActionsView(
@@ -447,7 +459,8 @@ private fun SkeetContentSection(
                     .padding(top = 4.dp),
                 timelineViewModel = viewModel,
                 skeet = skeet,
-                inThread = inThread
+                inThread = inThread,
+                targetTranslationLanguage = targetTranslationLanguage,
             )
         }
     }
@@ -465,8 +478,10 @@ private fun SkeetContent(
     avatarShape: Shape = CircleShape,
     isVisible: Boolean = true,
     showLabels: Boolean = true,
+    targetTranslationLanguage: String = "en",
 ) {
     val context = LocalContext.current
+    val translation = viewModel?.postTranslationStore?.states?.get(skeet.cid)
 
     if (skeet.content.isNotEmpty()) {
         val textStyle = when (postTextSize) {
@@ -476,15 +491,89 @@ private fun SkeetContent(
         }
         val uriHandler = if (LocalBaselineProfileMode.current) NoOpUriHandler else LocalUriHandler.current
         val primaryColor = MaterialTheme.colorScheme.primary
-        val annotated = remember(skeet.cid, primaryColor, onMentionClick) {
-            skeet.buildAnnotated(primaryColor, onMentionClick)
-        }
-        CompositionLocalProvider(LocalUriHandler provides uriHandler) {
-        Text(
-            text = annotated,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = textStyle,
-        )
+
+        val translatedText = translation?.translatedText
+        val showTranslated = translatedText != null && !translation.showOriginal && !translation.isTranslating
+
+        Column {
+            if (showTranslated && translatedText != null) {
+                Text(
+                    text = translatedText,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = textStyle,
+                )
+            } else {
+                val annotated = remember(skeet.cid, primaryColor, onMentionClick) {
+                    skeet.buildAnnotated(primaryColor, onMentionClick)
+                }
+                CompositionLocalProvider(LocalUriHandler provides uriHandler) {
+                    Text(
+                        text = annotated,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = textStyle,
+                    )
+                }
+            }
+
+            when {
+                translation?.isTranslating == true -> {
+                    Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text(
+                            text = when (translation.phase) {
+                                TranslationPhase.DetectingLanguage -> "Detecting language..."
+                                TranslationPhase.DownloadingModel -> "Downloading model..."
+                                TranslationPhase.Translating -> "Translating..."
+                                TranslationPhase.Idle -> "Translating..."
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                translation?.error != null -> {
+                    Text(
+                        text = translation.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                showTranslated && translation != null && viewModel != null -> {
+                    TranslationMetadata(
+                        detectedLanguage = translation.detectedLanguage,
+                        onShowOriginal = { viewModel.toggleTranslationOriginal(skeet.cid) },
+                        onWrongLanguage = { newSourceLang ->
+                            viewModel.retranslatePost(skeet, targetTranslationLanguage, newSourceLang)
+                        },
+                    )
+                }
+                translatedText != null && translation != null && translation.showOriginal && viewModel != null -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(
+                            onClick = { viewModel.toggleTranslationOriginal(skeet.cid) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = "Show translation",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -493,6 +582,86 @@ private fun SkeetContent(
     }
 
     Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TranslationMetadata(
+    detectedLanguage: String?,
+    onShowOriginal: () -> Unit,
+    onWrongLanguage: (String) -> Unit,
+) {
+    var showLanguagePicker by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        if (detectedLanguage != null) {
+            Text(
+                text = "Translated from ${languageCodeToName(detectedLanguage)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            TextButton(
+                onClick = onShowOriginal,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    text = "Show original",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+            TextButton(
+                onClick = { showLanguagePicker = true },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    text = "Wrong language?",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+
+    if (showLanguagePicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showLanguagePicker = false },
+            sheetState = rememberModalBottomSheetState(),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+            ) {
+                Text(
+                    text = "Select source language",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+                TRANSLATION_LANGUAGE_OPTIONS.forEach { (label, code) ->
+                    TextButton(
+                        onClick = {
+                            showLanguagePicker = false
+                            onWrongLanguage(code)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = label,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
 }
 
 @Composable

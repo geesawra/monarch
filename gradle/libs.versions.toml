@@ -39,6 +39,8 @@ kotlinxDatetime = "0.7.1-0.6.x-compat"
 humanReadable = "1.12.3"
 kotlinxCollectionsImmutable = "0.3.8"
 mlkitGenaiImageDescription = "1.0.0-beta1"
+mlkitTranslate = "17.0.3"
+mlkitLanguageId = "17.0.6"
 exifinterface = "1.3.6"
 
 [libraries]
@@ -109,6 +111,8 @@ kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime",
 human-readable = { group = "nl.jacobras", name = "Human-Readable", version.ref = "humanReadable" }
 kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
 mlkit-genai-image-description = { group = "com.google.mlkit", name = "genai-image-description", version.ref = "mlkitGenaiImageDescription" }
+mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
+mlkit-language-id = { group = "com.google.mlkit", name = "language-id", version.ref = "mlkitLanguageId" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 
 [plugins]
