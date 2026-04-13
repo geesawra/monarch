@@ -116,6 +116,6 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: industries.geesawra.monarch
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          track: closed
+          track: alpha
           status: completed
           mappingFile: app/build/outputs/mapping/release/mapping.txt
