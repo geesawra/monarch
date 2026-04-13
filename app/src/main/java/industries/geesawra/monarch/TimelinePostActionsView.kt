@@ -10,11 +10,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -26,12 +23,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Autorenew
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.ModeComment
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ModeComment
 import androidx.compose.material3.DropdownMenu
@@ -45,7 +40,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -291,6 +285,7 @@ fun TimelinePostActionsView(
         }
 
         var repostBounce by remember { mutableStateOf(false) }
+        var showRepostMenu by remember { mutableStateOf(false) }
         val repostScale by animateFloatAsState(
             targetValue = if (repostBounce) 1.3f else 1f,
             animationSpec = spring(
@@ -310,24 +305,15 @@ fun TimelinePostActionsView(
             label = "repostColor"
         )
 
-        @OptIn(ExperimentalFoundationApi::class)
         Box(
             modifier = Modifier
                 .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                .combinedClickable(
+                .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = {
-                        repostBounce = true
-                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                        when (isReposted) {
-                            false -> timelineViewModel?.repost(skeet.uri, skeet.cid)
-                            true -> timelineViewModel?.deleteRepost(skeet.cid)
-                        }
-                    },
-                    onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onReplyTap(skeet, true)
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        showRepostMenu = true
                     }
                 ),
             contentAlignment = Alignment.Center
@@ -341,29 +327,30 @@ fun TimelinePostActionsView(
                 isActive = isReposted,
                 activeContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
             )
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        if (isOwnPost) {
-            LongPressIconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    showDeleteDialog = true
-                },
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showRedraftDialog = true
-                },
-            ) {
-                Icon(
-                    modifier = Modifier.size(actionIconSize()),
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete (long press to redraft)",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+            DropdownMenu(expanded = showRepostMenu, onDismissRequest = { showRepostMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(if (isReposted) "Undo repost" else "Repost") },
+                    onClick = {
+                        showRepostMenu = false
+                        repostBounce = true
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        when (isReposted) {
+                            false -> timelineViewModel?.repost(skeet.uri, skeet.cid)
+                            true -> timelineViewModel?.deleteRepost(skeet.cid)
+                        }
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Quote") },
+                    onClick = {
+                        showRepostMenu = false
+                        onReplyTap(skeet, true)
+                    },
                 )
             }
         }
+
+        Spacer(Modifier.weight(1f))
 
         IconButton(
             onClick = {
@@ -406,40 +393,23 @@ fun TimelinePostActionsView(
                         clipboard.setPrimaryClip(ClipData.newPlainText("Post", skeet.content))
                     },
                 )
+                if (isOwnPost) {
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = {
+                            showMenu = false
+                            showDeleteDialog = true
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete and redraft") },
+                        onClick = {
+                            showMenu = false
+                            showRedraftDialog = true
+                        },
+                    )
+                }
             }
         }
-    }
-}
-
-
-@Composable
-fun LongPressIconButton(
-    modifier: Modifier = Modifier,
-    stepDelay: Long = 100L, // Minimum value is 1L milliseconds.
-    onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {},
-    content: @Composable () -> Unit,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val pressedListener by rememberUpdatedState(onLongClick)
-
-    LaunchedEffect(isPressed) {
-        if (isPressed) {
-            delay(stepDelay.coerceIn(1L, Long.MAX_VALUE))
-            pressedListener()
-        }
-    }
-
-    IconButton(
-        modifier = modifier,
-        onClick = if (isPressed) {
-            {}
-        } else {
-            onClick
-        },
-        interactionSource = interactionSource
-    ) {
-        content()
     }
 }
