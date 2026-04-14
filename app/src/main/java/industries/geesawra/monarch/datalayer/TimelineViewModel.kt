@@ -439,7 +439,34 @@ class TimelineViewModel @AssistedInject constructor(
             resetAllState()
             updateSession { it.copy(authenticated = true, sessionChecked = true) }
             refreshAccounts()
+
+            if (target.notificationsEnabled) {
+                pushNotificationManager.getAndRegisterToken(did)
+            }
+
             fetchAllNewData(then)
+        }
+    }
+
+    fun setAccountNotificationsEnabled(did: String, enabled: Boolean, onResult: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            accountManager.updateAccountNotificationSetting(did, enabled)
+            refreshAccounts()
+            if (enabled) {
+                pushNotificationManager.getAndRegisterToken(did).onSuccess {
+                    onResult(Result.success(Unit))
+                }.onFailure {
+                    accountManager.updateAccountNotificationSetting(did, false)
+                    refreshAccounts()
+                    onResult(Result.failure(it))
+                }
+            } else {
+                val account = accountManager.getAccount(did)
+                if (account != null && accountManager.getActiveDid() == did) {
+                    pushNotificationManager.unregisterToken()
+                }
+                onResult(Result.success(Unit))
+            }
         }
     }
 

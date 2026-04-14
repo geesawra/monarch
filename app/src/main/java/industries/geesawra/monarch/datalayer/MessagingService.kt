@@ -90,7 +90,10 @@ class MessagingService : FirebaseMessagingService() {
             pushManager.saveTokenLocally(token)
             val did = accountManager.getActiveDid()
             if (did != null) {
-                pushManager.registerToken(token, did)
+                val account = accountManager.getAccount(did)
+                if (account?.notificationsEnabled == true) {
+                    pushManager.registerToken(token, did)
+                }
             }
         }
     }
@@ -140,7 +143,8 @@ class MessagingService : FirebaseMessagingService() {
         val accountManager = entryPoint.accountManager()
         val title = if (recipientDid != null) {
             val accounts = kotlinx.coroutines.runBlocking { accountManager.getAccounts() }
-            if (accounts.size > 1) {
+            val accountsWithNotifications = accounts.count { it.notificationsEnabled }
+            if (accountsWithNotifications > 1) {
                 val recipient = accounts.firstOrNull { it.did == recipientDid }
                 if (recipient != null) "@${recipient.handle} · $rawTitle" else rawTitle
             } else rawTitle

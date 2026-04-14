@@ -322,6 +322,19 @@ fun ComposeView(
                     .fillMaxHeight(),
                 horizontalAlignment = Alignment.End
             ) {
+                var showThreadgateSheet by remember { mutableStateOf(false) }
+
+                if (showThreadgateSheet) {
+                    ThreadgateSettings(
+                        currentRules = threadgateRules.value,
+                        onDismiss = { showThreadgateSheet = false },
+                        onApply = { rules ->
+                            threadgateRules.value = rules
+                            showThreadgateSheet = false
+                        }
+                    )
+                }
+
                 ActionRow(
                     context,
                     uploadingPost,
@@ -345,6 +358,7 @@ fun ComposeView(
                     threadgateRules = threadgateRules,
                     wasEdited = wasEdited,
                     onDraftsClick = onDraftsClick,
+                    onThreadgateClick = { showThreadgateSheet = true },
                 )
 
                 LaunchedEffect(Unit) {
@@ -535,32 +549,6 @@ fun ComposeView(
                     )
                 }
 
-                var showThreadgateSheet by remember { mutableStateOf(false) }
-
-                if (showThreadgateSheet) {
-                    ThreadgateSettings(
-                        currentRules = threadgateRules.value,
-                        onDismiss = { showThreadgateSheet = false },
-                        onApply = { rules ->
-                            threadgateRules.value = rules
-                            showThreadgateSheet = false
-                        }
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = { showThreadgateSheet = true }) {
-                        Icon(
-                            Icons.Default.Shield,
-                            contentDescription = "Reply settings",
-                            tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                        )
-                    }
-                }
-
                 HorizontalDivider(
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -699,6 +687,7 @@ fun ActionRow(
     threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
     onDraftsClick: () -> Unit = {},
+    onThreadgateClick: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -730,6 +719,13 @@ fun ActionRow(
             }
             TextButton(onClick = onDraftsClick) {
                 Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
+            }
+            TextButton(onClick = onThreadgateClick) {
+                Icon(
+                    Icons.Default.Shield,
+                    contentDescription = "Reply settings",
+                    tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
             }
         }
         val allMediaHasAlt = mediaSelected.value.isEmpty() ||

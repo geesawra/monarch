@@ -26,6 +26,7 @@ data class StoredAccount(
     val pdsHost: String,
     val appviewProxy: String,
     val oauthTokenJson: String,
+    val notificationsEnabled: Boolean = false,
 )
 
 /**
@@ -148,5 +149,16 @@ class AccountManager @Inject constructor(
 
     suspend fun hasAccounts(): Boolean {
         return getAccounts().isNotEmpty()
+    }
+
+    suspend fun updateAccountNotificationSetting(did: String, enabled: Boolean) {
+        val accounts = getAccounts().toMutableList()
+        val idx = accounts.indexOfFirst { it.did == did }
+        if (idx >= 0) {
+            accounts[idx] = accounts[idx].copy(notificationsEnabled = enabled)
+            context.accountsDataStore.edit {
+                it[ACCOUNTS_LIST_KEY] = Json.encodeToString(accounts)
+            }
+        }
     }
 }

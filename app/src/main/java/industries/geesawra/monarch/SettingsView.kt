@@ -83,6 +83,7 @@ import industries.geesawra.monarch.datalayer.AppTheme
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TRANSLATION_LANGUAGE_OPTIONS
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import industries.geesawra.monarch.datalayer.StoredAccount
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -418,65 +419,149 @@ fun SettingsView(
             )
 
             if (pushNotificationManager != null && timelineViewModel != null) {
-                val coroutineScope = rememberCoroutineScope()
-                var pushError by remember { mutableStateOf<String?>(null) }
-
-                val enablePush: () -> Unit = {
-                    settingsViewModel.setPushNotificationsEnabled(true)
-                    val did = timelineViewModel.user?.did?.did
-                    if (did != null) {
-                        coroutineScope.launch {
-                            pushNotificationManager.getAndRegisterToken(did).onFailure {
-                                pushError = it.message ?: "Failed to register"
-                                settingsViewModel.setPushNotificationsEnabled(false)
-                            }.onSuccess {
-                                pushError = null
-                            }
-                        }
-                    }
-                }
+                val accounts = timelineViewModel.accounts
+                var pushErrors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
-                ) { granted ->
-                    if (granted) enablePush()
-                }
+                ) { _ -> }
 
-                ListItem(
-                    headlineContent = { Text("Push notifications") },
-                    supportingContent = {
-                        if (pushError != null) {
-                            Text(
-                                "Registration failed: $pushError",
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        } else {
-                            Text("Receive push notifications")
-                        }
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = settings.pushNotificationsEnabled,
-                            onCheckedChange = { enabled ->
-                                if (enabled) {
+                if (accounts.size <= 1) {
+                    var pushError by remember { mutableStateOf<String?>(null) }
+                    val account = accounts.firstOrNull()
+
+                    val enablePush: () -> Unit = {
+                        val did = account?.did ?: timelineViewModel.user?.did?.did
+                        if (did != null) {
+                            timelineViewModel.setAccountNotificationsEnabled(did, true) { result ->
+                                result.onFailure {
+                                    pushError = it.message ?: "Failed to register"
+                                }.onSuccess {
                                     pushError = null
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        val hasPermission = ContextCompat.checkSelfPermission(
-                                            context, Manifest.permission.POST_NOTIFICATIONS
-                                        ) == PackageManager.PERMISSION_GRANTED
-                                        if (hasPermission) enablePush()
-                                        else permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    } else {
-                                        enablePush()
-                                    }
-                                } else {
-                                    pushError = null
-                                    settingsViewModel.setPushNotificationsEnabled(false)
                                 }
                             }
+                        }
+                    }
+
+                    val singlePermissionLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission()
+                    ) { granted ->
+                        if (granted) enablePush()
+                    }
+
+                    ListItem(
+                        headlineContent = { Text("Push notifications") },
+                        supportingContent = {
+                            if (pushError != null) {
+                                Text(
+                                    "Registration failed: $pushError",
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            } else {
+                                Text("Receive push notifications")
+                            }
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = account?.notificationsEnabled == true,
+                                onCheckedChange = { enabled ->
+                                    val did = account?.did ?: timelineViewModel.user?.did?.did
+                                    if (did != null) {
+                                        if (enabled) {
+                                            pushError = null
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                val hasPermission = ContextCompat.checkSelfPermission(
+                                                    context, Manifest.permission.POST_NOTIFICATIONS
+                                                ) == PackageManager.PERMISSION_GRANTED
+                                                if (hasPermission) enablePush()
+                                                else singlePermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            } else {
+                                                enablePush()
+                                            }
+                                        } else {
+                                            pushError = null
+                                            timelineViewModel.setAccountNotificationsEnabled(did, false)
+                                        }
+                                    }
+                                }
+                            )
+                        },
+                    )
+                } else {
+                    Text(
+                        text = "Push notifications",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
+                    )
+
+                    accounts.forEach { account ->
+                        val accountError = pushErrors[account.did]
+                        ListItem(
+                            headlineContent = {
+                                Text(account.displayName ?: account.handle)
+                            },
+                            supportingContent = {
+                                if (accountError != null) {
+                                    Text(
+                                        "Registration failed: $accountError",
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                } else {
+                                    Text("@${account.handle}")
+                                }
+                            },
+                            leadingContent = {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(account.avatarUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                )
+                            },
+                            trailingContent = {
+                                Switch(
+                                    checked = account.notificationsEnabled,
+                                    onCheckedChange = { enabled ->
+                                        if (enabled) {
+                                            pushErrors = pushErrors - account.did
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                val hasPermission = ContextCompat.checkSelfPermission(
+                                                    context, Manifest.permission.POST_NOTIFICATIONS
+                                                ) == PackageManager.PERMISSION_GRANTED
+                                                if (hasPermission) {
+                                                    timelineViewModel.setAccountNotificationsEnabled(account.did, true) { result ->
+                                                        result.onFailure {
+                                                            pushErrors = pushErrors + (account.did to (it.message ?: "Failed"))
+                                                        }
+                                                    }
+                                                } else {
+                                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                }
+                                            } else {
+                                                timelineViewModel.setAccountNotificationsEnabled(account.did, true) { result ->
+                                                    result.onFailure {
+                                                        pushErrors = pushErrors + (account.did to (it.message ?: "Failed"))
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            pushErrors = pushErrors - account.did
+                                            timelineViewModel.setAccountNotificationsEnabled(account.did, false)
+                                        }
+                                    }
+                                )
+                            },
                         )
-                    },
-                )
+                    }
+                }
             }
 
             if (timelineViewModel != null) {
