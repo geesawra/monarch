@@ -65,6 +65,7 @@ import industries.geesawra.monarch.datalayer.ThreadConnector
 import industries.geesawra.monarch.datalayer.ThreadConnectorType
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
 
 val LocalActiveVideoKey = compositionLocalOf<MutableState<String?>?> { null }
@@ -84,6 +85,9 @@ fun ShowSkeets(
     onSeeMoreTap: ((SkeetData) -> Unit)? = null,
     onProfileTap: ((Did) -> Unit)? = null,
     searchFilter: String = "",
+    onShowLikes: ((AtUri) -> Unit)? = null,
+    onShowReposts: ((AtUri) -> Unit)? = null,
+    onShowQuotes: ((AtUri) -> Unit)? = null,
 ) {
     val avatarClipShape = settingsState.avatarClipShape
     // Collect CIDs already shown as thread context (root/parent) to avoid duplicates
@@ -406,6 +410,9 @@ fun ShowSkeets(
                             isVisible = isVisible,
                             translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                             targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                            onShowLikes = { onShowLikes?.invoke(skeet.uri) },
+                            onShowReposts = { onShowReposts?.invoke(skeet.uri) },
+                            onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
                         )
                     } else {
                         SkeetView(

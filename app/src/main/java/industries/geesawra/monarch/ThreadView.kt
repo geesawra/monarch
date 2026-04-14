@@ -21,8 +21,11 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import sh.christian.ozone.api.AtUri
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -32,6 +35,8 @@ import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import sh.christian.ozone.api.Did
+
+enum class EngagementType { Likes, Reposts, Quotes }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +55,8 @@ fun ThreadView(
     )
 
     val isRefreshing = remember { mutableStateOf(true) }
+    var engagementUri by remember { mutableStateOf<AtUri?>(null) }
+    var engagementType by remember { mutableStateOf<EngagementType?>(null) }
 
     PullToRefreshBox(
         modifier = modifier,
@@ -125,9 +132,81 @@ fun ThreadView(
                             timelineViewModel.setThread(tapped)
                             onThreadTap()
                         },
+                        onShowLikes = { uri ->
+                            engagementUri = uri
+                            engagementType = EngagementType.Likes
+                        },
+                        onShowReposts = { uri ->
+                            engagementUri = uri
+                            engagementType = EngagementType.Reposts
+                        },
+                        onShowQuotes = { uri ->
+                            engagementUri = uri
+                            engagementType = EngagementType.Quotes
+                        },
                     )
                 }
             }
+        }
+    }
+
+    engagementUri?.let { uri ->
+        when (engagementType) {
+            EngagementType.Likes -> {
+                UserListSheet(
+                    title = "Likes",
+                    onDismiss = { engagementUri = null; engagementType = null },
+                    fetchUsers = { cursor ->
+                        timelineViewModel.getLikes(uri, cursor).getOrNull()?.let {
+                            Pair(it.likes.map { like -> like.actor }, it.cursor)
+                        }
+                    },
+                    onProfileTap = { did ->
+                        engagementUri = null
+                        engagementType = null
+                        onProfileTap?.invoke(did)
+                    },
+                )
+            }
+            EngagementType.Reposts -> {
+                UserListSheet(
+                    title = "Reposts",
+                    onDismiss = { engagementUri = null; engagementType = null },
+                    fetchUsers = { cursor ->
+                        timelineViewModel.getRepostedBy(uri, cursor).getOrNull()?.let {
+                            Pair(it.repostedBy, it.cursor)
+                        }
+                    },
+                    onProfileTap = { did ->
+                        engagementUri = null
+                        engagementType = null
+                        onProfileTap?.invoke(did)
+                    },
+                )
+            }
+            EngagementType.Quotes -> {
+                QuotesSheet(
+                    onDismiss = { engagementUri = null; engagementType = null },
+                    fetchQuotes = { cursor ->
+                        timelineViewModel.getQuotes(uri, cursor).getOrNull()?.let {
+                            Pair(it.posts.map { post -> SkeetData.fromPostView(post, post.author) }, it.cursor)
+                        }
+                    },
+                    timelineViewModel = timelineViewModel,
+                    onShowThread = { skeet ->
+                        engagementUri = null
+                        engagementType = null
+                        timelineViewModel.setThread(skeet)
+                        onThreadTap()
+                    },
+                    onProfileTap = { did ->
+                        engagementUri = null
+                        engagementType = null
+                        onProfileTap?.invoke(did)
+                    },
+                )
+            }
+            null -> {}
         }
     }
 }

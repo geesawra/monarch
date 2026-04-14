@@ -27,9 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.text.font.FontWeight
+import sh.christian.ozone.api.Did
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -40,6 +42,7 @@ fun UserListSheet(
     title: String,
     onDismiss: () -> Unit,
     fetchUsers: suspend (cursor: String?) -> Pair<List<app.bsky.actor.ProfileView>, String?>?,
+    onProfileTap: (Did) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var users by remember { mutableStateOf<List<app.bsky.actor.ProfileView>>(emptyList()) }
@@ -98,6 +101,10 @@ fun UserListSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(MaterialTheme.shapes.medium)
+                                .clickable {
+                                    onProfileTap(user.did)
+                                    onDismiss()
+                                }
                                 .padding(vertical = 8.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),

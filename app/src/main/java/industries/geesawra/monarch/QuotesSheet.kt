@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import sh.christian.ozone.api.Did
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +38,8 @@ fun QuotesSheet(
     onDismiss: () -> Unit,
     fetchQuotes: suspend (cursor: String?) -> Pair<List<SkeetData>, String?>?,
     timelineViewModel: TimelineViewModel?,
+    onShowThread: (SkeetData) -> Unit = {},
+    onProfileTap: (Did) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var quotes by remember { mutableStateOf<List<SkeetData>>(emptyList()) }
@@ -98,6 +101,14 @@ fun QuotesSheet(
                                 viewModel = timelineViewModel,
                                 skeet = quote,
                                 nested = true,
+                                onShowThread = {
+                                    onShowThread(it)
+                                    onDismiss()
+                                },
+                                onAvatarTap = {
+                                    onProfileTap(it)
+                                    onDismiss()
+                                },
                             )
                         }
                     }

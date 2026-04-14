@@ -143,6 +143,7 @@ fun TimelinePostActionsView(
     inThread: Boolean = false,
     translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
+    showCounts: Boolean = true,
 ) {
     val interactionState = timelineViewModel?.postInteractionStore?.getState(skeet.cid) {
         PostInteraction.from(skeet)
@@ -232,7 +233,7 @@ fun TimelinePostActionsView(
             ActionIcon(
                 icon = Icons.Outlined.ModeComment,
                 contentDescription = "Reply",
-                count = replies,
+                count = if (showCounts) replies else 0,
                 tint = if (replyDisabled) MaterialTheme.colorScheme.outlineVariant
                     else MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -278,7 +279,7 @@ fun TimelinePostActionsView(
             ActionIcon(
                 icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = "Like",
-                count = likes,
+                count = if (showCounts) likes else 0,
                 tint = likeColor,
                 scale = likeScale,
                 isActive = isLiked,
@@ -323,7 +324,7 @@ fun TimelinePostActionsView(
             ActionIcon(
                 icon = Icons.Default.Autorenew,
                 contentDescription = "Repost",
-                count = reposts,
+                count = if (showCounts) reposts else 0,
                 tint = repostColor,
                 scale = repostScale,
                 isActive = isReposted,

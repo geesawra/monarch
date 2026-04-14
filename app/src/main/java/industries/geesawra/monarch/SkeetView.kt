@@ -100,6 +100,7 @@ import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.datalayer.toFloat
+import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
 import nl.jacobras.humanreadable.HumanReadable
 import industries.geesawra.monarch.datalayer.PostInteraction
@@ -260,6 +261,53 @@ fun SkeetView(
     }
 }
 
+@Composable
+fun EngagementStatsRow(
+    likes: Long,
+    reposts: Long,
+    quotes: Long,
+    onShowLikes: () -> Unit,
+    onShowReposts: () -> Unit,
+    onShowQuotes: () -> Unit,
+) {
+    val stats = buildList {
+        if (likes > 0) add(Triple(likes, "like", onShowLikes))
+        if (reposts > 0) add(Triple(reposts, "repost", onShowReposts))
+        if (quotes > 0) add(Triple(quotes, "quote", onShowQuotes))
+    }
+
+    if (stats.isEmpty()) return
+
+    Column {
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 12.dp),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        ) {
+            stats.forEach { (count, label, onClick) ->
+                Surface(
+                    onClick = onClick,
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Text(
+                        text = "$count ${if (count == 1L) label else "${label}s"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FocusedSkeetView(
@@ -276,9 +324,19 @@ fun FocusedSkeetView(
     isVisible: Boolean = true,
     translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
+    onShowLikes: () -> Unit = {},
+    onShowReposts: () -> Unit = {},
+    onShowQuotes: () -> Unit = {},
 ) {
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
     var contentRevealed by remember { mutableStateOf(warningLabel == null) }
+    var quoteCount by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(skeet.uri) {
+        viewModel?.getQuotes(skeet.uri)?.getOrNull()?.let {
+            quoteCount = it.posts.size.toLong()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -312,6 +370,24 @@ fun FocusedSkeetView(
             targetTranslationLanguage = targetTranslationLanguage,
         )
 
+        val interactionState = viewModel?.postInteractionStore?.getState(skeet.cid) {
+            PostInteraction.from(skeet)
+        }
+        val interaction = interactionState?.value
+        val likesCount = interaction?.likes ?: skeet.likes ?: 0L
+        val repostsCount = interaction?.reposts ?: skeet.reposts ?: 0L
+        val quotesCount = quoteCount ?: 0L
+        val hasEngagementStats = likesCount > 0 || repostsCount > 0 || quotesCount > 0
+
+        EngagementStatsRow(
+            likes = likesCount,
+            reposts = repostsCount,
+            quotes = quotesCount,
+            onShowLikes = onShowLikes,
+            onShowReposts = onShowReposts,
+            onShowQuotes = onShowQuotes,
+        )
+
         TimelinePostActionsView(
             onReplyTap = onReplyTap,
             modifier = Modifier
@@ -322,6 +398,7 @@ fun FocusedSkeetView(
             inThread = true,
             translationEnabled = translationEnabled,
             targetTranslationLanguage = targetTranslationLanguage,
+            showCounts = !hasEngagementStats,
         )
     }
 }
