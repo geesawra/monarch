@@ -1337,23 +1337,18 @@ private fun InnerTimelineView(
                                         timelineViewModel.fetchBookmarks(refresh = true)
                                     }
                                 }
-                                PullToRefreshBox(
-                                    isRefreshing = timelineViewModel.bookmarksState.isFetchingBookmarks,
-                                    onRefresh = { timelineViewModel.fetchBookmarks(refresh = true) },
-                                ) {
-                                    ShowSkeets(
-                                        viewModel = timelineViewModel,
-                                        settingsState = settingsState,
-                                        state = bookmarksListState,
-                                        onReplyTap = onReplyTap,
-                                        data = timelineViewModel.bookmarksState.bookmarks,
-                                        isLoading = timelineViewModel.bookmarksState.isFetchingBookmarks,
-                                        isScrollEnabled = isScrollEnabled,
-                                        onSeeMoreTap = if (isExpandedScreen) expandedOnSeeMoreTap else onSeeMoreTap,
-                                        onProfileTap = if (isExpandedScreen) expandedOnProfileTap else onProfileTap,
-                                        shouldFetchMoreData = false,
-                                    )
-                                }
+                                ShowSkeets(
+                                    viewModel = timelineViewModel,
+                                    settingsState = settingsState,
+                                    state = bookmarksListState,
+                                    onReplyTap = onReplyTap,
+                                    data = timelineViewModel.bookmarksState.bookmarks,
+                                    isLoading = timelineViewModel.bookmarksState.isFetchingBookmarks,
+                                    isScrollEnabled = isScrollEnabled,
+                                    onSeeMoreTap = if (isExpandedScreen) expandedOnSeeMoreTap else onSeeMoreTap,
+                                    onProfileTap = if (isExpandedScreen) expandedOnProfileTap else onProfileTap,
+                                    shouldFetchMoreData = false,
+                                )
                                 OnEndOfListReached(
                                     listState = bookmarksListState,
                                     items = timelineViewModel.bookmarksState.bookmarks,

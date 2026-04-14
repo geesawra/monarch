@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -143,6 +144,7 @@ fun ShowSkeets(
             .testTag("feed_list")
             .fillMaxSize()
             .padding(horizontal = feedHorizontalPadding()),
+        contentPadding = PaddingValues(bottom = 16.dp),
         verticalArrangement = if (isShowingThread) Arrangement.spacedBy(0.dp) else Arrangement.spacedBy(feedItemSpacing()),
     ) {
         if (isLoading && (data.isEmpty() || (isShowingThread && data.size <= 1))) {

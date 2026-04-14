@@ -631,16 +631,16 @@ private fun SkeetContent(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                showTranslated && viewModel != null -> {
+                showTranslated -> {
                     TranslationMetadata(
-                        detectedLanguage = translation?.detectedLanguage,
+                        detectedLanguage = translation.detectedLanguage,
                         onShowOriginal = { viewModel.toggleTranslationOriginal(skeet.cid) },
                         onWrongLanguage = { newSourceLang ->
                             viewModel.retranslatePost(skeet, targetTranslationLanguage, newSourceLang)
                         },
                     )
                 }
-                translation?.showOriginal == true && viewModel != null -> {
+                translation?.showOriginal == true -> {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
