@@ -161,7 +161,7 @@ enum class TabBarDestinations(
     val badgeValue: MutableIntState? = null,
     val badgeDescFmt: (Int) -> String = { "" },
 ) {
-    TIMELINE(R.string.timeline, Icons.Filled.Home, R.string.timeline),
+    TIMELINE(R.string.timeline, Icons.Filled.Home, R.string.timeline, mutableIntStateOf(0)),
     SEARCH(R.string.search, Icons.Filled.Search, R.string.search),
     BOOKMARKS(R.string.bookmarks, Icons.Filled.Bookmark, R.string.bookmarks),
     NOTIFICATIONS(
@@ -523,6 +523,22 @@ private fun InnerTimelineView(
         }
     }
 
+    val activeTimelineListState = if (settingsState.swipeableFeeds) {
+        pagerListStates[pagerState.settledPage] ?: timelineState
+    } else timelineState
+    val showNewPostsDot = timelineViewModel.hasNewTimelinePosts &&
+        activeTimelineListState.firstVisibleItemIndex > 0
+
+    LaunchedEffect(showNewPostsDot) {
+        TabBarDestinations.TIMELINE.badgeValue?.intValue = if (showNewPostsDot) 1 else 0
+    }
+
+    LaunchedEffect(activeTimelineListState.firstVisibleItemIndex) {
+        if (activeTimelineListState.firstVisibleItemIndex == 0) {
+            timelineViewModel.clearNewTimelinePostsIndicator()
+        }
+    }
+
     val pullToRefreshState = rememberPullToRefreshState()
     PullToRefreshBox(
         state = pullToRefreshState,
@@ -629,14 +645,16 @@ private fun InnerTimelineView(
                             }
 
                             Badge {
-                                Text(
-                                    badgeValue.intValue.toString(),
-                                    modifier =
-                                        Modifier.semantics {
-                                            contentDescription =
-                                                dest.badgeDescFmt(dest.badgeValue.intValue)
-                                        },
-                                )
+                                if (dest == TabBarDestinations.NOTIFICATIONS) {
+                                    Text(
+                                        badgeValue.intValue.toString(),
+                                        modifier =
+                                            Modifier.semantics {
+                                                contentDescription =
+                                                    dest.badgeDescFmt(dest.badgeValue.intValue)
+                                            },
+                                    )
+                                }
                             }
                         }
                     ) {

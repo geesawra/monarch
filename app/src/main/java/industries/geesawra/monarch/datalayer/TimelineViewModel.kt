@@ -212,6 +212,11 @@ class TimelineViewModel @AssistedInject constructor(
     var bookmarksState by mutableStateOf(BookmarksState()); private set
     var redraftText by mutableStateOf<String?>(null); private set
     var pendingNotificationsTab by mutableStateOf(false)
+    var hasNewTimelinePosts by mutableStateOf(false); private set
+
+    fun clearNewTimelinePostsIndicator() {
+        hasNewTimelinePosts = false
+    }
 
     fun setRedraft(text: String?) { redraftText = text }
 
@@ -574,6 +579,7 @@ class TimelineViewModel @AssistedInject constructor(
                 val feedKey = selectedFeed
                 val existingFeedSkeets: List<SkeetData> = feedSkeets[feedKey] ?: persistentListOf()
                 val currentMutedWords = mutedWords
+                val previousFirstCid = skeets.firstOrNull()?.cid
                 val newSkeets = if (fresh) {
                     response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
                 } else {
@@ -593,6 +599,9 @@ class TimelineViewModel @AssistedInject constructor(
                         timelineCursor = response.cursor,
                         isFetchingMoreTimeline = false,
                     )
+                }
+                if (fresh && previousFirstCid != null && newSkeets.firstOrNull()?.cid != previousFirstCid) {
+                    hasNewTimelinePosts = true
                 }
                 newSkeets.forEach { postInteractionStore.seed(it) }
                 then()
