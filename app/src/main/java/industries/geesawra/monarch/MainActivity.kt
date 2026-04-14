@@ -262,8 +262,6 @@ class MainActivity : ComponentActivity() {
                                     if (firstLoadDone.value || !settings.loaded) {
                                         return@MainView
                                     }
-                                    val df = settings.defaultFeed
-                                    timelineViewModel.applyFeedState(df.uri, df.displayName, df.avatar)
                                     timelineViewModel.fetchAllNewData {
                                         firstLoadDone.value = true
                                     }

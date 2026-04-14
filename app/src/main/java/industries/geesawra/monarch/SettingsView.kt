@@ -26,7 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -83,6 +84,7 @@ import industries.geesawra.monarch.datalayer.AppTheme
 import industries.geesawra.monarch.datalayer.ThemeMode
 import industries.geesawra.monarch.datalayer.TRANSLATION_LANGUAGE_OPTIONS
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import industries.geesawra.monarch.datalayer.CachedFeedInfo
 import industries.geesawra.monarch.datalayer.StoredAccount
 import kotlinx.coroutines.launch
 
@@ -295,17 +297,6 @@ fun SettingsView(
             }
 
             ListItem(
-                headlineContent = { Text("Swipeable feeds") },
-                supportingContent = { Text("Swipe left/right on the timeline to switch feeds") },
-                trailingContent = {
-                    Switch(
-                        checked = settings.swipeableFeeds,
-                        onCheckedChange = { settingsViewModel.setSwipeableFeeds(it) }
-                    )
-                },
-            )
-
-            ListItem(
                 headlineContent = { Text("Auto-like on reply") },
                 supportingContent = { Text("Automatically like a post when you reply to it") },
                 trailingContent = {
@@ -335,6 +326,123 @@ fun SettingsView(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
             )
+
+            if (timelineViewModel != null) {
+                val feeds = timelineViewModel.feeds
+                val cachedMetadata = timelineViewModel.cachedFeedMetadata
+                val orderedUris = timelineViewModel.orderedFeedUris
+                var showReorderDialog by remember { mutableStateOf(false) }
+
+                data class FeedReorderItem(val uri: String, val name: String, val avatar: String?)
+                val userAvatar = timelineViewModel.user?.avatar?.uri
+                val feedMap = remember(feeds) { feeds.associateBy { it.uri.atUri } }
+                val cachedMap = remember(cachedMetadata) { cachedMetadata.associateBy { it.uri } }
+                var reorderList by remember(orderedUris, feeds, cachedMetadata, userAvatar) {
+                    mutableStateOf(
+                        orderedUris.mapNotNull { uri ->
+                            if (uri == "following") {
+                                FeedReorderItem("following", "Following", userAvatar)
+                            } else {
+                                feedMap[uri]?.let { FeedReorderItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
+                                    ?: cachedMap[uri]?.let { FeedReorderItem(it.uri, it.name, it.avatar) }
+                            }
+                        }.ifEmpty {
+                            listOf(FeedReorderItem("following", "Following", userAvatar)) +
+                            feeds.map { FeedReorderItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
+                        }
+                    )
+                }
+
+                ListItem(
+                    headlineContent = { Text("Reorder feeds") },
+                    supportingContent = { Text("Change the order of feeds in the tab row") },
+                    modifier = Modifier.clickable { showReorderDialog = true },
+                )
+
+                if (showReorderDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showReorderDialog = false },
+                        title = { Text("Reorder feeds") },
+                        text = {
+                            Column(
+                                modifier = Modifier.verticalScroll(rememberScrollState())
+                            ) {
+                                reorderList.forEachIndexed { index, feed ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        if (feed.avatar != null) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current)
+                                                    .data(feed.avatar)
+                                                    .crossfade(true)
+                                                    .build(),
+                                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                            )
+                                        } else {
+                                            Spacer(modifier = Modifier.size(32.dp))
+                                        }
+                                        Text(
+                                            text = feed.name,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                if (index > 0) {
+                                                    reorderList = reorderList.toMutableList().apply {
+                                                        add(index - 1, removeAt(index))
+                                                    }
+                                                }
+                                            },
+                                            enabled = index > 0,
+                                        ) {
+                                            Icon(Icons.Default.KeyboardArrowUp, "Move up")
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                if (index < reorderList.size - 1) {
+                                                    reorderList = reorderList.toMutableList().apply {
+                                                        add(index + 1, removeAt(index))
+                                                    }
+                                                }
+                                            },
+                                            enabled = index < reorderList.size - 1,
+                                        ) {
+                                            Icon(Icons.Default.KeyboardArrowDown, "Move down")
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    timelineViewModel.reorderFeeds(reorderList.map { it.uri })
+                                    showReorderDialog = false
+                                }
+                            ) {
+                                Text("Save")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showReorderDialog = false }) {
+                                Text("Cancel")
+                            }
+                        },
+                    )
+                }
+            }
 
             ListItem(
                 headlineContent = { Text("Reply filtering") },
@@ -561,55 +669,6 @@ fun SettingsView(
                             },
                         )
                     }
-                }
-            }
-
-            if (timelineViewModel != null) {
-                var showFeedPicker by remember { mutableStateOf(false) }
-                val feeds = timelineViewModel.feeds
-
-                ListItem(
-                    headlineContent = { Text("Default feed") },
-                    supportingContent = { Text(settings.defaultFeed.displayName) },
-                    modifier = Modifier.clickable { showFeedPicker = true },
-                )
-
-                if (showFeedPicker) {
-                    AlertDialog(
-                        onDismissRequest = { showFeedPicker = false },
-                        title = { Text("Default feed") },
-                        text = {
-                            Column(
-                                modifier = Modifier.verticalScroll(rememberScrollState())
-                            ) {
-                                FeedPickerItem(
-                                    name = "Following",
-                                    avatarUrl = null,
-                                    isDefault = settings.defaultFeed.uri == "following",
-                                    onClick = {
-                                        settingsViewModel.setDefaultFeed("following", "Following", null)
-                                        showFeedPicker = false
-                                    },
-                                )
-                                feeds.forEach { feed ->
-                                    FeedPickerItem(
-                                        name = feed.displayName,
-                                        avatarUrl = feed.avatar?.uri,
-                                        isDefault = settings.defaultFeed.uri == feed.uri.atUri,
-                                        onClick = {
-                                            settingsViewModel.setDefaultFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
-                                            showFeedPicker = false
-                                        },
-                                    )
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showFeedPicker = false }) {
-                                Text("Cancel")
-                            }
-                        },
-                    )
                 }
             }
 
@@ -891,55 +950,6 @@ fun SettingsView(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
         }
-        }
-    }
-}
-
-@Composable
-private fun FeedPickerItem(
-    name: String,
-    avatarUrl: String?,
-    isDefault: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (avatarUrl != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarUrl)
-                    .crossfade(true)
-                    .build(),
-                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape),
-                contentDescription = null,
-            )
-        } else {
-            Spacer(modifier = Modifier.size(28.dp))
-        }
-
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-
-        if (isDefault) {
-            Icon(
-                Icons.Default.Home,
-                contentDescription = "Default",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
         }
     }
 }

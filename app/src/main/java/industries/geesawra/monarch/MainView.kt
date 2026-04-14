@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.ViewStream
@@ -74,7 +75,6 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalWideNavigationRail
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -88,8 +88,6 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.WideNavigationRailItem
-import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -98,7 +96,6 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
@@ -139,6 +136,7 @@ import industries.geesawra.monarch.datalayer.NotificationBadge
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
+import industries.geesawra.monarch.datalayer.CachedFeedInfo
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
@@ -462,22 +460,29 @@ private fun InnerTimelineView(
     val bookmarksListState = rememberLazyListState()
     val searchPostsState = rememberLazyListState()
     val searchPeopleState = rememberLazyListState()
-    val drawerState = rememberWideNavigationRailState(
-        initialValue = WideNavigationRailValue.Collapsed
-    )
-    val feedItems = remember(timelineViewModel.feeds, timelineViewModel.user?.avatar) {
-        listOf(FeedItem("following", "Following", timelineViewModel.user?.avatar?.uri)) +
-        timelineViewModel.feeds.map { FeedItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
+    val feedItems = remember(timelineViewModel.feeds, timelineViewModel.cachedFeedMetadata, timelineViewModel.orderedFeedUris, timelineViewModel.user?.avatar) {
+        val feedMap = timelineViewModel.feeds.associateBy { it.uri.atUri }
+        val cachedMap = timelineViewModel.cachedFeedMetadata.associateBy { it.uri }
+        val userAvatar = timelineViewModel.user?.avatar?.uri
+        timelineViewModel.orderedFeedUris.mapNotNull { uri ->
+            if (uri == "following") {
+                FeedItem("following", "Following", userAvatar)
+            } else {
+                feedMap[uri]?.let { FeedItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
+                    ?: cachedMap[uri]?.let { FeedItem(it.uri, it.name, it.avatar) }
+            }
+        }.ifEmpty {
+            listOf(FeedItem("following", "Following", userAvatar)) +
+            timelineViewModel.feeds.map { FeedItem(it.uri.atUri, it.displayName, it.avatar?.uri) }
+        }
     }
     val pagerState = rememberPagerState(pageCount = { feedItems.size })
     val pagerListStates = remember { mutableMapOf<Int, LazyListState>() }
 
-    if (settingsState.swipeableFeeds) {
-        LaunchedEffect(pagerState.settledPage) {
-            val feed = feedItems.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
-            if (feed.uri != timelineViewModel.selectedFeed) {
-                timelineViewModel.selectFeed(feed.uri, feed.displayName, feed.avatar)
-            }
+    LaunchedEffect(pagerState.settledPage) {
+        val feed = feedItems.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
+        if (feed.uri != timelineViewModel.selectedFeed) {
+            timelineViewModel.selectFeed(feed.uri, feed.displayName, feed.avatar)
         }
     }
 
@@ -523,9 +528,7 @@ private fun InnerTimelineView(
         }
     }
 
-    val activeTimelineListState = if (settingsState.swipeableFeeds) {
-        pagerListStates[pagerState.settledPage] ?: timelineState
-    } else timelineState
+    val activeTimelineListState = pagerListStates[pagerState.settledPage] ?: timelineState
     val showNewPostsDot = timelineViewModel.hasNewTimelinePosts &&
         activeTimelineListState.firstVisibleItemIndex > 0
 
@@ -563,47 +566,6 @@ private fun InnerTimelineView(
             }
         },
     ) {
-        if (!settingsState.swipeableFeeds) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                ModalWideNavigationRail(
-                    header = {
-                        Column(modifier = Modifier.padding(start = 16.dp)) {
-                            Text(
-                                text = "Feeds",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                        }
-                    },
-                    hideOnCollapse = true,
-                    state = drawerState,
-                    modifier = modifier,
-                    content = {
-                        FeedsDrawer(
-                            state = drawerState.targetValue,
-                            selectFeed = { uri: String, displayName: String, avatar: String? ->
-                                coroutineScope.launch {
-                                    drawerState.collapse()
-                                }
-                                timelineViewModel.selectFeed(
-                                    uri,
-                                    displayName,
-                                    avatar
-                                ) {
-                                    coroutineScope.launch {
-                                        launch {
-                                            timelineState.scrollToItem(0)
-                                        }
-                                    }
-                                }
-                            },
-                            timelineViewModel = timelineViewModel,
-                        )
-                    }
-                )
-            }
-        }
-
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             val notifBadgeCount by NotificationBadge.count.collectAsState()
             LaunchedEffect(notifBadgeCount) {
@@ -675,9 +637,7 @@ private fun InnerTimelineView(
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 if (dest == currentDestination) {
                     val state = when (dest) {
-                        TabBarDestinations.TIMELINE -> if (settingsState.swipeableFeeds) {
-                            pagerListStates[pagerState.settledPage] ?: timelineState
-                        } else timelineState
+                        TabBarDestinations.TIMELINE -> pagerListStates[pagerState.settledPage] ?: timelineState
                         TabBarDestinations.SEARCH -> searchPostsState
                         TabBarDestinations.BOOKMARKS -> bookmarksListState
                         TabBarDestinations.NOTIFICATIONS -> notificationsState
@@ -778,28 +738,22 @@ private fun InnerTimelineView(
                                     LaunchedEffect(Unit) {
                                         focusRequester.requestFocus()
                                     }
-                                } else if (settingsState.swipeableFeeds) {
-                                    Text(text = timelineViewModel.user?.displayName
-                                        ?: timelineViewModel.user?.handle?.handle
-                                        ?: "")
                                 } else {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        if (timelineViewModel.feedAvatar != null && timelineViewModel.selectedFeed != "following") {
-                                            AsyncImage(
-                                                model = timelineViewModel.feedAvatar,
-                                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                                modifier = Modifier
-                                                    .size(topBarAvatarSize())
-                                                    .clip(CircleShape),
-                                                contentDescription = "Feed avatar",
+                                    Column {
+                                        Text(
+                                            text = timelineViewModel.user?.displayName
+                                                ?: timelineViewModel.user?.handle?.handle
+                                                ?: ""
+                                        )
+                                        val handle = timelineViewModel.user?.handle?.handle
+                                        val showHandle = timelineViewModel.user?.displayName != null && handle != null
+                                        if (showHandle) {
+                                            Text(
+                                                text = "@$handle",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
-
-                                        Text(text = timelineViewModel.feedName)
                                     }
                                 }
 
@@ -833,14 +787,6 @@ private fun InnerTimelineView(
                                         }) {
                                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close search")
                                         }
-                                    } else if (!settingsState.swipeableFeeds) {
-                                        IconButton(onClick = {
-                                            coroutineScope.launch {
-                                                drawerState.expand()
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.Tag, "Feeds")
-                                        }
                                     }
                                 }
                                 TabBarDestinations.SEARCH -> {}
@@ -858,7 +804,7 @@ private fun InnerTimelineView(
                                     }
                                 } else {
                                     IconButton(onClick = { isTimelineSearchActive = true }) {
-                                        Icon(Icons.Default.Search, "Search timeline")
+                                        Icon(Icons.Default.FilterList, "Filter timeline")
                                     }
 
                                     val user = timelineViewModel.user
@@ -993,8 +939,7 @@ private fun InnerTimelineView(
                     Box(modifier = contentModifier.fillMaxSize()) {
                         when (currentDestination) {
                             TabBarDestinations.TIMELINE -> {
-                                if (settingsState.swipeableFeeds) {
-                                    if (isExpandedScreen) {
+                                if (isExpandedScreen) {
                                         Row(modifier = Modifier.fillMaxSize()) {
                                             Box(modifier = Modifier.weight(0.45f).fillMaxHeight()) {
                                                 Column(modifier = Modifier.fillMaxSize()) {
@@ -1204,110 +1149,6 @@ private fun InnerTimelineView(
                                             )
                                         }
                                     }
-                                    }
-                                } else if (isExpandedScreen) {
-                                    Row(modifier = Modifier.fillMaxSize()) {
-                                        Box(modifier = Modifier.weight(0.45f).fillMaxHeight()) {
-                                            ShowSkeets(
-                                                viewModel = timelineViewModel,
-                                                settingsState = settingsState,
-                                                state = timelineState,
-                                                onReplyTap = onReplyTap,
-                                                data = timelineViewModel.skeets,
-                                                isLoading = timelineViewModel.isFetchingMoreTimeline,
-                                                isScrollEnabled = isScrollEnabled,
-                                                onSeeMoreTap = expandedOnSeeMoreTap,
-                                                onProfileTap = expandedOnProfileTap,
-                                                searchFilter = timelineSearchQuery,
-                                            )
-                                            Column(
-                                                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                                            ) {
-                                                SmallFloatingActionButton(
-                                                    onClick = {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                        val feedUri = feedItems.getOrNull(pagerState.settledPage)?.uri ?: "following"
-                                                        mediaFeedPosts = timelineViewModel.feedSkeets[feedUri] ?: timelineViewModel.skeets
-                                                    },
-                                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                                ) {
-                                                    Icon(Icons.Default.ViewStream, "Media scroll")
-                                                }
-                                                FloatingActionButton(
-                                                    onClick = {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                        fobOnClick()
-                                                    }
-                                                ) {
-                                                    Icon(Icons.Filled.Create, "Post")
-                                                }
-                                            }
-                                        }
-
-                                        VerticalDivider(modifier = Modifier.fillMaxHeight().width(1.dp))
-
-                                        Box(
-                                            modifier = Modifier.weight(0.55f).fillMaxHeight(),
-                                        ) {
-                                            when (val content = detailPaneContent) {
-                                                is DetailPaneContent.Thread -> DetailThreadPane(
-                                                    timelineViewModel = timelineViewModel,
-                                                    settingsState = settingsState,
-                                                    isRefreshing = detailRefreshing.value,
-                                                    onProfileTap = expandedOnProfileTap,
-                                                    onReplyTap = onReplyTap,
-                                                    onSeeMoreTap = expandedOnSeeMoreTap,
-                                                    onClose = { detailPaneContent = DetailPaneContent.Empty },
-                                                )
-                                                is DetailPaneContent.Profile -> DetailProfilePane(
-                                                    did = content.did,
-                                                    timelineViewModel = timelineViewModel,
-                                                    settingsState = settingsState,
-                                                    onProfileTap = expandedOnProfileTap,
-                                                    onThreadTap = expandedOnSeeMoreTap,
-                                                    onReplyTap = onReplyTap,
-                                                    onSettingsTap = onSettingsTap,
-                                                    onClose = { detailPaneContent = DetailPaneContent.Empty },
-                                                )
-                                                is DetailPaneContent.Empty -> Box(
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentAlignment = Alignment.Center,
-                                                ) {
-                                                    Column(
-                                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                                    ) {
-                                                        Icon(
-                                                            Icons.Default.Forum,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(48.dp),
-                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        )
-                                                        Spacer(modifier = Modifier.height(16.dp))
-                                                        Text(
-                                                            "Tap a post to view the thread",
-                                                            style = MaterialTheme.typography.bodyLarge,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    ShowSkeets(
-                                        viewModel = timelineViewModel,
-                                        settingsState = settingsState,
-                                        state = timelineState,
-                                        onReplyTap = onReplyTap,
-                                        data = timelineViewModel.skeets,
-                                        isLoading = timelineViewModel.isFetchingMoreTimeline,
-                                        isScrollEnabled = isScrollEnabled,
-                                        onSeeMoreTap = onSeeMoreTap,
-                                        onProfileTap = onProfileTap,
-                                        searchFilter = timelineSearchQuery,
-                                    )
                                 }
                             }
 
@@ -1506,83 +1347,6 @@ private fun DetailProfilePane(
                     onReplyTap = onReplyTap,
                 )
             }
-        }
-    }
-}
-
-
-
-@Composable
-fun FeedsDrawer(
-    state: WideNavigationRailValue,
-    selectFeed: (uri: String, displayName: String, avatar: String?) -> Unit,
-    timelineViewModel: TimelineViewModel,
-) {
-    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-        WideNavigationRailItem(
-            label = {
-                Text(text = "Following")
-            },
-            selected = timelineViewModel.selectedFeed.lowercase() == "following",
-            onClick = {
-                selectFeed("following", "Following", null)
-            },
-            icon = {
-                val userAvatar = timelineViewModel.user?.avatar?.uri
-                if (userAvatar != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(userAvatar)
-                            .crossfade(true)
-                            .build(),
-                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape),
-                        contentDescription = "Following feed",
-                    )
-                } else {
-                    Spacer(modifier = Modifier.size(20.dp))
-                }
-            },
-            railExpanded = state == WideNavigationRailValue.Expanded,
-        )
-
-        timelineViewModel.feeds.forEach { feed ->
-            WideNavigationRailItem(
-                label = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = feed.displayName)
-                    }
-                },
-                selected = timelineViewModel.selectedFeed == feed.uri.atUri,
-                onClick = {
-                    selectFeed(feed.uri.atUri, feed.displayName, feed.avatar?.uri)
-                },
-                icon = {
-                    if (feed.avatar != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(feed.avatar?.uri)
-                                .crossfade(true)
-                                .build(),
-                            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape),
-                            contentDescription = "Feed avatar",
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.size(20.dp))
-                    }
-                },
-                railExpanded = state == WideNavigationRailValue.Expanded,
-            )
         }
     }
 }

@@ -26,6 +26,7 @@ import app.bsky.actor.PreferencesUnion
 import app.bsky.actor.Profile
 import app.bsky.actor.PutPreferencesRequest
 import app.bsky.actor.SavedFeedType
+import app.bsky.actor.SavedFeedsPrefV2
 import app.bsky.actor.ProfileViewBasic
 import app.bsky.actor.ProfileViewDetailed
 import app.bsky.actor.SearchActorsQueryParams
@@ -217,6 +218,8 @@ class BlueskyConn(val context: Context) {
         private val OAUTH_IN_FLIGHT_APPVIEW_PROXY = stringPreferencesKey(AuthData.OAuthInFlightAppviewProxy.name)
         private val OAUTH_IN_FLIGHT_AUTH_SERVER_URL = stringPreferencesKey(AuthData.OAuthInFlightAuthServerURL.name)
         private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
+        private val CACHED_FEED_ORDER = stringPreferencesKey("cached_feed_order")
+        private val CACHED_FEED_METADATA = stringPreferencesKey("cached_feed_metadata")
 
         // OAuth client identity. Must match the JSON document hosted at OAUTH_CLIENT_ID exactly.
         // See oauth/client-metadata.json and oauth/README.md.
@@ -1411,6 +1414,71 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    data class CachedFeed(val uri: String, val name: String, val avatar: String?)
+
+    suspend fun getCachedFeedOrder(): List<String> {
+        return context.dataStore.data.first()[CACHED_FEED_ORDER]
+            ?.split(",")
+            ?.filter { it.isNotBlank() }
+            ?: listOf("following")
+    }
+
+    suspend fun getCachedFeedMetadata(): List<CachedFeed> {
+        val raw = context.dataStore.data.first()[CACHED_FEED_METADATA] ?: return emptyList()
+        return raw.split("\n").mapNotNull { line ->
+            val parts = line.split("\t")
+            if (parts.size >= 2) {
+                CachedFeed(parts[0], parts[1], parts.getOrNull(2)?.takeIf { it.isNotBlank() })
+            } else null
+        }
+    }
+
+    private suspend fun saveCachedFeedOrder(uris: List<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[CACHED_FEED_ORDER] = uris.joinToString(",")
+        }
+    }
+
+    private suspend fun saveCachedFeedMetadata(feeds: List<GeneratorView>) {
+        context.dataStore.edit { prefs ->
+            prefs[CACHED_FEED_METADATA] = feeds.joinToString("\n") { feed ->
+                "${feed.uri.atUri}\t${feed.displayName}\t${feed.avatar?.uri ?: ""}"
+            }
+        }
+    }
+
+    suspend fun orderedFeedUris(): Result<List<String>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
+            val savedFeeds = prefs.preferences.firstOrNull {
+                it is PreferencesUnion.SavedFeedsPrefV2
+            } as? PreferencesUnion.SavedFeedsPrefV2
+
+            if (savedFeeds == null) {
+                val default = listOf("following")
+                saveCachedFeedOrder(default)
+                return Result.success(default)
+            }
+
+            val orderedUris = savedFeeds.value.items.filter {
+                (it.type is SavedFeedType.Feed && it.value.startsWith("at://")) ||
+                it.type is SavedFeedType.Timeline
+            }.map { it.value }
+
+            if (orderedUris.isEmpty()) {
+                val default = listOf("following")
+                saveCachedFeedOrder(default)
+                return Result.success(default)
+            }
+
+            saveCachedFeedOrder(orderedUris)
+            return Result.success(orderedUris)
+        }
+    }
+
     suspend fun feeds(): Result<List<GeneratorView>> {
         return runCatching {
             create().onFailure {
@@ -1440,7 +1508,10 @@ class BlueskyConn(val context: Context) {
             }.getOrNull()
 
             if (batch is AtpResponse.Success) {
-                return Result.success(batch.response.feeds)
+                val feedMap = batch.response.feeds.associateBy { it.uri.atUri }
+                val orderedFeeds = feedUris.mapNotNull { feedMap[it.atUri] }
+                saveCachedFeedMetadata(orderedFeeds)
+                return Result.success(orderedFeeds)
             }
 
             val resolved = coroutineScope {
@@ -1457,7 +1528,44 @@ class BlueskyConn(val context: Context) {
                 }.awaitAll()
             }.mapNotNull { it?.takeIf { r -> r.isValid }?.view }
 
-            return Result.success(resolved)
+            val resolvedMap = resolved.associateBy { it.uri.atUri }
+            val orderedFeeds = feedUris.mapNotNull { resolvedMap[it.atUri] }
+            saveCachedFeedMetadata(orderedFeeds)
+            return Result.success(orderedFeeds)
+        }
+    }
+
+    suspend fun reorderFeeds(newOrder: List<String>): Result<Unit> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
+            val savedFeeds = prefs.preferences.firstOrNull {
+                it is PreferencesUnion.SavedFeedsPrefV2
+            } as? PreferencesUnion.SavedFeedsPrefV2
+
+            if (savedFeeds == null) {
+                return Result.success(Unit)
+            }
+
+            val existingItems = savedFeeds.value.items.toMutableList()
+            val orderMap = newOrder.withIndex().associate { it.value to it.index }
+            existingItems.sortBy { item ->
+                orderMap[item.value] ?: Int.MAX_VALUE
+            }
+
+            val updatedPrefs = prefs.preferences.toMutableList()
+            val existingIndex = updatedPrefs.indexOfFirst { it is PreferencesUnion.SavedFeedsPrefV2 }
+            val newPref = PreferencesUnion.SavedFeedsPrefV2(
+                SavedFeedsPrefV2(items = existingItems)
+            )
+            if (existingIndex >= 0) {
+                updatedPrefs[existingIndex] = newPref
+            } else {
+                updatedPrefs.add(newPref)
+            }
+            pdsClient!!.putPreferences(PutPreferencesRequest(preferences = updatedPrefs)).requireResponse()
         }
     }
 

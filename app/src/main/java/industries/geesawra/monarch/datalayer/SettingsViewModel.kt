@@ -49,12 +49,6 @@ enum class AvatarShape {
     RoundedSquare,
 }
 
-data class DefaultFeed(
-    val uri: String = "following",
-    val displayName: String = "Following",
-    val avatar: String? = null,
-)
-
 data class SettingsState(
     val themeMode: ThemeMode = ThemeMode.System,
     val appTheme: AppTheme = AppTheme.Monarch,
@@ -64,10 +58,8 @@ data class SettingsState(
     val replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads,
     val showLabels: Boolean = true,
     val showPronounsInPosts: Boolean = false,
-    val defaultFeed: DefaultFeed = DefaultFeed(),
     val defaultAppviewProxy: String = BLUESKY_APPVIEW_DID,
     val forceCompactLayout: Boolean = false,
-    val swipeableFeeds: Boolean = true,
     val autoLikeOnReply: Boolean = false,
     val autoLikeOnScroll: Boolean = false,
     val aiEnabled: Boolean = true,
@@ -105,11 +97,7 @@ class SettingsViewModel @Inject constructor(
         private val SHOW_LABELS = stringPreferencesKey("show_labels")
         private val SHOW_PRONOUNS_IN_POSTS = stringPreferencesKey("show_pronouns_in_posts")
         private val DEFAULT_APPVIEW_PROXY = stringPreferencesKey("default_appview_proxy")
-        private val DEFAULT_FEED_URI = stringPreferencesKey("default_feed_uri")
-        private val DEFAULT_FEED_NAME = stringPreferencesKey("default_feed_name")
-        private val DEFAULT_FEED_AVATAR = stringPreferencesKey("default_feed_avatar")
         private val FORCE_COMPACT_LAYOUT = stringPreferencesKey("force_compact_layout")
-        private val SWIPEABLE_FEEDS = stringPreferencesKey("swipeable_feeds")
         private val AUTO_LIKE_ON_REPLY = stringPreferencesKey("auto_like_on_reply")
         private val AUTO_LIKE_ON_SCROLL = stringPreferencesKey("auto_like_on_scroll")
         private val AI_ENABLED = stringPreferencesKey("ai_enabled")
@@ -139,13 +127,7 @@ class SettingsViewModel @Inject constructor(
                     showLabels = prefs[SHOW_LABELS]?.toBooleanStrictOrNull() ?: !narrowScreen,
                     showPronounsInPosts = prefs[SHOW_PRONOUNS_IN_POSTS]?.toBooleanStrictOrNull() ?: false,
                     defaultAppviewProxy = prefs[DEFAULT_APPVIEW_PROXY] ?: BLUESKY_APPVIEW_DID,
-                    defaultFeed = DefaultFeed(
-                        uri = prefs[DEFAULT_FEED_URI] ?: "following",
-                        displayName = prefs[DEFAULT_FEED_NAME] ?: "Following",
-                        avatar = prefs[DEFAULT_FEED_AVATAR],
-                    ),
                     forceCompactLayout = prefs[FORCE_COMPACT_LAYOUT]?.toBooleanStrictOrNull() ?: false,
-                    swipeableFeeds = prefs[SWIPEABLE_FEEDS]?.toBooleanStrictOrNull() ?: !narrowScreen,
                     autoLikeOnReply = prefs[AUTO_LIKE_ON_REPLY]?.toBooleanStrictOrNull() ?: false,
                     autoLikeOnScroll = prefs[AUTO_LIKE_ON_SCROLL]?.toBooleanStrictOrNull() ?: false,
                     aiEnabled = prefs[AI_ENABLED]?.toBooleanStrictOrNull() ?: true,
@@ -224,12 +206,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setSwipeableFeeds(enabled: Boolean) {
-        viewModelScope.launch {
-            context.settingsDataStore.edit { it[SWIPEABLE_FEEDS] = enabled.toString() }
-        }
-    }
-
     fun setAutoLikeOnScroll(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[AUTO_LIKE_ON_SCROLL] = enabled.toString() }
@@ -287,17 +263,6 @@ class SettingsViewModel @Inject constructor(
     fun setNotificationServerUrl(url: String) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[NOTIFICATION_SERVER_URL] = url }
-        }
-    }
-
-    fun setDefaultFeed(uri: String, displayName: String, avatar: String?) {
-        viewModelScope.launch {
-            context.settingsDataStore.edit {
-                it[DEFAULT_FEED_URI] = uri
-                it[DEFAULT_FEED_NAME] = displayName
-                if (avatar != null) it[DEFAULT_FEED_AVATAR] = avatar
-                else it.remove(DEFAULT_FEED_AVATAR)
-            }
         }
     }
 }

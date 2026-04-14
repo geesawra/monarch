@@ -12,6 +12,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toPersistentList
 import androidx.lifecycle.ViewModel
@@ -80,11 +81,15 @@ data class SessionState(
     val error: String? = null,
 )
 
+data class CachedFeedInfo(val uri: String, val name: String, val avatar: String?)
+
 data class TimelineState(
     val selectedFeed: String = "following",
     val feedName: String = "",
     val feedAvatar: String? = null,
     val feeds: ImmutableList<GeneratorView> = persistentListOf(),
+    val cachedFeedMetadata: ImmutableList<CachedFeedInfo> = persistentListOf(),
+    val orderedFeedUris: ImmutableList<String> = persistentListOf("following"),
     val skeets: ImmutableList<SkeetData> = persistentListOf(),
     val feedSkeets: ImmutableMap<String, ImmutableList<SkeetData>> = persistentMapOf(),
     val feedCursors: ImmutableMap<String, String?> = persistentMapOf(),
@@ -214,6 +219,31 @@ class TimelineViewModel @AssistedInject constructor(
     var pendingNotificationsTab by mutableStateOf(false)
     var hasNewTimelinePosts by mutableStateOf(false); private set
 
+    init {
+        viewModelScope.launch {
+            val cachedOrder = bskyConn.getCachedFeedOrder()
+            val cachedMetadata = bskyConn.getCachedFeedMetadata().map {
+                CachedFeedInfo(it.uri, it.name, it.avatar)
+            }
+            val firstFeed = cachedOrder.firstOrNull() ?: "following"
+            val firstFeedMeta = if (firstFeed == "following") {
+                CachedFeedInfo("following", "Following", null)
+            } else {
+                cachedMetadata.find { it.uri == firstFeed }
+                    ?: CachedFeedInfo(firstFeed, "Feed", null)
+            }
+            updateTimeline {
+                it.copy(
+                    orderedFeedUris = cachedOrder.toImmutableList(),
+                    cachedFeedMetadata = cachedMetadata.toImmutableList(),
+                    selectedFeed = firstFeed,
+                    feedName = firstFeedMeta.name,
+                    feedAvatar = firstFeedMeta.avatar
+                )
+            }
+        }
+    }
+
     fun clearNewTimelinePostsIndicator() {
         hasNewTimelinePosts = false
     }
@@ -231,6 +261,8 @@ class TimelineViewModel @AssistedInject constructor(
     val feedName: String get() = timelineState.feedName
     val feedAvatar: String? get() = timelineState.feedAvatar
     val feeds: ImmutableList<GeneratorView> get() = timelineState.feeds
+    val cachedFeedMetadata: ImmutableList<CachedFeedInfo> get() = timelineState.cachedFeedMetadata
+    val orderedFeedUris: ImmutableList<String> get() = timelineState.orderedFeedUris
     val skeets: ImmutableList<SkeetData> get() = timelineState.skeets
     val feedSkeets: ImmutableMap<String, ImmutableList<SkeetData>> get() = timelineState.feedSkeets
     val feedCursors: ImmutableMap<String, String?> get() = timelineState.feedCursors
@@ -534,6 +566,16 @@ class TimelineViewModel @AssistedInject constructor(
             }.onSuccess { fetched ->
                 updateSession { it.copy(user = fetched) }
                 saveCurrentAccount()
+            }
+
+            bskyConn.orderedFeedUris().onSuccess { uris ->
+                val firstFeed = uris.firstOrNull() ?: "following"
+                updateTimeline {
+                    it.copy(
+                        orderedFeedUris = uris.toImmutableList(),
+                        selectedFeed = firstFeed
+                    )
+                }
             }
 
             fetchTimeline(fresh = true)
@@ -1003,6 +1045,9 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun feeds(): Job {
         return viewModelScope.launch {
+            bskyConn.orderedFeedUris().onSuccess { uris ->
+                updateTimeline { it.copy(orderedFeedUris = uris.toImmutableList()) }
+            }
             bskyConn.feeds().onFailure {
                 handleError(it)
             }.onSuccess { fetched ->
@@ -1026,6 +1071,21 @@ class TimelineViewModel @AssistedInject constructor(
     fun selectFeed(uri: String, displayName: String, avatar: String?, then: () -> Unit = {}) {
         applyFeedState(uri, displayName, avatar)
         fetchTimeline(fresh = true) { then() }
+    }
+
+    fun reorderFeeds(newOrder: List<String>, onComplete: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = bskyConn.reorderFeeds(newOrder)
+            result.onSuccess {
+                bskyConn.orderedFeedUris().onSuccess { uris ->
+                    updateTimeline { it.copy(orderedFeedUris = uris.toImmutableList()) }
+                }
+                bskyConn.feeds().onSuccess { updatedFeeds ->
+                    updateTimeline { it.copy(feeds = updatedFeeds.toImmutableList()) }
+                }
+            }
+            onComplete(result)
+        }
     }
 
     fun like(uri: AtUri, cid: Cid) {
