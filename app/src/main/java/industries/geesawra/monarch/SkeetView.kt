@@ -46,7 +46,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.ModalBottomSheet
@@ -59,7 +58,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.ui.Alignment
@@ -78,7 +76,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import androidx.media3.common.MimeTypes
 import app.bsky.embed.ExternalViewExternal
 import app.bsky.embed.ImagesViewImage
 import app.bsky.embed.RecordView
@@ -100,7 +97,6 @@ import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import industries.geesawra.monarch.datalayer.toFloat
-import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
 import nl.jacobras.humanreadable.HumanReadable
 import industries.geesawra.monarch.datalayer.PostInteraction
@@ -108,9 +104,6 @@ import industries.geesawra.monarch.datalayer.TranslationPhase
 import industries.geesawra.monarch.datalayer.languageCodeToName
 import industries.geesawra.monarch.datalayer.TRANSLATION_LANGUAGE_OPTIONS
 import androidx.compose.material3.CircularProgressIndicator
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.Instant as JavaInstant
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -977,7 +970,6 @@ private fun TenorGifView(context: Context, ev: ExternalViewExternal, isVisible: 
         }
     } else {
         ev.thumb?.let {
-            val context = LocalContext.current
             val request = remember(it.uri) {
                 ImageRequest.Builder(context)
                     .data(it.uri)
@@ -1115,6 +1107,7 @@ private fun ExternalView(context: Context, ev: ExternalViewExternal, isVisible: 
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun RecordView(
     modifier: Modifier = Modifier,
@@ -1146,6 +1139,7 @@ fun RecordView(
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 private fun RecordWithMediaView(
     modifier: Modifier = Modifier,
@@ -1219,7 +1213,6 @@ private fun SkeetReason(
 
         var isRepost = false
         skeet.reason?.let {
-            it
             when (it) {
                 is FeedViewPostReasonUnion.ReasonRepost -> {
                     Row(
@@ -1461,8 +1454,8 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
                 modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
             ) {
                 skeet.authorLabels.forEach {
-                    it.neg?.let { it ->
-                        if (!it) {
+                    it.neg?.let { neg ->
+                        if (!neg) {
                             return@forEach
                         }
                     }
@@ -1567,6 +1560,7 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
     }
 }
 
+@Suppress("SameParameterValue")
 @Composable
 private fun ContentWarningCard(
     label: String,

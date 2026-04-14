@@ -8,28 +8,19 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,7 +48,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
@@ -77,13 +67,10 @@ import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.ModalWideNavigationRail
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -101,7 +88,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator
@@ -140,17 +126,10 @@ import coil3.request.crossfade
 import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.TextButton
-import androidx.compose.foundation.shape.RoundedCornerShape
-import android.net.Uri
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import app.bsky.feed.ThreadgateAllowUnion
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.LinkPreviewData
 import industries.geesawra.monarch.datalayer.NotificationBadge
@@ -314,8 +293,8 @@ fun MainView(
                 }
                 val isFromThisDevice = draftView.draft.deviceId == null || draftView.draft.deviceId == localDeviceId
                 if (isFromThisDevice) {
-                    val imageUris = post.embedImages?.map { Uri.parse(it.localRef.path) } ?: emptyList()
-                    val videoUris = post.embedVideos?.map { Uri.parse(it.localRef.path) } ?: emptyList()
+                    val imageUris = post.embedImages?.map { it.localRef.path.toUri() } ?: emptyList()
+                    val videoUris = post.embedVideos?.map { it.localRef.path.toUri() } ?: emptyList()
                     if (videoUris.isNotEmpty()) {
                         composeMediaSelected.value = videoUris
                         composeMediaSelectedIsVideo.value = true
@@ -349,11 +328,6 @@ fun MainView(
             },
         )
     }
-
-    val scrimAlpha by animateFloatAsState(
-        targetValue = if (scaffoldState.bottomSheetState.isVisible) 0.32f else 0f,
-        label = "scrimAlpha"
-    )
 
     BottomSheetScaffold(
         modifier = Modifier
@@ -711,7 +685,6 @@ private fun InnerTimelineView(
 
             val compactBottomBar: @Composable () -> Unit = {
                 val barHeight = 64.dp
-                val density = LocalDensity.current
                 val collapseFraction = with(scrollBehavior.state) {
                     if (heightOffsetLimit != 0f) (heightOffset / heightOffsetLimit).coerceIn(0f, 1f) else 0f
                 }
@@ -941,7 +914,7 @@ private fun InnerTimelineView(
                     )
                 },
                 floatingActionButton = {
-                    if (LocalBaselineProfileMode.current || isExpandedScreen) {} else when (currentDestination) {
+                    if (!LocalBaselineProfileMode.current && !isExpandedScreen) when (currentDestination) {
                         TabBarDestinations.TIMELINE -> {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1437,6 +1410,7 @@ private fun DetailThreadPane(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
+@Suppress("UNUSED_PARAMETER")
 private fun DetailProfilePane(
     did: Did,
     timelineViewModel: TimelineViewModel,

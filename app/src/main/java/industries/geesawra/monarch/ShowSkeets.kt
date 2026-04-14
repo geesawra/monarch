@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,8 +24,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
@@ -58,11 +55,8 @@ import app.bsky.feed.ReplyRefParentUnion
 import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
 import io.github.fornewid.placeholder.material3.fade
 import io.github.fornewid.placeholder.material3.placeholder
-import industries.geesawra.monarch.datalayer.AvatarShape
-import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
-import industries.geesawra.monarch.datalayer.ThreadConnector
 import industries.geesawra.monarch.datalayer.ThreadConnectorType
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
@@ -293,7 +287,7 @@ fun ShowSkeets(
                     }
                 }
             } else {
-                if (isShowingThread && !isGroupStart && !hasConnectors) {
+                if (isShowingThread && !isGroupStart) {
                     HorizontalDivider(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant,
@@ -459,7 +453,7 @@ fun ShowSkeets(
                 }
             }
 
-            if (isShowingThread && isGroupEnd && !hasConnectors) {
+            if (isShowingThread && isGroupEnd) {
                 Spacer(modifier = Modifier.height(4.dp))
             }
         }
