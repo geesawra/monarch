@@ -1043,6 +1043,33 @@ class TimelineViewModel @AssistedInject constructor(
         return result
     }
 
+    suspend fun postThread(
+        posts: List<ThreadPostData>,
+        threadgateRules: List<ThreadgateAllowUnion>? = null,
+        onProgress: (Int, Int) -> Unit = { _, _ -> },
+    ): Result<List<PostResult>> {
+        val result = bskyConn.postThread(
+            posts = posts,
+            threadgateRules = threadgateRules,
+            onProgress = onProgress,
+            onVideoStatus = { status, progress ->
+                updateVideoUpload { VideoUploadState(status = status, progress = progress) }
+            },
+        )
+        updateVideoUpload { VideoUploadState() }
+        result.onSuccess { postResults ->
+            if (selectedFeed == "following" && postResults.isNotEmpty()) {
+                kotlinx.coroutines.delay(500)
+                bskyConn.getPosts(postResults.map { it.uri }).onSuccess { posts ->
+                    val newSkeets = posts.mapNotNull { SkeetData.fromPostView(it, it.author) }
+                    newSkeets.forEach { postInteractionStore.seed(it) }
+                    updateTimeline { it.copy(skeets = (newSkeets + it.skeets).toImmutableList()) }
+                }
+            }
+        }
+        return result
+    }
+
     fun feeds(): Job {
         return viewModelScope.launch {
             bskyConn.orderedFeedUris().onSuccess { uris ->

@@ -200,6 +200,20 @@ data class Timeline(
     val feed: List<FeedViewPost>,
 )
 
+data class PostResult(
+    val uri: AtUri,
+    val cid: Cid,
+)
+
+data class ThreadPostData(
+    val text: String,
+    val facets: List<Facet> = emptyList(),
+    val images: List<Uri>? = null,
+    val video: Uri? = null,
+    val mediaAltTexts: Map<Uri, String> = emptyMap(),
+    val linkPreview: LinkPreviewData? = null,
+)
+
 @Stable
 class BlueskyConn(val context: Context) {
     companion object {
@@ -998,6 +1012,135 @@ class BlueskyConn(val context: Context) {
                 rkey = postUri.rkey(),
             )
         )
+    }
+
+    suspend fun postThread(
+        posts: List<ThreadPostData>,
+        threadgateRules: List<ThreadgateAllowUnion>? = null,
+        onProgress: (Int, Int) -> Unit = { _, _ -> },
+        onVideoStatus: (VideoUploadStatus, Long?) -> Unit = { _, _ -> },
+    ): Result<List<PostResult>> {
+        return runCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+
+            if (posts.isEmpty()) {
+                return Result.failure(Exception("Thread must have at least one post"))
+            }
+
+            val results = mutableListOf<PostResult>()
+            var rootRef: StrongRef? = null
+
+            for ((index, postData) in posts.withIndex()) {
+                onProgress(index + 1, posts.size)
+
+                var mediaUnion: RecordWithMediaMediaUnion? = null
+
+                if (postData.images != null) {
+                    val blobs = uploadImages(postData.images).getOrThrow()
+                    mediaUnion = RecordWithMediaMediaUnion.Images(
+                        value = Images(
+                            images = blobs.mapIndexed { i, uploaded ->
+                                ImagesImage(
+                                    image = uploaded.blob,
+                                    alt = postData.mediaAltTexts[postData.images[i]].orEmpty(),
+                                    aspectRatio = AspectRatio(uploaded.width, uploaded.height)
+                                )
+                            }
+                        )
+                    )
+                }
+
+                if (postData.video != null) {
+                    val blob = uploadVideo(postData.video, onVideoStatus).getOrThrow()
+                    mediaUnion = RecordWithMediaMediaUnion.Video(
+                        value = Video(
+                            video = blob.blob,
+                            alt = postData.mediaAltTexts[postData.video].orEmpty(),
+                            aspectRatio = AspectRatio(blob.width, blob.height)
+                        )
+                    )
+                }
+
+                if (mediaUnion == null && postData.linkPreview != null) {
+                    var thumbBlob: Blob? = null
+                    if (postData.linkPreview.imageUrl != null) {
+                        try {
+                            thumbBlob = uploadBlobFromUrl(postData.linkPreview.imageUrl)
+                        } catch (_: Exception) {
+                        }
+                    }
+                    mediaUnion = RecordWithMediaMediaUnion.External(
+                        value = External(
+                            external = ExternalExternal(
+                                uri = sh.christian.ozone.api.Uri(postData.linkPreview.url),
+                                title = postData.linkPreview.title ?: "",
+                                description = postData.linkPreview.description ?: "",
+                                thumb = thumbBlob,
+                            )
+                        )
+                    )
+                }
+
+                val postEmbed: PostEmbedUnion? = when {
+                    mediaUnion is RecordWithMediaMediaUnion.Images -> PostEmbedUnion.Images(
+                        value = mediaUnion.value
+                    )
+                    mediaUnion is RecordWithMediaMediaUnion.Video -> PostEmbedUnion.Video(
+                        value = mediaUnion.value
+                    )
+                    mediaUnion is RecordWithMediaMediaUnion.External -> PostEmbedUnion.External(
+                        value = mediaUnion.value
+                    )
+                    else -> null
+                }
+
+                val replyRef: PostReplyRef? = if (results.isNotEmpty()) {
+                    val previousPost = results.last()
+                    PostReplyRef(
+                        root = rootRef!!,
+                        parent = StrongRef(previousPost.uri, previousPost.cid)
+                    )
+                } else null
+
+                val r = BlueskyJson.encodeAsJsonContent(
+                    Post(
+                        text = postData.text,
+                        createdAt = Clock.System.now(),
+                        embed = postEmbed,
+                        reply = replyRef,
+                        facets = postData.facets,
+                    )
+                )
+
+                val postRes = pdsClient!!.createRecord(
+                    CreateRecordRequest(
+                        repo = session!!.handle,
+                        collection = Nsid("app.bsky.feed.post"),
+                        record = r,
+                    )
+                )
+
+                when (postRes) {
+                    is AtpResponse.Failure<*> -> {
+                        return Result.failure(Exception("Failed to post part ${index + 1}: ${postRes.error?.message}"))
+                    }
+                    is AtpResponse.Success<CreateRecordResponse> -> {
+                        val result = PostResult(postRes.response.uri, postRes.response.cid)
+                        results.add(result)
+                        if (index == 0) {
+                            rootRef = StrongRef(result.uri, result.cid)
+                            if (threadgateRules != null) {
+                                createThreadgate(result.uri, threadgateRules)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Result.success(results)
+        }.getOrElse { Result.failure(it) }
     }
 
     suspend fun fetchRecord(uri: AtUri): Result<JsonContent> {

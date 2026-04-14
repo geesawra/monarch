@@ -54,9 +54,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CameraRoll
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.Button
@@ -91,11 +93,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -133,6 +138,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import industries.geesawra.monarch.datalayer.LinkPreviewData
 import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
+import industries.geesawra.monarch.datalayer.ThreadPostData
 import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -148,6 +154,20 @@ private const val MAX_POST_CHARS = 300
 private const val KEYBOARD_SHOW_DELAY_MS = 100L
 private const val MENTION_SEARCH_DEBOUNCE_MS = 300L
 private const val LINK_PREVIEW_FETCH_DEBOUNCE_MS = 500L
+private const val MAX_THREAD_POSTS = 10
+
+class ThreadPostState(
+    val id: Int,
+    val textFieldState: TextFieldState,
+) {
+    val media = mutableStateOf<List<Uri>>(emptyList())
+    val mediaIsVideo = mutableStateOf(false)
+    val mediaAltTexts = mutableStateOf<Map<Uri, String>>(emptyMap())
+    val facets = mutableStateListOf<Facet>()
+    val mentionDids = mutableStateMapOf<String, Did>()
+    val linkPreview = mutableStateOf<LinkPreviewData?>(null)
+    val linkPreviewDismissed = mutableStateOf(false)
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -184,6 +204,16 @@ fun ComposeView(
     val linkPreviewDismissed = remember { mutableStateOf(false) }
     val linkPreviewCache = remember { mutableMapOf<String, LinkPreviewData?>() }
 
+    val isThreadMode = remember { mutableStateOf(false) }
+    var threadPostIdCounter = remember { mutableStateOf(1) }
+    val threadPosts = remember {
+        mutableStateListOf(
+            ThreadPostState(0, TextFieldState())
+        )
+    }
+    val uploadingThread = remember { mutableStateOf(false) }
+    val threadProgress = remember { mutableStateOf(0 to 0) }
+
     LaunchedEffect(scaffoldState.bottomSheetState.targetValue) {
         when (scaffoldState.bottomSheetState.targetValue) {
             SheetValue.Hidden -> {
@@ -205,6 +235,11 @@ fun ComposeView(
                     linkPreviewDismissed.value = false
                     linkPreviewCache.clear()
                     timelineViewModel.clearActiveDraft()
+                    isThreadMode.value = false
+                    threadPosts.clear()
+                    threadPosts.add(ThreadPostState(0, TextFieldState()))
+                    threadPostIdCounter.value = 1
+                    uploadingThread.value = false
                 }
             }
 
@@ -239,6 +274,7 @@ fun ComposeView(
         }
     }
 
+    val focusedThreadPostIndex = remember { mutableStateOf(0) }
 
     val pickMedia =
         rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)) { uris ->
@@ -277,8 +313,16 @@ fun ComposeView(
                 return@rememberLauncherForActivityResult
             }
 
-            mediaSelectedIsVideo.value = containsVideo && urisMap.size == 1
-            mediaSelected.value = urisMap.filterValues { it != null }.keys.toList()
+            if (isThreadMode.value) {
+                val targetPost = threadPosts.getOrNull(focusedThreadPostIndex.value)
+                if (targetPost != null) {
+                    targetPost.mediaIsVideo.value = containsVideo && urisMap.size == 1
+                    targetPost.media.value = urisMap.filterValues { it != null }.keys.toList()
+                }
+            } else {
+                mediaSelectedIsVideo.value = containsVideo && urisMap.size == 1
+                mediaSelected.value = urisMap.filterValues { it != null }.keys.toList()
+            }
         }
 
     val cameraImageUri = remember { mutableStateOf<Uri?>(null) }
@@ -286,8 +330,16 @@ fun ComposeView(
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success) {
                 cameraImageUri.value?.let { uri ->
-                    mediaSelectedIsVideo.value = false
-                    mediaSelected.value = mediaSelected.value + uri
+                    if (isThreadMode.value) {
+                        val targetPost = threadPosts.getOrNull(focusedThreadPostIndex.value)
+                        if (targetPost != null) {
+                            targetPost.mediaIsVideo.value = false
+                            targetPost.media.value = targetPost.media.value + uri
+                        }
+                    } else {
+                        mediaSelectedIsVideo.value = false
+                        mediaSelected.value = mediaSelected.value + uri
+                    }
                 }
             }
         }
@@ -359,15 +411,84 @@ fun ComposeView(
                     wasEdited = wasEdited,
                     onDraftsClick = onDraftsClick,
                     onThreadgateClick = { showThreadgateSheet = true },
+                    isThreadMode = isThreadMode,
+                    threadPosts = threadPosts,
+                    focusedThreadPostIndex = focusedThreadPostIndex.value,
+                    onThreadPost = {
+                        coroutineScope.launch {
+                            uploadingPost.value = true
+                            val posts = threadPosts.map { post ->
+                                ThreadPostData(
+                                    text = post.textFieldState.text.toString(),
+                                    facets = post.facets.toList(),
+                                    images = if (!post.mediaIsVideo.value) post.media.value.ifEmpty { null } else null,
+                                    video = if (post.mediaIsVideo.value) post.media.value.firstOrNull() else null,
+                                    mediaAltTexts = post.mediaAltTexts.value,
+                                    linkPreview = if (!post.linkPreviewDismissed.value) post.linkPreview.value else null,
+                                )
+                            }
+                            timelineViewModel.postThread(
+                                posts = posts,
+                                threadgateRules = threadgateRules.value,
+                                onProgress = { current, total ->
+                                    threadProgress.value = current to total
+                                },
+                            ).onSuccess {
+                                wasEdited.value = false
+                                coroutineScope.launch {
+                                    scaffoldState.bottomSheetState.hide()
+                                }
+                            }.onFailure { error ->
+                                Toast.makeText(
+                                    context,
+                                    "Could not post thread: ${error.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }.also {
+                                uploadingPost.value = false
+                            }
+                        }
+                    },
                 )
 
                 LaunchedEffect(Unit) {
-                    snapshotFlow { textfieldState.text.toString() to mediaSelected.value }
-                        .collect { (text, media) ->
-                            wasEdited.value = text.isNotEmpty() || media.isNotEmpty()
+                    snapshotFlow {
+                        if (isThreadMode.value) {
+                            threadPosts.any { it.textFieldState.text.isNotEmpty() || it.media.value.isNotEmpty() }
+                        } else {
+                            textfieldState.text.isNotEmpty() || mediaSelected.value.isNotEmpty()
                         }
+                    }.collect { hasContent ->
+                        wasEdited.value = hasContent
+                    }
                 }
 
+                if (isThreadMode.value) {
+                    ThreadComposeContent(
+                        threadPosts = threadPosts,
+                        timelineViewModel = timelineViewModel,
+                        settingsState = settingsState,
+                        maxChars = maxChars,
+                        onAddPost = {
+                            if (threadPosts.size < MAX_THREAD_POSTS) {
+                                val newId = threadPostIdCounter.value++
+                                threadPosts.add(ThreadPostState(newId, TextFieldState()))
+                            }
+                        },
+                        onRemovePost = { index ->
+                            if (threadPosts.size > 1) {
+                                threadPosts.removeAt(index)
+                                if (focusedThreadPostIndex.value >= threadPosts.size) {
+                                    focusedThreadPostIndex.value = threadPosts.size - 1
+                                }
+                            }
+                        },
+                        onFocusChanged = { index ->
+                            focusedThreadPostIndex.value = index
+                        },
+                        linkPreviewCache = linkPreviewCache,
+                    )
+                } else {
                 // Mention typeahead: detect @query and search
                 LaunchedEffect(textfieldState.text, textfieldState.selection) {
                     val text = textfieldState.text.toString()
@@ -642,6 +763,7 @@ fun ComposeView(
                     },
                     onEditAlt = { index -> altEditorUri.value = mediaSelected.value[index] },
                 )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -688,6 +810,10 @@ fun ActionRow(
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
     onDraftsClick: () -> Unit = {},
     onThreadgateClick: () -> Unit = {},
+    isThreadMode: MutableState<Boolean> = mutableStateOf(false),
+    threadPosts: SnapshotStateList<ThreadPostState>? = null,
+    focusedThreadPostIndex: Int = 0,
+    onThreadPost: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -727,9 +853,29 @@ fun ActionRow(
                     tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
                 )
             }
+            if (inReplyToData == null && !isQuotePost) {
+                TextButton(onClick = { isThreadMode.value = !isThreadMode.value }) {
+                    Icon(
+                        Icons.Default.FormatListNumbered,
+                        contentDescription = "Thread mode",
+                        tint = if (isThreadMode.value) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                    )
+                }
+            }
         }
         val allMediaHasAlt = mediaSelected.value.isEmpty() ||
             mediaSelected.value.all { uri -> mediaAltTexts.value[uri]?.isNotBlank() == true }
+
+        val threadButtonEnabled = if (isThreadMode.value && threadPosts != null) {
+            threadPosts.all { post ->
+                val hasContent = post.textFieldState.text.isNotBlank() || post.media.value.isNotEmpty()
+                val withinLimit = post.textFieldState.text.length <= maxChars
+                val altTextOk = !requireAltText || post.media.value.isEmpty() ||
+                    post.media.value.all { uri -> post.mediaAltTexts.value[uri]?.isNotBlank() == true }
+                hasContent && withinLimit && altTextOk
+            }
+        } else false
+
         val postButtonEnabled = remember(postText, mediaSelected.value, mediaAltTexts.value, requireAltText) {
             val hasContent = postText.isNotBlank() || mediaSelected.value.isNotEmpty()
             val withinLimit = postText.length <= maxChars
@@ -756,12 +902,33 @@ fun ActionRow(
                     )
                 }
             }
+        } else if (isThreadMode.value && onThreadPost != null) {
+            val focusedPostText = threadPosts?.getOrNull(focusedThreadPostIndex)?.textFieldState?.text?.length ?: 0
+            val charsRemaining = maxChars - focusedPostText
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                    onThreadPost()
+                },
+                modifier = Modifier.padding(end = 8.dp),
+                enabled = threadButtonEnabled && !uploadingPost.value,
+                colors = if (focusedPostText > maxChars) ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ) else ButtonDefaults.buttonColors(),
+            ) {
+                Icon(Icons.Filled.ArrowUpward, contentDescription = "Post thread")
+                if (focusedPostText > 0) {
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("$charsRemaining")
+                }
+            }
         } else {
             Button(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                     coroutineScope.launch {
-                        uploadingPost.value = true // Show progress immediately
+                        uploadingPost.value = true
                         timelineViewModel.post(
                             content = postText,
                             facets = facets,
@@ -807,7 +974,7 @@ fun ActionRow(
                                 Toast.LENGTH_LONG
                             ).show()
                         }.also {
-                            uploadingPost.value = false // Hide progress after completion
+                            uploadingPost.value = false
                         }
                     }
                 },
@@ -832,16 +999,16 @@ val tokensRegexp = Regex("(\\S+)")
 
 private val bareUrlRegex = Regex("^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\\.[a-zA-Z]{2,}(/\\S*)?$")
 
-private fun isUrl(s: String): Boolean {
+internal fun isUrl(s: String): Boolean {
     return URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s) || bareUrlRegex.matches(s)
 }
 
-private fun normalizeUrl(s: String): String {
+internal fun normalizeUrl(s: String): String {
     if (URLUtil.isHttpUrl(s) || URLUtil.isHttpsUrl(s)) return s
     return "https://$s"
 }
 
-private fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap()): List<Facet> {
+internal fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap()): List<Facet> {
     val facets = mutableListOf<Facet>()
 
     for (token in tokensRegexp.findAll(data)) {
@@ -1212,4 +1379,257 @@ private fun ThreadgateRuleItem(
         },
         modifier = Modifier.clickable(enabled = enabled) { onCheckedChange(!checked) }
     )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ThreadComposeContent(
+    threadPosts: SnapshotStateList<ThreadPostState>,
+    timelineViewModel: TimelineViewModel,
+    settingsState: SettingsState,
+    maxChars: Int,
+    onAddPost: () -> Unit,
+    onRemovePost: (Int) -> Unit,
+    onFocusChanged: (Int) -> Unit,
+    linkPreviewCache: MutableMap<String, LinkPreviewData?>,
+) {
+    val urlColor = MaterialTheme.colorScheme.primary
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        threadPosts.forEachIndexed { index, postState ->
+            val focusRequester = remember { FocusRequester() }
+            val linkPreviewLoading = remember { mutableStateOf(false) }
+
+            LaunchedEffect(postState.textFieldState.text.toString()) {
+                val text = postState.textFieldState.text.toString()
+                val firstUrl = tokensRegexp.findAll(text)
+                    .map { it.value }
+                    .firstOrNull { isUrl(it) }
+
+                if (firstUrl == null) {
+                    linkPreviewLoading.value = false
+                    return@LaunchedEffect
+                }
+
+                val normalizedUrl = normalizeUrl(firstUrl)
+
+                if (postState.linkPreviewDismissed.value && postState.linkPreview.value == null) {
+                    return@LaunchedEffect
+                }
+
+                if (postState.linkPreview.value?.url == normalizedUrl) {
+                    return@LaunchedEffect
+                }
+
+                if (linkPreviewCache.containsKey(normalizedUrl)) {
+                    postState.linkPreview.value = linkPreviewCache[normalizedUrl]
+                    linkPreviewLoading.value = false
+                    return@LaunchedEffect
+                }
+
+                delay(LINK_PREVIEW_FETCH_DEBOUNCE_MS)
+
+                linkPreviewLoading.value = true
+                val preview = LinkPreviewFetcher.fetch(normalizedUrl)
+                linkPreviewCache[normalizedUrl] = preview
+                postState.linkPreview.value = preview
+                linkPreviewLoading.value = false
+                postState.linkPreviewDismissed.value = false
+            }
+
+            LaunchedEffect(postState.textFieldState.text) {
+                val data = postState.textFieldState.text.toString()
+                val computed = readFacets(data, postState.mentionDids)
+                postState.facets.clear()
+                postState.facets.addAll(computed)
+            }
+
+            val facetHighlighter = remember(postState) {
+                object : OutputTransformation {
+                    override fun TextFieldBuffer.transformOutput() {
+                        for (token in tokensRegexp.findAll(originalText)) {
+                            val s = token.value
+                            if (isUrl(s)) {
+                                addStyle(
+                                    SpanStyle(color = urlColor),
+                                    token.range.first,
+                                    token.range.last + 1,
+                                )
+                            } else if (s.startsWith("#") && s.length > 1) {
+                                val tag = s.substring(1)
+                                if (tag.isNotEmpty() && !tag.contains(" ") && tag.length <= 64) {
+                                    addStyle(
+                                        SpanStyle(color = urlColor),
+                                        token.range.first,
+                                        token.range.last + 1,
+                                    )
+                                }
+                            } else if (s.startsWith("@") && s.length > 1) {
+                                val handle = s.removePrefix("@")
+                                if (postState.mentionDids.containsKey(handle)) {
+                                    addStyle(
+                                        SpanStyle(color = urlColor),
+                                        token.range.first,
+                                        token.range.last + 1,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = postHorizontalPadding(), end = postHorizontalPadding(), top = 8.dp),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(avatarSize()),
+                ) {
+                    AsyncImage(
+                        model = timelineViewModel.user?.avatar?.uri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(avatarSize())
+                            .clip(settingsState.avatarClipShape),
+                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                    if (index < threadPosts.size - 1) {
+                        Box(
+                            modifier = Modifier
+                                .width(2.dp)
+                                .weight(1f)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = avatarTextGap())
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextField(
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { if (it.isFocused) onFocusChanged(index) },
+                            contentPadding = PaddingValues(horizontal = 2.dp),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences,
+                                autoCorrectEnabled = true,
+                                keyboardType = KeyboardType.Text,
+                            ),
+                            placeholder = {
+                                Text(if (index == 0) "Start your thread..." else "Continue...")
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                errorContainerColor = Color.Transparent,
+                                errorIndicatorColor = Color.Transparent,
+                            ),
+                            isError = postState.textFieldState.text.length > maxChars,
+                            lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 6),
+                            state = postState.textFieldState,
+                            outputTransformation = facetHighlighter,
+                        )
+                        if (threadPosts.size > 1) {
+                            IconButton(
+                                onClick = { onRemovePost(index) },
+                                modifier = Modifier.size(24.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Remove post",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    LinkPreviewCard(
+                        isLoading = linkPreviewLoading.value,
+                        preview = if (!postState.linkPreviewDismissed.value) postState.linkPreview.value else null,
+                        onDismiss = {
+                            postState.linkPreview.value = null
+                            postState.linkPreviewDismissed.value = true
+                        },
+                    )
+
+                    if (postState.media.value.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            if (!postState.mediaIsVideo.value) {
+                                PostImageGallery(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(4.dp),
+                                    images = postState.media.value.map { uri ->
+                                        Image(
+                                            url = uri.toString(),
+                                            alt = postState.mediaAltTexts.value[uri].orEmpty().ifEmpty { "Tap to add alt text" },
+                                        )
+                                    },
+                                    onCrossClick = { i ->
+                                        val toDelUri = postState.media.value[i]
+                                        postState.media.value = postState.media.value.filter { it != toDelUri }
+                                        postState.mediaAltTexts.value = postState.mediaAltTexts.value - toDelUri
+                                    },
+                                    onImageClick = { },
+                                )
+                            } else {
+                                DeletableMediaView(
+                                    originalIndex = 0,
+                                    onCrossClick = {
+                                        postState.mediaAltTexts.value = postState.mediaAltTexts.value - postState.media.value.toSet()
+                                        postState.media.value = emptyList()
+                                        postState.mediaIsVideo.value = false
+                                    },
+                                    onMediaClick = { }
+                                ) {
+                                    AsyncImage(
+                                        model = postState.media.value.first(),
+                                        contentDescription = "Selected video",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 200.dp),
+                                        contentScale = ContentScale.Crop,
+                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (threadPosts.size < MAX_THREAD_POSTS) {
+            TextButton(
+                onClick = onAddPost,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 8.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text("Add to thread")
+            }
+        }
+    }
 }
