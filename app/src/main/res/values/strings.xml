@@ -3,4 +3,5 @@
     <string name="timeline">Timeline</string>
     <string name="notifications">Notifications</string>
     <string name="search">Search</string>
+    <string name="bookmarks">Bookmarks</string>
 </resources>

@@ -15,6 +15,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.bsky.actor.GetProfileQueryParams
+import app.bsky.bookmark.CreateBookmarkRequest
+import app.bsky.bookmark.DeleteBookmarkRequest
+import app.bsky.bookmark.GetBookmarksQueryParams
+import app.bsky.bookmark.GetBookmarksResponse
 import app.bsky.actor.GetProfileResponse
 import app.bsky.actor.MutedWord
 import app.bsky.actor.MutedWordsPref
@@ -175,6 +179,7 @@ enum class AuthData {
     OAuthInFlightHandle,
     OAuthInFlightPdsURL,
     OAuthInFlightAppviewProxy,
+    OAuthInFlightAuthServerURL,
 }
 
 class LoginException(message: String?) : Exception(message)
@@ -210,6 +215,7 @@ class BlueskyConn(val context: Context) {
         private val OAUTH_IN_FLIGHT_HANDLE = stringPreferencesKey(AuthData.OAuthInFlightHandle.name)
         private val OAUTH_IN_FLIGHT_PDS_URL = stringPreferencesKey(AuthData.OAuthInFlightPdsURL.name)
         private val OAUTH_IN_FLIGHT_APPVIEW_PROXY = stringPreferencesKey(AuthData.OAuthInFlightAppviewProxy.name)
+        private val OAUTH_IN_FLIGHT_AUTH_SERVER_URL = stringPreferencesKey(AuthData.OAuthInFlightAuthServerURL.name)
         private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
 
         // OAuth client identity. Must match the JSON document hosted at OAUTH_CLIENT_ID exactly.
@@ -312,6 +318,28 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(Exception("No PDS service defined in the DID document associated with $handleOrDid"))
             }
         }
+
+        suspend fun authServerForPds(pdsURL: String): Result<String> {
+            return runCatching {
+                val httpClient = createRetryHttpClient()
+                val endpoint = pdsURL.trimEnd('/') + "/.well-known/oauth-protected-resource"
+                val response = httpClient.get(endpoint)
+                httpClient.close()
+
+                if (response.status != HttpStatusCode.OK) {
+                    return Result.failure(Exception("Failed to fetch OAuth protected resource metadata: HTTP ${response.status}"))
+                }
+
+                val body: String = response.body()
+                val protectedResource = BlueskyJson.decodeFromString(OAuthProtectedResource.serializer(), body)
+
+                if (protectedResource.authorizationServers.isEmpty()) {
+                    return Result.failure(Exception("PDS does not specify any authorization servers"))
+                }
+
+                return Result.success(protectedResource.authorizationServers.first())
+            }
+        }
     }
 
     @Serializable
@@ -324,6 +352,13 @@ class BlueskyConn(val context: Context) {
     @Serializable
     private data class DIDDoc(
         val service: List<Service>
+    )
+
+    @Serializable
+    private data class OAuthProtectedResource(
+        val resource: String,
+        @kotlinx.serialization.SerialName("authorization_servers")
+        val authorizationServers: List<String>
     )
 
     var client: BlueskyApi? = null      // appview queries (has atproto-proxy)
@@ -528,7 +563,11 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(it)
             }
 
-            val httpClient = createRetryHttpClient(baseUrl = pdsURL)
+            val authServerURL = authServerForPds(pdsURL).getOrElse {
+                return Result.failure(it)
+            }
+
+            val httpClient = createRetryHttpClient(baseUrl = authServerURL)
             val oauthApi = OAuthApi(
                 httpClient = httpClient,
                 challengeSelector = { OAuthCodeChallengeMethod.S256 },
@@ -551,6 +590,7 @@ class BlueskyConn(val context: Context) {
                     settings[OAUTH_IN_FLIGHT_HANDLE] = handle
                     settings[OAUTH_IN_FLIGHT_PDS_URL] = pdsURL
                     settings[OAUTH_IN_FLIGHT_APPVIEW_PROXY] = appviewProxy
+                    settings[OAUTH_IN_FLIGHT_AUTH_SERVER_URL] = authServerURL
                 }
 
                 Result.success(request.authorizeRequestUrl)
@@ -583,13 +623,15 @@ class BlueskyConn(val context: Context) {
                 ?: return Result.failure(Exception("Missing OAuth PDS URL"))
             val appviewProxy = prefs[OAUTH_IN_FLIGHT_APPVIEW_PROXY]
                 ?: return Result.failure(Exception("Missing OAuth appview proxy"))
+            val authServerURL = prefs[OAUTH_IN_FLIGHT_AUTH_SERVER_URL]
+                ?: return Result.failure(Exception("Missing OAuth auth server URL"))
 
             if (state != expectedState) {
                 clearInFlightOAuthState()
                 return Result.failure(Exception("OAuth state mismatch (possible CSRF)"))
             }
 
-            val httpClient = createRetryHttpClient(baseUrl = pdsURL)
+            val httpClient = createRetryHttpClient(baseUrl = authServerURL)
             val oauthApi = OAuthApi(
                 httpClient = httpClient,
                 challengeSelector = { OAuthCodeChallengeMethod.S256 },
@@ -657,6 +699,7 @@ class BlueskyConn(val context: Context) {
             settings.remove(OAUTH_IN_FLIGHT_HANDLE)
             settings.remove(OAUTH_IN_FLIGHT_PDS_URL)
             settings.remove(OAUTH_IN_FLIGHT_APPVIEW_PROXY)
+            settings.remove(OAUTH_IN_FLIGHT_AUTH_SERVER_URL)
         }
     }
 
@@ -1816,6 +1859,24 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun deviceId(): String = getOrCreateDeviceId()
+
+    suspend fun createBookmark(uri: AtUri, cid: Cid): Result<Unit> = retryOnDpopHiccup {
+        apiCall("Could not create bookmark") {
+            client!!.createBookmark(CreateBookmarkRequest(uri = uri, cid = cid))
+        }
+    }
+
+    suspend fun deleteBookmark(uri: AtUri): Result<Unit> = retryOnDpopHiccup {
+        apiCall("Could not delete bookmark") {
+            client!!.deleteBookmark(DeleteBookmarkRequest(uri = uri))
+        }
+    }
+
+    suspend fun getBookmarks(limit: Long = 50, cursor: String? = null): Result<GetBookmarksResponse> = retryOnDpopHiccup {
+        apiCall("Could not fetch bookmarks") {
+            client!!.getBookmarks(GetBookmarksQueryParams(limit = limit, cursor = cursor))
+        }
+    }
 
     private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> =
         apiCall("Could not delete record") {

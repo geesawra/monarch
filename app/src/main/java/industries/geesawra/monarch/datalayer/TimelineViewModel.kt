@@ -165,6 +165,11 @@ data class DraftsState(
     val activeDraftId: sh.christian.ozone.api.Tid? = null,
 )
 
+data class BookmarksState(
+    val bookmarks: ImmutableList<SkeetData> = persistentListOf(),
+    val cursor: String? = null,
+    val isFetchingBookmarks: Boolean = false,
+)
 
 object NotificationBadge {
     val count = kotlinx.coroutines.flow.MutableStateFlow(0)
@@ -204,6 +209,7 @@ class TimelineViewModel @AssistedInject constructor(
     var videoUploadState by mutableStateOf(VideoUploadState()); private set
     var publicationsState by mutableStateOf(PublicationsState()); private set
     var draftsState by mutableStateOf(DraftsState()); private set
+    var bookmarksState by mutableStateOf(BookmarksState()); private set
     var redraftText by mutableStateOf<String?>(null); private set
     var pendingNotificationsTab by mutableStateOf(false)
 
@@ -297,6 +303,9 @@ class TimelineViewModel @AssistedInject constructor(
     private inline fun updateDrafts(block: (DraftsState) -> DraftsState) {
         draftsState = block(draftsState)
     }
+    private inline fun updateBookmarks(block: (BookmarksState) -> BookmarksState) {
+        bookmarksState = block(bookmarksState)
+    }
 
     var accounts by mutableStateOf<List<StoredAccount>>(emptyList())
         private set
@@ -318,6 +327,7 @@ class TimelineViewModel @AssistedInject constructor(
         videoUploadState = VideoUploadState()
         publicationsState = PublicationsState()
         draftsState = DraftsState()
+        bookmarksState = BookmarksState()
     }
 
     fun appviewName(): String = bskyConn.appviewName()
@@ -1225,6 +1235,64 @@ class TimelineViewModel @AssistedInject constructor(
                     it.copy(didRepost = true, reposts = it.reposts + 1, repostRkey = rkey)
                 }
                 handleError(it)
+            }
+        }
+    }
+
+    fun bookmark(uri: AtUri, cid: Cid) {
+        if (postInteractionStore.peek(cid)?.didBookmark == true) return
+        postInteractionStore.update(cid) { it.copy(didBookmark = true) }
+        viewModelScope.launch {
+            bskyConn.createBookmark(uri, cid).onFailure {
+                postInteractionStore.update(cid) { it.copy(didBookmark = false) }
+                handleError(it)
+            }
+        }
+    }
+
+    fun deleteBookmark(uri: AtUri, cid: Cid) {
+        if (postInteractionStore.peek(cid)?.didBookmark != true) return
+        postInteractionStore.update(cid) { it.copy(didBookmark = false) }
+        updateBookmarks { state ->
+            state.copy(bookmarks = state.bookmarks.filter { it.cid != cid }.toPersistentList())
+        }
+        viewModelScope.launch {
+            bskyConn.deleteBookmark(uri).onFailure {
+                postInteractionStore.update(cid) { it.copy(didBookmark = true) }
+                handleError(it)
+            }
+        }
+    }
+
+    fun fetchBookmarks(refresh: Boolean = false) {
+        if (bookmarksState.isFetchingBookmarks) return
+        val cursor = if (refresh) null else bookmarksState.cursor
+        updateBookmarks { it.copy(isFetchingBookmarks = true) }
+        viewModelScope.launch {
+            bskyConn.getBookmarks(cursor = cursor).onFailure {
+                updateBookmarks { it.copy(isFetchingBookmarks = false) }
+                handleError(it)
+            }.onSuccess { response ->
+                val newBookmarks = response.bookmarks.mapNotNull { bookmark ->
+                    when (val item = bookmark.item) {
+                        is app.bsky.bookmark.BookmarkViewItemUnion.PostView ->
+                            SkeetData.fromPostView(item.value, item.value.author)
+                        else -> null
+                    }
+                }
+                newBookmarks.forEach { postInteractionStore.seed(it) }
+                updateBookmarks { state ->
+                    val combined = if (refresh) {
+                        newBookmarks.toPersistentList()
+                    } else {
+                        (state.bookmarks + newBookmarks).toPersistentList()
+                    }
+                    state.copy(
+                        bookmarks = combined,
+                        cursor = response.cursor,
+                        isFetchingBookmarks = false,
+                    )
+                }
             }
         }
     }

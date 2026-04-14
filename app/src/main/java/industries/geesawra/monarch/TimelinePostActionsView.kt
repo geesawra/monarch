@@ -26,7 +26,9 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.ModeComment
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ModeComment
 import androidx.compose.material3.DropdownMenu
@@ -154,6 +156,7 @@ fun TimelinePostActionsView(
     val replies = interaction?.replies ?: skeet.replies ?: 0
     val isLiked = interaction?.didLike ?: skeet.didLike
     val isReposted = interaction?.didRepost ?: skeet.didRepost
+    val isBookmarked = interaction?.didBookmark ?: skeet.didBookmark
     val haptic = LocalHapticFeedback.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRedraftDialog by remember { mutableStateOf(false) }
@@ -373,6 +376,53 @@ fun TimelinePostActionsView(
                 imageVector = Icons.Outlined.Share,
                 contentDescription = "Share",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        var bookmarkBounce by remember { mutableStateOf(false) }
+        val bookmarkScale by animateFloatAsState(
+            targetValue = if (bookmarkBounce) 1.3f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "bookmarkScale"
+        )
+        LaunchedEffect(bookmarkBounce) {
+            if (bookmarkBounce) {
+                delay(150)
+                bookmarkBounce = false
+            }
+        }
+        val bookmarkColor by animateColorAsState(
+            targetValue = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            label = "bookmarkColor"
+        )
+
+        Box(
+            modifier = Modifier
+                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {
+                        bookmarkBounce = true
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        when (isBookmarked) {
+                            false -> timelineViewModel?.bookmark(skeet.uri, skeet.cid)
+                            true -> timelineViewModel?.deleteBookmark(skeet.uri, skeet.cid)
+                        }
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                modifier = Modifier
+                    .size(actionIconSize())
+                    .scale(bookmarkScale),
+                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                contentDescription = "Bookmark",
+                tint = bookmarkColor,
             )
         }
 

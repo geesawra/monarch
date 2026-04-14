@@ -58,6 +58,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
@@ -180,6 +181,7 @@ enum class TabBarDestinations(
 ) {
     TIMELINE(R.string.timeline, Icons.Filled.Home, R.string.timeline),
     SEARCH(R.string.search, Icons.Filled.Search, R.string.search),
+    BOOKMARKS(R.string.bookmarks, Icons.Filled.Bookmark, R.string.bookmarks),
     NOTIFICATIONS(
         R.string.notifications,
         Icons.Filled.Notifications,
@@ -480,6 +482,7 @@ private fun InnerTimelineView(
     }
     val timelineState = rememberLazyListState()
     val notificationsState = rememberLazyListState()
+    val bookmarksListState = rememberLazyListState()
     val searchPostsState = rememberLazyListState()
     val searchPeopleState = rememberLazyListState()
     val drawerState = rememberWideNavigationRailState(
@@ -681,6 +684,7 @@ private fun InnerTimelineView(
                             pagerListStates[pagerState.settledPage] ?: timelineState
                         } else timelineState
                         TabBarDestinations.SEARCH -> searchPostsState
+                        TabBarDestinations.BOOKMARKS -> bookmarksListState
                         TabBarDestinations.NOTIFICATIONS -> notificationsState
                     }
                     coroutineScope.launch {
@@ -814,6 +818,8 @@ private fun InnerTimelineView(
                                     }
                                 }
 
+                                TabBarDestinations.BOOKMARKS -> Text(text = stringResource(R.string.bookmarks))
+
                                 TabBarDestinations.NOTIFICATIONS -> Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -844,6 +850,7 @@ private fun InnerTimelineView(
                                     }
                                 }
                                 TabBarDestinations.SEARCH -> {}
+                                TabBarDestinations.BOOKMARKS -> {}
                                 TabBarDestinations.NOTIFICATIONS -> {}
                             }
                         },
@@ -927,6 +934,7 @@ private fun InnerTimelineView(
                                         }
                                     }
                                 }
+                                TabBarDestinations.BOOKMARKS -> {}
                                 TabBarDestinations.NOTIFICATIONS -> {}
                             }
                         }
@@ -973,6 +981,7 @@ private fun InnerTimelineView(
                         }
 
                         TabBarDestinations.SEARCH -> {}
+                        TabBarDestinations.BOOKMARKS -> {}
                         TabBarDestinations.NOTIFICATIONS -> {}
                     }
                 },
@@ -1321,6 +1330,40 @@ private fun InnerTimelineView(
                                 },
                                 onProfileTap = if (isExpandedScreen) expandedOnProfileTap else onProfileTap,
                             )
+
+                            TabBarDestinations.BOOKMARKS -> {
+                                LaunchedEffect(Unit) {
+                                    if (timelineViewModel.bookmarksState.bookmarks.isEmpty()) {
+                                        timelineViewModel.fetchBookmarks(refresh = true)
+                                    }
+                                }
+                                PullToRefreshBox(
+                                    isRefreshing = timelineViewModel.bookmarksState.isFetchingBookmarks,
+                                    onRefresh = { timelineViewModel.fetchBookmarks(refresh = true) },
+                                ) {
+                                    ShowSkeets(
+                                        viewModel = timelineViewModel,
+                                        settingsState = settingsState,
+                                        state = bookmarksListState,
+                                        onReplyTap = onReplyTap,
+                                        data = timelineViewModel.bookmarksState.bookmarks,
+                                        isLoading = timelineViewModel.bookmarksState.isFetchingBookmarks,
+                                        isScrollEnabled = isScrollEnabled,
+                                        onSeeMoreTap = if (isExpandedScreen) expandedOnSeeMoreTap else onSeeMoreTap,
+                                        onProfileTap = if (isExpandedScreen) expandedOnProfileTap else onProfileTap,
+                                        shouldFetchMoreData = false,
+                                    )
+                                }
+                                OnEndOfListReached(
+                                    listState = bookmarksListState,
+                                    items = timelineViewModel.bookmarksState.bookmarks,
+                                    onEndReached = {
+                                        if (timelineViewModel.bookmarksState.cursor != null) {
+                                            timelineViewModel.fetchBookmarks()
+                                        }
+                                    },
+                                )
+                            }
 
                             TabBarDestinations.NOTIFICATIONS -> NotificationsView(
                                 viewModel = timelineViewModel,

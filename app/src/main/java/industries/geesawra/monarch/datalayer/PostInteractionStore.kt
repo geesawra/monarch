@@ -13,6 +13,7 @@ data class PostInteraction(
     val replies: Long,
     val didLike: Boolean,
     val didRepost: Boolean,
+    val didBookmark: Boolean,
     val likeRkey: RKey? = null,
     val repostRkey: RKey? = null,
 ) {
@@ -23,6 +24,7 @@ data class PostInteraction(
             replies = skeet.replies ?: 0,
             didLike = skeet.didLike,
             didRepost = skeet.didRepost,
+            didBookmark = skeet.didBookmark,
             likeRkey = skeet.likeRkey,
             repostRkey = skeet.repostRkey,
         )
