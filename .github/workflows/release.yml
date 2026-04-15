@@ -132,17 +132,6 @@ jobs:
           mkdir -p "${{ github.workspace }}/whatsnew"
           printf '%s\n' "$play_notes" > "${{ github.workspace }}/whatsnew/whatsnew-en-US"
 
-      - name: Debug whatsnew directory
-        run: |
-          echo "=== ls ${{ github.workspace }}/whatsnew/ ==="
-          ls -la "${{ github.workspace }}/whatsnew/" || echo "(whatsnew dir missing)"
-          echo "=== wc -c ==="
-          wc -c "${{ github.workspace }}/whatsnew/whatsnew-en-US" || true
-          echo "=== cat ==="
-          cat "${{ github.workspace }}/whatsnew/whatsnew-en-US" || true
-          echo "=== xxd tail ==="
-          xxd "${{ github.workspace }}/whatsnew/whatsnew-en-US" | tail -5 || true
-
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
