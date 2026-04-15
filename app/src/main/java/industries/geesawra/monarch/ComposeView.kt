@@ -139,6 +139,7 @@ import androidx.compose.foundation.rememberScrollState
 import industries.geesawra.monarch.datalayer.LinkPreviewData
 import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
 import industries.geesawra.monarch.datalayer.ThreadPostData
+import industries.geesawra.monarch.datalayer.splitTextForThread
 import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -402,6 +403,7 @@ fun ComposeView(
                     timelineViewModel,
                     autoLikeOnReply = settingsState.autoLikeOnReply,
                     requireAltText = settingsState.requireAltText,
+                    autoThreadOnOverflow = settingsState.autoThreadOnOverflow,
                     scaffoldState,
                     inReplyTo.value,
                     isQuotePost.value,
@@ -794,6 +796,7 @@ fun ActionRow(
     timelineViewModel: TimelineViewModel,
     autoLikeOnReply: Boolean = false,
     requireAltText: Boolean = false,
+    autoThreadOnOverflow: Boolean = false,
     scaffoldState: BottomSheetScaffoldState,
     inReplyToData: SkeetData? = null,
     isQuotePost: Boolean = false,
@@ -826,11 +829,20 @@ fun ActionRow(
         }
     } else false
 
-    val postButtonEnabled = remember(postText, mediaSelected.value, mediaAltTexts.value, requireAltText) {
+    val isImplicitEligible = inReplyToData == null && !isQuotePost && autoThreadOnOverflow
+    val overflow = postText.length > maxChars
+    val implicitSplitCount = if (isImplicitEligible && overflow) {
+        splitTextForThread(postText, maxChars).size
+    } else 0
+    val canImplicitSplit = implicitSplitCount in 2..MAX_THREAD_POSTS
+
+    val postButtonEnabled = remember(postText, mediaSelected.value, mediaAltTexts.value, requireAltText, isImplicitEligible) {
         val hasContent = postText.isNotBlank() || mediaSelected.value.isNotEmpty()
         val withinLimit = postText.length <= maxChars
         val altTextOk = !requireAltText || allMediaHasAlt
-        hasContent && withinLimit && altTextOk
+        val implicitOk = isImplicitEligible && postText.length > maxChars &&
+            splitTextForThread(postText, maxChars).size in 2..MAX_THREAD_POSTS
+        hasContent && (withinLimit || implicitOk) && altTextOk
     }
 
     Column(
@@ -884,55 +896,73 @@ fun ActionRow(
                     }
                 }
             } else {
+                if (canImplicitSplit) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 8.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.FormatListNumbered,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.size(4.dp))
+                        Text(
+                            text = "Auto-thread",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                         coroutineScope.launch {
                             uploadingPost.value = true
-                            timelineViewModel.post(
-                                content = postText,
-                                facets = facets,
-                                images = if (!mediaSelectedIsVideo.value) mediaSelected.value
-                                    .ifEmpty { null } else null,
-                                video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
-                                mediaAltTexts = mediaAltTexts.value,
-                                replyRef = if (!isQuotePost) {
-                                    inReplyToData?.replyRef()
-                                } else {
-                                    null
-                                },
-                                quotePostRef = if (isQuotePost) {
-                                    val cid = inReplyToData?.cid
-                                    val uri = inReplyToData?.uri
-
-                                    if (cid == null || uri == null) {
-                                        null
-                                    } else {
-                                        StrongRef(uri, cid)
-                                    }
-                                } else {
-                                    null
-                                },
-                                linkPreview = linkPreview,
-                                threadgateRules = threadgateRules.value,
-                            ).onSuccess {
+                            val result = if (canImplicitSplit) {
+                                val posts = buildImplicitThreadPosts(
+                                    text = postText,
+                                    mentionDids = mentionDids.orEmpty(),
+                                    maxChars = maxChars,
+                                    images = if (!mediaSelectedIsVideo.value) mediaSelected.value.ifEmpty { null } else null,
+                                    video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
+                                    mediaAltTexts = mediaAltTexts.value,
+                                    linkPreview = linkPreview,
+                                )
+                                timelineViewModel.postThread(
+                                    posts = posts,
+                                    threadgateRules = threadgateRules.value,
+                                ).map { Unit }
+                            } else {
+                                timelineViewModel.post(
+                                    content = postText,
+                                    facets = facets,
+                                    images = if (!mediaSelectedIsVideo.value) mediaSelected.value.ifEmpty { null } else null,
+                                    video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
+                                    mediaAltTexts = mediaAltTexts.value,
+                                    replyRef = if (!isQuotePost) inReplyToData?.replyRef() else null,
+                                    quotePostRef = if (isQuotePost) {
+                                        val cid = inReplyToData?.cid
+                                        val uri = inReplyToData?.uri
+                                        if (cid == null || uri == null) null else StrongRef(uri, cid)
+                                    } else null,
+                                    linkPreview = linkPreview,
+                                    threadgateRules = threadgateRules.value,
+                                ).map { Unit }
+                            }
+                            result.onSuccess {
                                 wasEdited.value = false
                                 timelineViewModel.draftsState.activeDraftId?.let { draftId ->
                                     timelineViewModel.deleteDraft(draftId)
                                     timelineViewModel.clearActiveDraft()
                                 }
-                                if (autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
+                                if (!canImplicitSplit && autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
                                     timelineViewModel.like(inReplyToData.uri, inReplyToData.cid)
                                 }
-                                coroutineScope.launch {
-                                    scaffoldState.bottomSheetState.hide()
-                                }
+                                coroutineScope.launch { scaffoldState.bottomSheetState.hide() }
                             }.onFailure {
-                                Toast.makeText(
-                                    context,
-                                    "Could not post: ${it.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                Toast.makeText(context, "Could not post: ${it.message}", Toast.LENGTH_LONG).show()
                             }.also {
                                 uploadingPost.value = false
                             }
@@ -940,7 +970,7 @@ fun ActionRow(
                     },
                     modifier = Modifier.padding(end = 8.dp),
                     enabled = postButtonEnabled && !uploadingPost.value,
-                    colors = if (postText.length > maxChars) ButtonDefaults.buttonColors(
+                    colors = if (overflow && !canImplicitSplit) ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError,
                     ) else ButtonDefaults.buttonColors(),
@@ -948,7 +978,11 @@ fun ActionRow(
                     Icon(Icons.Filled.ArrowUpward, contentDescription = "Post")
                     if (postText.isNotEmpty()) {
                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                        Text("${maxChars - postText.length}")
+                        val label = when {
+                            canImplicitSplit -> "$implicitSplitCount"
+                            else -> "${maxChars - postText.length}"
+                        }
+                        Text(label)
                     }
                 }
             }
@@ -1107,6 +1141,39 @@ internal fun readFacets(data: String, mentionDids: Map<String, Did> = emptyMap()
     }
 
     return facets
+}
+
+private fun buildImplicitThreadPosts(
+    text: String,
+    mentionDids: Map<String, Did>,
+    maxChars: Int,
+    images: List<Uri>?,
+    video: Uri?,
+    mediaAltTexts: Map<Uri, String>,
+    linkPreview: LinkPreviewData?,
+): List<ThreadPostData> {
+    val fragments = splitTextForThread(text, maxChars)
+
+    val linkPreviewFragmentIdx: Int? = if (linkPreview != null) {
+        val idx = fragments.indexOfFirst { frag: String ->
+            tokensRegexp.findAll(frag)
+                .map { m -> m.value }
+                .firstOrNull { s -> isUrl(s) }
+                ?.let { s -> normalizeUrl(s) == linkPreview.url } == true
+        }
+        if (idx >= 0) idx else null
+    } else null
+
+    return fragments.mapIndexed { idx: Int, frag: String ->
+        ThreadPostData(
+            text = frag,
+            facets = readFacets(frag, mentionDids),
+            images = if (idx == 0) images else null,
+            video = if (idx == 0) video else null,
+            mediaAltTexts = if (idx == 0) mediaAltTexts else emptyMap(),
+            linkPreview = if (idx == linkPreviewFragmentIdx) linkPreview else null,
+        )
+    }
 }
 
 @Composable

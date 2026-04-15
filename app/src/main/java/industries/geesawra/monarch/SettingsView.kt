@@ -514,6 +514,17 @@ fun SettingsView(
                 },
             )
 
+            ListItem(
+                headlineContent = { Text("Auto-thread long posts") },
+                supportingContent = { Text("Automatically split posts over 300 characters into a thread") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.autoThreadOnOverflow,
+                        onCheckedChange = { settingsViewModel.setAutoThreadOnOverflow(it) }
+                    )
+                },
+            )
+
             val mutedWordsCount = timelineViewModel?.mutedWords?.size ?: 0
             ListItem(
                 headlineContent = { Text("Muted words") },
