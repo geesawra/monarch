@@ -1165,6 +1165,64 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    fun deleteThreadPosts(uris: List<AtUri>, then: () -> Unit) {
+        if (uris.isEmpty()) { then(); return }
+        viewModelScope.launch {
+            for (uri in uris) {
+                val result = bskyConn.deletePost(uri.rkey())
+                if (result.isFailure) {
+                    handleError(result.exceptionOrNull() ?: Exception("delete failed"))
+                    return@launch
+                }
+            }
+            val uriSet = uris.toSet()
+            updateTimeline { t -> t.copy(skeets = t.skeets.filter { it.uri !in uriSet }.toPersistentList()) }
+            updateProfile { p -> p.copy(profilePosts = p.profilePosts.filter { it.uri !in uriSet }.toPersistentList()) }
+            then()
+        }
+    }
+
+    suspend fun findSelfAuthoredThreadUris(skeet: SkeetData): List<AtUri> {
+        val myDid = bskyConn.session?.did ?: return listOf(skeet.uri)
+        if (skeet.did != myDid) return listOf(skeet.uri)
+        val response = bskyConn.getThread(skeet.uri, parentHeight = 80).getOrNull()
+            ?: return listOf(skeet.uri)
+        val tree = readThread(response.thread)
+        val path = mutableListOf<ThreadPost>()
+        if (!findThreadPath(tree, skeet.uri, path)) return listOf(skeet.uri)
+        var topIdx = path.lastIndex
+        while (topIdx > 0 && path[topIdx - 1].post.did == myDid) topIdx--
+        val out = mutableListOf<AtUri>()
+        collectSelfSubtree(path[topIdx], myDid, out)
+        return if (out.isEmpty()) listOf(skeet.uri) else out
+    }
+
+    private fun findThreadPath(
+        node: ThreadPost,
+        target: AtUri,
+        acc: MutableList<ThreadPost>,
+    ): Boolean {
+        acc.add(node)
+        if (node.post.uri == target) return true
+        for (r in node.replies) {
+            if (findThreadPath(r, target, acc)) return true
+        }
+        acc.removeAt(acc.lastIndex)
+        return false
+    }
+
+    private fun collectSelfSubtree(
+        node: ThreadPost,
+        selfDid: Did,
+        out: MutableList<AtUri>,
+    ) {
+        if (node.post.did != selfDid) return
+        out.add(node.post.uri)
+        for (r in node.replies) {
+            collectSelfSubtree(r, selfDid, out)
+        }
+    }
+
     fun isOwnPost(skeet: SkeetData): Boolean {
         return skeet.did == bskyConn.session?.did
     }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -159,31 +160,96 @@ fun TimelinePostActionsView(
     val isBookmarked = interaction?.didBookmark ?: skeet.didBookmark
     val haptic = LocalHapticFeedback.current
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var threadUris by remember(skeet.uri) { mutableStateOf<List<AtUri>?>(null) }
     var showRedraftDialog by remember { mutableStateOf(false) }
     val isOwnPost = timelineViewModel?.isOwnPost(skeet) == true
 
+    LaunchedEffect(showDeleteDialog, skeet.uri) {
+        if (showDeleteDialog && timelineViewModel != null && threadUris == null) {
+            threadUris = timelineViewModel.findSelfAuthoredThreadUris(skeet)
+        }
+    }
+
     if (showDeleteDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { androidx.compose.material3.Text("Delete post?") },
-            text = { androidx.compose.material3.Text("This cannot be undone.") },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    showDeleteDialog = false
-                    timelineViewModel?.deletePost(skeet.uri) {}
-                }) {
+        val uris = threadUris
+        when {
+            uris == null -> androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { androidx.compose.material3.Text("Delete post?") },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        androidx.compose.material3.Text("Checking thread…")
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { showDeleteDialog = false }) {
+                        androidx.compose.material3.Text("Cancel")
+                    }
+                },
+            )
+            uris.size == 1 -> androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { androidx.compose.material3.Text("Delete post?") },
+                text = { androidx.compose.material3.Text("This cannot be undone.") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        showDeleteDialog = false
+                        timelineViewModel?.deletePost(skeet.uri) {}
+                    }) {
+                        androidx.compose.material3.Text(
+                            "Delete",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showDeleteDialog = false }) {
+                        androidx.compose.material3.Text("Cancel")
+                    }
+                }
+            )
+            else -> androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { androidx.compose.material3.Text("Delete thread?") },
+                text = {
                     androidx.compose.material3.Text(
-                        "Delete",
-                        color = MaterialTheme.colorScheme.error
+                        "This post is part of a ${uris.size}-post thread you wrote. Delete the entire thread, or just this post?"
                     )
+                },
+                confirmButton = {
+                    androidx.compose.foundation.layout.Column {
+                        androidx.compose.material3.TextButton(onClick = {
+                            showDeleteDialog = false
+                            timelineViewModel?.deleteThreadPosts(uris) {}
+                        }) {
+                            androidx.compose.material3.Text(
+                                "Delete entire thread",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        androidx.compose.material3.TextButton(onClick = {
+                            showDeleteDialog = false
+                            timelineViewModel?.deletePost(skeet.uri) {}
+                        }) {
+                            androidx.compose.material3.Text(
+                                "Delete this post only",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showDeleteDialog = false }) {
+                        androidx.compose.material3.Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showDeleteDialog = false }) {
-                    androidx.compose.material3.Text("Cancel")
-                }
-            }
-        )
+            )
+        }
     }
 
     if (showRedraftDialog) {
@@ -460,6 +526,8 @@ fun TimelinePostActionsView(
                         text = { Text("Delete") },
                         onClick = {
                             showMenu = false
+                            val mightBeInThread = skeet.reply != null || (skeet.replies ?: 0) > 0
+                            threadUris = if (mightBeInThread) null else listOf(skeet.uri)
                             showDeleteDialog = true
                         },
                     )
