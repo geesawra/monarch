@@ -100,15 +100,11 @@ jobs:
 
       - name: Generate release notes
         id: notes
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           previous_tag=$(git tag --list 'v0.0.*' --sort=-version:refname | sed -n '2p')
           if [ -n "$previous_tag" ]; then
-            notes=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-              -f tag_name=${{ steps.version.outputs.tag }} \
-              -f previous_tag_name="$previous_tag" \
-              --jq '.body')
+            range="$previous_tag..${{ steps.version.outputs.tag }}"
+            notes=$(git log --no-merges --pretty='- %s' "$range")
           else
             notes="Initial release"
           fi
@@ -133,19 +129,19 @@ jobs:
           print(text)
           PY
           )
-          mkdir -p whatsnew
-          printf '%s\n' "$play_notes" > whatsnew/whatsnew-en-US
+          mkdir -p "${{ github.workspace }}/whatsnew"
+          printf '%s\n' "$play_notes" > "${{ github.workspace }}/whatsnew/whatsnew-en-US"
 
       - name: Debug whatsnew directory
         run: |
-          echo "=== ls whatsnew/ ==="
-          ls -la whatsnew/ || echo "(whatsnew dir missing)"
-          echo "=== wc -c whatsnew/whatsnew-en-US ==="
-          wc -c whatsnew/whatsnew-en-US || true
-          echo "=== cat whatsnew/whatsnew-en-US ==="
-          cat whatsnew/whatsnew-en-US || true
-          echo "=== xxd tail (catch UTF-8 truncation) ==="
-          xxd whatsnew/whatsnew-en-US | tail -5 || true
+          echo "=== ls ${{ github.workspace }}/whatsnew/ ==="
+          ls -la "${{ github.workspace }}/whatsnew/" || echo "(whatsnew dir missing)"
+          echo "=== wc -c ==="
+          wc -c "${{ github.workspace }}/whatsnew/whatsnew-en-US" || true
+          echo "=== cat ==="
+          cat "${{ github.workspace }}/whatsnew/whatsnew-en-US" || true
+          echo "=== xxd tail ==="
+          xxd "${{ github.workspace }}/whatsnew/whatsnew-en-US" | tail -5 || true
 
       - name: Create GitHub release
         env:
@@ -161,8 +157,6 @@ jobs:
       - name: Upload AAB to Google Play Closed testing
         if: ${{ vars.ENABLE_PLAY_UPLOAD == 'true' }}
         uses: r0adkll/upload-google-play@v1
-        env:
-          ACTIONS_STEP_DEBUG: true
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: industries.geesawra.monarch
@@ -170,4 +164,4 @@ jobs:
           track: alpha
           status: completed
           mappingFile: app/build/outputs/mapping/release/mapping.txt
-          whatsNewDirectory: whatsnew
+          whatsNewDirectory: ${{ github.workspace }}/whatsnew
