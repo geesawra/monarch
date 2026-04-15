@@ -27,6 +27,47 @@ After that, grep `/tmp/bluesky-sdk/new-sources/commonMain/` for bluesky / actor 
 
 The worktree may not have `local.properties` — copy it from the main repo root if the build fails with "SDK location not found".
 
+### Containerized typecheck (Claude Code sandbox)
+
+Inside the clampdown sandbox, `$HOME/Android/Sdk` is not reachable and the native process is firewalled, so gradle runs must happen in a container. The image `mingc/android-build-box` ships JDK 21 + Android SDK 36 + build-tools 36.0.0, which matches this project's `compileSdk`/`targetSdk = 36`.
+
+**Resolve digest once per session** (tags are mutable):
+
+```bash
+podman pull mingc/android-build-box:latest
+podman image inspect mingc/android-build-box:latest --format '{{.Digest}}'
+# last known good (2026-04-15): sha256:679bb44d54be76fd0ac4d0d8f731eaac4ddaf0b59f4a205b96b23d87d2e09079
+```
+
+**Prepare an overlay `local.properties`** with `sdk.dir` stripped, so Android Gradle Plugin falls back to the container's `ANDROID_HOME=/opt/android-sdk`. This preserves the `benchmark.*` credentials in the original file without touching the worktree:
+
+```bash
+S="$SANDBOX_CACHE"  # == $PWD/.claude/$SANDBOX_SESSION
+mkdir -p "$S/gradle-user-home"
+cp local.properties "$S/local.properties"
+sed -i '/^sdk\.dir=/d' "$S/local.properties"
+```
+
+**Run the typecheck** (bind-mount the overlay over the real file, cache Gradle under `$SANDBOX_CACHE`, force JDK 21 since the image's default `JAVA_HOME` points at JDK 17, disable the daemon):
+
+```bash
+podman run --rm \
+  -v "$PWD":"$PWD" -w "$PWD" \
+  -v "$S/local.properties":"$PWD/local.properties":ro \
+  -e HOME="$S" \
+  -e JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
+  -e GRADLE_USER_HOME="$S/gradle-user-home" \
+  -e GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g" \
+  mingc/android-build-box@sha256:679bb44d54be76fd0ac4d0d8f731eaac4ddaf0b59f4a205b96b23d87d2e09079 \
+  bash -lc 'export PATH=$JAVA_HOME/bin:$PATH && ./gradlew compileDebugKotlin'
+```
+
+First run downloads Gradle 9.3.1 and all dependencies (~3 min). Subsequent runs reuse `$S/gradle-user-home` and are much faster. The `analytics.settings: Permission denied` warning on `/opt/android-sdk` during configure is harmless — metrics init is best-effort and the build proceeds past it.
+
+Ozone artifacts under `libs/ozone-artifacts/` are resolved from the mounted workdir, so you do not need to re-run `publish-ozone-local.sh` inside the container as long as the host already staged them. If they are missing, run the script on the host first (it needs `~/.cache` and GPG state outside the sandbox).
+
+Swap `compileDebugKotlin` for `assembleDebug`, `test`, etc. as needed — same invocation.
+
 ### Ozone prerequisite (first build + after OZONE_REF bump)
 
 Monarch depends on `sh.christian.ozone:*:0.3.3-local`, a version that **only exists after you run `scripts/publish-ozone-local.sh`**. It is not on Maven Central. Before the first build (and after bumping `OZONE_REF` at the top of the script), run:
