@@ -112,10 +112,40 @@ jobs:
           else
             notes="Initial release"
           fi
-          echo "$notes" > release-notes.md
-          clean_notes=$(echo "$notes" | sed '/^\*\*Full Changelog\*\*/d' | head -c 500)
+          printf '%s\n' "$notes" > release-notes.md
+          play_notes=$(python3 <<'PY'
+          import pathlib
+          raw = pathlib.Path("release-notes.md").read_text(encoding="utf-8")
+          lines = []
+          for line in raw.splitlines():
+              if line.startswith("##"):
+                  continue
+              if line.startswith("**Full Changelog**"):
+                  continue
+              if line.startswith("* "):
+                  line = "- " + line[2:]
+              lines.append(line)
+          text = "\n".join(lines).strip()
+          if not text:
+              text = "Bug fixes and improvements"
+          if len(text) > 500:
+              text = text[:499].rstrip() + "\u2026"
+          print(text)
+          PY
+          )
           mkdir -p whatsnew
-          echo "$clean_notes" > whatsnew/whatsnew-en-US
+          printf '%s\n' "$play_notes" > whatsnew/whatsnew-en-US
+
+      - name: Debug whatsnew directory
+        run: |
+          echo "=== ls whatsnew/ ==="
+          ls -la whatsnew/ || echo "(whatsnew dir missing)"
+          echo "=== wc -c whatsnew/whatsnew-en-US ==="
+          wc -c whatsnew/whatsnew-en-US || true
+          echo "=== cat whatsnew/whatsnew-en-US ==="
+          cat whatsnew/whatsnew-en-US || true
+          echo "=== xxd tail (catch UTF-8 truncation) ==="
+          xxd whatsnew/whatsnew-en-US | tail -5 || true
 
       - name: Create GitHub release
         env:
@@ -131,6 +161,8 @@ jobs:
       - name: Upload AAB to Google Play Closed testing
         if: ${{ vars.ENABLE_PLAY_UPLOAD == 'true' }}
         uses: r0adkll/upload-google-play@v1
+        env:
+          ACTIONS_STEP_DEBUG: true
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: industries.geesawra.monarch
