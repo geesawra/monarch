@@ -53,6 +53,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import industries.geesawra.monarch.datalayer.PostInteraction
@@ -83,6 +84,7 @@ private fun ActionIcon(
     scale: Float = 1f,
     isActive: Boolean = false,
     activeContainerColor: Color = Color.Transparent,
+    iconSize: Dp? = null,
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (isActive) activeContainerColor else Color.Transparent,
@@ -92,6 +94,8 @@ private fun ActionIcon(
         targetValue = if (isActive) 8.dp else 0.dp,
         label = "pillPadding"
     )
+
+    val effectiveSize = iconSize ?: actionIconSize()
 
     Box(
         modifier = Modifier
@@ -107,7 +111,7 @@ private fun ActionIcon(
                 icon,
                 contentDescription = contentDescription,
                 modifier = Modifier
-                    .size(actionIconSize())
+                    .size(effectiveSize)
                     .scale(scale),
                 tint = tint
             )
@@ -147,7 +151,11 @@ fun TimelinePostActionsView(
     translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
     showCounts: Boolean = true,
+    detailMode: Boolean = false,
 ) {
+    val effectiveIconSize: Dp? = if (detailMode) 24.dp else null
+    val actionArrangement = if (detailMode) Arrangement.SpaceBetween else Arrangement.Start
+
     val interactionState = timelineViewModel?.postInteractionStore?.getState(skeet.cid) {
         PostInteraction.from(skeet)
     }
@@ -278,7 +286,7 @@ fun TimelinePostActionsView(
     }
 
     Row(
-        horizontalArrangement = Arrangement.Start,
+        horizontalArrangement = actionArrangement,
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.defaultMinSize(minHeight = 48.dp),
     ) {
@@ -305,6 +313,7 @@ fun TimelinePostActionsView(
                 count = if (showCounts) replies else 0,
                 tint = if (replyDisabled) MaterialTheme.colorScheme.outlineVariant
                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                iconSize = effectiveIconSize,
             )
         }
 
@@ -353,6 +362,7 @@ fun TimelinePostActionsView(
                 scale = likeScale,
                 isActive = isLiked,
                 activeContainerColor = MaterialTheme.colorScheme.errorContainer,
+                iconSize = effectiveIconSize,
             )
         }
 
@@ -398,6 +408,7 @@ fun TimelinePostActionsView(
                 scale = repostScale,
                 isActive = isReposted,
                 activeContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                iconSize = effectiveIconSize,
             )
             DropdownMenu(expanded = showRepostMenu, onDismissRequest = { showRepostMenu = false }) {
                 DropdownMenuItem(
@@ -422,7 +433,9 @@ fun TimelinePostActionsView(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        if (!detailMode) {
+            Spacer(Modifier.weight(1f))
+        }
 
         IconButton(
             onClick = {
@@ -438,7 +451,7 @@ fun TimelinePostActionsView(
             }
         ) {
             Icon(
-                modifier = Modifier.size(actionIconSize()),
+                modifier = Modifier.size(effectiveIconSize ?: actionIconSize()),
                 imageVector = Icons.Outlined.Share,
                 contentDescription = "Share",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -484,7 +497,7 @@ fun TimelinePostActionsView(
         ) {
             Icon(
                 modifier = Modifier
-                    .size(actionIconSize())
+                    .size(effectiveIconSize ?: actionIconSize())
                     .scale(bookmarkScale),
                 imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
                 contentDescription = "Bookmark",
@@ -497,7 +510,7 @@ fun TimelinePostActionsView(
         Box {
             IconButton(onClick = { showMenu = true }) {
                 Icon(
-                    modifier = Modifier.size(actionIconSize()),
+                    modifier = Modifier.size(effectiveIconSize ?: actionIconSize()),
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "More",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,

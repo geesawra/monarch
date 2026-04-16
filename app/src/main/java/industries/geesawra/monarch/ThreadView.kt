@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import sh.christian.ozone.api.AtUri
 import androidx.compose.ui.Alignment
@@ -61,7 +62,10 @@ fun ThreadView(
     PullToRefreshBox(
         modifier = modifier,
         isRefreshing = isRefreshing.value,
-        onRefresh = {},
+        onRefresh = {
+            isRefreshing.value = true
+            timelineViewModel.getThread { isRefreshing.value = false }
+        },
     ) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -88,12 +92,17 @@ fun ThreadView(
         ) { padding ->
             val thread = timelineViewModel.currentlyShownThread
             val tappedPostUri = remember { thread.post.uri }
-            val threadData = remember(thread) { thread.flatten() }
+            val threadData = remember(thread) { thread.flatten(focusedUri = tappedPostUri) }
             val focusIdx = remember(threadData) {
                 threadData.indexOfFirst { it.isFocused }.coerceAtLeast(0)
             }
-            val listState = remember(focusIdx) {
-                LazyListState(firstVisibleItemIndex = focusIdx)
+            val threadKey = tappedPostUri.atUri
+
+            val listState = rememberSaveable(
+                threadKey, focusIdx,
+                saver = LazyListState.Saver,
+            ) {
+                LazyListState(firstVisibleItemIndex = focusIdx.coerceAtLeast(0))
             }
 
             LaunchedEffect(Unit) {

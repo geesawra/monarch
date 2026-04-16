@@ -104,6 +104,10 @@ import industries.geesawra.monarch.datalayer.TranslationPhase
 import industries.geesawra.monarch.datalayer.languageCodeToName
 import industries.geesawra.monarch.datalayer.TRANSLATION_LANGUAGE_OPTIONS
 import androidx.compose.material3.CircularProgressIndicator
+import java.time.Instant as JavaInstant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -331,17 +335,92 @@ fun FocusedSkeetView(
         }
     }
 
+    val isBot = skeet.authorLabels.any { it.`val` == "bot" }
+    val displayName = skeet.authorName?.ifEmpty { null } ?: skeet.authorHandle?.handle.orEmpty()
+
     Column(
         modifier = modifier
             .padding(top = 8.dp, start = postHorizontalPadding(), end = postHorizontalPadding(), bottom = 0.dp)
     ) {
-        SkeetHeaderSection(
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AvatarImage(
+                url = skeet.authorAvatarURL,
+                size = avatarSize() + 8.dp,
+                shape = avatarShape,
+                did = skeet.did,
+                onTap = onAvatarTap,
+            )
+            Spacer(Modifier.width(avatarTextGap()))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (skeet.verified) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Filled.Verified,
+                            contentDescription = "Verified",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    if (isBot) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Filled.SmartToy,
+                            contentDescription = "Bot account",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    skeet.authorHandle?.let {
+                        Text(
+                            text = "@${it.handle}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (showPronouns && !skeet.authorPronouns.isNullOrBlank()) {
+                        Text(
+                            text = skeet.authorPronouns,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = MaterialTheme.shapes.small,
+                                )
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        SkeetLabelsRow(
             skeet = skeet,
-            avatarShape = avatarShape,
             showLabels = showLabels,
-            showPronouns = showPronouns,
-            viewModel = viewModel,
-            onAvatarTap = onAvatarTap,
+            labelDisplayName = { viewModel?.labelDisplayName(it) },
+            labelDescription = { viewModel?.labelDescription(it) },
+            labelerAvatar = { viewModel?.labelerAvatar(it) },
         )
 
         SkeetContentSection(
@@ -363,6 +442,23 @@ fun FocusedSkeetView(
             targetTranslationLanguage = targetTranslationLanguage,
         )
 
+        skeet.createdAt?.let { instant ->
+            val formatter = remember {
+                DateTimeFormatter.ofPattern("HH:mm · d MMM yyyy", Locale.getDefault())
+            }
+            val zoned = remember(instant) {
+                JavaInstant
+                    .ofEpochSecond(instant.epochSeconds, instant.nanosecondsOfSecond.toLong())
+                    .atZone(ZoneId.systemDefault())
+            }
+            Text(
+                text = formatter.format(zoned),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+            )
+        }
+
         val interactionState = viewModel?.postInteractionStore?.getState(skeet.cid) {
             PostInteraction.from(skeet)
         }
@@ -381,6 +477,10 @@ fun FocusedSkeetView(
             onShowQuotes = onShowQuotes,
         )
 
+        if (hasEngagementStats) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+
         TimelinePostActionsView(
             onReplyTap = onReplyTap,
             modifier = Modifier
@@ -392,6 +492,7 @@ fun FocusedSkeetView(
             translationEnabled = translationEnabled,
             targetTranslationLanguage = targetTranslationLanguage,
             showCounts = !hasEngagementStats,
+            detailMode = true,
         )
     }
 }
@@ -1446,117 +1547,134 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             }
         }
 
-        if (showLabels) {
-            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
-            ) {
-                skeet.authorLabels.forEach {
-                    it.neg?.let { neg ->
-                        if (!neg) {
-                            return@forEach
-                        }
-                    }
-                    if (it.`val`.startsWith("!") || it.`val` == "bot") {
+        SkeetLabelsRow(
+            skeet = skeet,
+            showLabels = showLabels,
+            labelDisplayName = labelDisplayName,
+            labelDescription = labelDescription,
+            labelerAvatar = labelerAvatar,
+        )
+
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun SkeetLabelsRow(
+    skeet: SkeetData,
+    showLabels: Boolean,
+    labelDisplayName: (Label) -> String? = { null },
+    labelDescription: (Label) -> String? = { null },
+    labelerAvatar: (Label) -> String? = { null },
+) {
+    if (!showLabels) return
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+        ) {
+            skeet.authorLabels.forEach {
+                it.neg?.let { neg ->
+                    if (!neg) {
                         return@forEach
                     }
+                }
+                if (it.`val`.startsWith("!") || it.`val` == "bot") {
+                    return@forEach
+                }
 
-                    val resolvedName = labelDisplayName(it)
-                    val definition = if (resolvedName != null) {
-                        LabelDefinition(plaintext = resolvedName, icon = Icons.Filled.Visibility)
-                    } else {
-                        labelDefinition(it.`val`)
-                    }
-                    val description = labelDescription(it)
+                val resolvedName = labelDisplayName(it)
+                val definition = if (resolvedName != null) {
+                    LabelDefinition(plaintext = resolvedName, icon = Icons.Filled.Visibility)
+                } else {
+                    labelDefinition(it.`val`)
+                }
+                val description = labelDescription(it)
 
-                    val chipContent = @Composable {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val avatarUrl = labelerAvatar(it)
-                            if (avatarUrl != null) {
-                                val labelerContext = LocalContext.current
-                                val labelerRequest = remember(avatarUrl) {
-                                    ImageRequest.Builder(labelerContext)
-                                        .data(avatarUrl)
-                                        .crossfade(true)
-                                        .build()
-                                }
-                                AsyncImage(
-                                    model = labelerRequest,
-                                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                    error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentDescription = definition.plaintext,
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = definition.icon,
-                                    contentDescription = definition.plaintext,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                val chipContent = @Composable {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val avatarUrl = labelerAvatar(it)
+                        if (avatarUrl != null) {
+                            val labelerContext = LocalContext.current
+                            val labelerRequest = remember(avatarUrl) {
+                                ImageRequest.Builder(labelerContext)
+                                    .data(avatarUrl)
+                                    .crossfade(true)
+                                    .build()
                             }
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = definition.plaintext,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
+                            AsyncImage(
+                                model = labelerRequest,
+                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                contentDescription = definition.plaintext,
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = definition.icon,
+                                contentDescription = definition.plaintext,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-
-                    if (description != null) {
-                        var showSheet by remember { mutableStateOf(false) }
-
-                        if (showSheet) {
-                            ModalBottomSheet(
-                                onDismissRequest = { showSheet = false },
-                                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(
-                                        start = 24.dp, end = 24.dp,
-                                        bottom = 32.dp
-                                    )
-                                ) {
-                                    Text(
-                                        text = definition.plaintext,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = description,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-
-                        Surface(
-                            onClick = { showSheet = true },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            content = chipContent,
-                        )
-                    } else {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            content = chipContent,
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = definition.plaintext,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
                         )
                     }
                 }
-            }
+
+                if (description != null) {
+                    var showSheet by remember { mutableStateOf(false) }
+
+                    if (showSheet) {
+                        ModalBottomSheet(
+                            onDismissRequest = { showSheet = false },
+                            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(
+                                    start = 24.dp, end = 24.dp,
+                                    bottom = 32.dp
+                                )
+                            ) {
+                                Text(
+                                    text = definition.plaintext,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        onClick = { showSheet = true },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        content = chipContent,
+                    )
+                } else {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        content = chipContent,
+                    )
+                }
             }
         }
-
     }
 }
 

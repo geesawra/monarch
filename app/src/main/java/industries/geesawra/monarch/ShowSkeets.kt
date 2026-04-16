@@ -35,14 +35,19 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.toMutableStateList
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -64,6 +69,13 @@ import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
 
 val LocalActiveVideoKey = compositionLocalOf<MutableState<String?>?> { null }
+
+private const val DEEP_BRANCH_THRESHOLD = 3
+
+private sealed interface ThreadItem {
+    data class Post(val skeet: SkeetData, val originalIndex: Int) : ThreadItem
+    data class Collapsed(val key: String, val count: Int, val level: Int) : ThreadItem
+}
 
 @Composable
 fun ShowSkeets(
@@ -130,6 +142,77 @@ fun ShowSkeets(
 
     val activeVideoKey = remember { mutableStateOf<String?>(null) }
 
+    val expandedBranches = rememberSaveable(
+        saver = listSaver(
+            save = { it.toList() },
+            restore = { it.toMutableStateList() },
+        ),
+    ) { mutableStateListOf<String>() }
+
+    val focusIdxLocal = remember(filteredData) { filteredData.indexOfFirst { it.isFocused } }
+
+    val isAncestorOrFocusAt: (Int) -> Boolean = lambda@{ idx ->
+        if (!isShowingThread) return@lambda false
+        if (idx < 0 || idx >= filteredData.size) return@lambda false
+        val s = filteredData[idx]
+        if (s.threadConnectors.isNotEmpty()) return@lambda false
+        s.isFocused || (focusIdxLocal >= 0 && idx < focusIdxLocal)
+    }
+
+    val visibleItems = remember(filteredData, expandedBranches.size, isShowingThread) {
+        if (!isShowingThread) {
+            filteredData.mapIndexed { i, s -> ThreadItem.Post(s, i) as ThreadItem }
+        } else {
+            buildList<ThreadItem> {
+                var i = 0
+                while (i < filteredData.size) {
+                    val skeet = filteredData[i]
+                    if (skeet.nestingLevel < DEEP_BRANCH_THRESHOLD) {
+                        add(ThreadItem.Post(skeet, i))
+                        i++
+                        continue
+                    }
+                    var end = i
+                    while (end < filteredData.size && filteredData[end].nestingLevel >= DEEP_BRANCH_THRESHOLD) end++
+                    val branchKey = filteredData[i].uri.atUri
+                    val containsFocus = (i until end).any { filteredData[it].isFocused }
+                    if (expandedBranches.contains(branchKey) || containsFocus) {
+                        for (j in i until end) add(ThreadItem.Post(filteredData[j], j))
+                    } else {
+                        add(ThreadItem.Collapsed(branchKey, end - i, filteredData[i].nestingLevel))
+                    }
+                    i = end
+                }
+            }
+        }
+    }
+
+    val focusedVisibleIdx = remember(visibleItems) {
+        visibleItems.indexOfFirst { it is ThreadItem.Post && it.skeet.isFocused }
+    }
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val sumFromFocusPx by remember(focusedVisibleIdx) {
+        derivedStateOf {
+            if (focusedVisibleIdx < 0) return@derivedStateOf 0
+            state.layoutInfo.visibleItemsInfo
+                .filter { it.index >= focusedVisibleIdx }
+                .sumOf { it.size }
+        }
+    }
+    val viewportHeightPx by remember {
+        derivedStateOf { state.layoutInfo.viewportSize.height }
+    }
+
+    val fallbackBottomPadding = LocalConfiguration.current.screenHeightDp.dp
+    val bottomScrollPadding = if (!isShowingThread) {
+        16.dp
+    } else if (viewportHeightPx <= 0 || sumFromFocusPx <= 0) {
+        fallbackBottomPadding
+    } else {
+        with(density) { (viewportHeightPx - sumFromFocusPx).coerceAtLeast(0).toDp() }
+    }
+
     CompositionLocalProvider(LocalActiveVideoKey provides activeVideoKey) {
     LazyColumn(
         state = state,
@@ -138,7 +221,7 @@ fun ShowSkeets(
             .testTag("feed_list")
             .fillMaxSize()
             .padding(horizontal = feedHorizontalPadding()),
-        contentPadding = PaddingValues(bottom = 16.dp),
+        contentPadding = PaddingValues(bottom = bottomScrollPadding),
         verticalArrangement = if (isShowingThread) Arrangement.spacedBy(0.dp) else Arrangement.spacedBy(feedItemSpacing()),
     ) {
         if (isLoading && (data.isEmpty() || (isShowingThread && data.size <= 1))) {
@@ -153,28 +236,65 @@ fun ShowSkeets(
             return@LazyColumn
         }
         itemsIndexed(
-            items = filteredData,
-            key = { _, skeet -> skeet.lazyListKey() },
-            contentType = { _, skeet -> if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0 },
-        ) { idx, skeet ->
+            items = visibleItems,
+            key = { _, item ->
+                when (item) {
+                    is ThreadItem.Post -> item.skeet.lazyListKey()
+                    is ThreadItem.Collapsed -> "collapsed_${item.key}"
+                }
+            },
+            contentType = { _, item ->
+                when (item) {
+                    is ThreadItem.Post -> if (item.skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0
+                    is ThreadItem.Collapsed -> 2
+                }
+            },
+        ) { _, item ->
+            if (item is ThreadItem.Collapsed) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(Modifier.width((item.level * nestingIndent()).dp))
+                    FilledTonalButton(onClick = { expandedBranches.add(item.key) }) {
+                        Text("Show ${item.count} more replies")
+                    }
+                }
+                return@itemsIndexed
+            }
+            item as ThreadItem.Post
+            val skeet = item.skeet
+            val originalIndex = item.originalIndex
             val skeetKey = skeet.lazyListKey()
             val isVisible = visibleKeys.contains(skeetKey)
 
             val connectors = skeet.threadConnectors
             val hasConnectors = isShowingThread && connectors.isNotEmpty()
 
+            val inAncestorGroup = isAncestorOrFocusAt(originalIndex)
+
             val isGroupStart = if (isShowingThread && !hasConnectors) {
-                val prev = filteredData.getOrNull(idx - 1)
-                prev == null || prev.threadConnectors.isNotEmpty() ||
-                    (prev.nestingLevel == 0 && !skeet.isSameAuthorContinuation && idx > 0) ||
-                    skeet.isFocused || prev.isFocused
+                if (inAncestorGroup) {
+                    !isAncestorOrFocusAt(originalIndex - 1)
+                } else {
+                    val prev = filteredData.getOrNull(originalIndex - 1)
+                    prev == null || prev.threadConnectors.isNotEmpty() ||
+                        (prev.nestingLevel == 0 && !skeet.isSameAuthorContinuation && originalIndex > 0) ||
+                        skeet.isFocused || prev.isFocused
+                }
             } else false
 
             val isGroupEnd = if (isShowingThread && !hasConnectors) {
-                val next = filteredData.getOrNull(idx + 1)
-                next == null || next.threadConnectors.isNotEmpty() ||
-                    (next.nestingLevel == 0 && !next.isSameAuthorContinuation) ||
-                    skeet.isFocused || next.isFocused
+                if (inAncestorGroup) {
+                    !isAncestorOrFocusAt(originalIndex + 1)
+                } else {
+                    val next = filteredData.getOrNull(originalIndex + 1)
+                    next == null || next.threadConnectors.isNotEmpty() ||
+                        (next.nestingLevel == 0 && !next.isSameAuthorContinuation) ||
+                        skeet.isFocused || next.isFocused
+                }
             } else false
 
             val threadCardShape = if (isShowingThread && !hasConnectors) {
@@ -267,27 +387,47 @@ fun ShowSkeets(
                             .clip(MaterialTheme.shapes.medium)
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
-                        SkeetView(
-                            viewModel = viewModel,
-                            skeet = skeet,
-                            onReplyTap = onReplyTap,
-                            postTextSize = settingsState.postTextSize,
-                            avatarShape = avatarClipShape,
-                            showLabels = settingsState.showLabels,
-                            showPronouns = settingsState.showPronounsInPosts,
-                            onAvatarTap = onProfileTap,
-                            onShowThread = { tapped ->
-                                onSeeMoreTap?.invoke(tapped)
-                            },
-                            isVisible = isVisible,
-                            overrideAvatarSize = replyAvatarSize(),
-                            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
-                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
-                        )
+                        if (skeet.isFocused) {
+                            FocusedSkeetView(
+                                viewModel = viewModel,
+                                skeet = skeet,
+                                onReplyTap = onReplyTap,
+                                postTextSize = settingsState.postTextSize,
+                                avatarShape = avatarClipShape,
+                                showLabels = settingsState.showLabels,
+                                showPronouns = settingsState.showPronounsInPosts,
+                                onAvatarTap = onProfileTap,
+                                onShowThread = {},
+                                isVisible = isVisible,
+                                translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
+                                targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                                onShowLikes = { onShowLikes?.invoke(skeet.uri) },
+                                onShowReposts = { onShowReposts?.invoke(skeet.uri) },
+                                onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
+                            )
+                        } else {
+                            SkeetView(
+                                viewModel = viewModel,
+                                skeet = skeet,
+                                onReplyTap = onReplyTap,
+                                postTextSize = settingsState.postTextSize,
+                                avatarShape = avatarClipShape,
+                                showLabels = settingsState.showLabels,
+                                showPronouns = settingsState.showPronounsInPosts,
+                                onAvatarTap = onProfileTap,
+                                onShowThread = { tapped ->
+                                    onSeeMoreTap?.invoke(tapped)
+                                },
+                                isVisible = isVisible,
+                                overrideAvatarSize = replyAvatarSize(),
+                                translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
+                                targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                            )
+                        }
                     }
                 }
             } else {
-                if (isShowingThread && !isGroupStart) {
+                if (isShowingThread && !isGroupStart && !inAncestorGroup) {
                     HorizontalDivider(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant,
@@ -428,6 +568,7 @@ fun ShowSkeets(
                                 }
                             },
                             isVisible = isVisible,
+                            inThread = isShowingThread && focusIdxLocal >= 0 && originalIndex < focusIdxLocal,
                             overrideAvatarSize = if (isShowingThread && !skeet.isFocused) replyAvatarSize() else null,
                             translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                             targetTranslationLanguage = settingsState.targetTranslationLanguage,

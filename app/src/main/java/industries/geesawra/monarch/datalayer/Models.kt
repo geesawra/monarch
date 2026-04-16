@@ -825,12 +825,36 @@ data class ThreadPost(
         private const val MAX_NESTING = 5
     }
 
-    fun flatten(): ImmutableList<SkeetData> {
+    fun flatten(focusedUri: AtUri? = null): ImmutableList<SkeetData> {
         val out = mutableListOf<SkeetData>()
-        flattenInner(out, activeConnectors = mutableListOf(), parentDid = null, effectiveLevel = 0)
-        val focusIdx = out.indexOfLast { it.nestingLevel == 0 && it.threadConnectors.isEmpty() }
+        flattenInner(
+            out = out,
+            activeConnectors = mutableListOf(),
+            parentDid = null,
+            effectiveLevel = 0,
+            parentIsInChain = true,
+        )
+        val focusIdx = if (focusedUri != null) {
+            out.indexOfFirst { it.uri == focusedUri }
+        } else {
+            out.indexOfLast { it.nestingLevel == 0 && it.threadConnectors.isEmpty() }
+        }
         if (focusIdx >= 0) {
             out[focusIdx] = out[focusIdx].copy(isFocused = true)
+        }
+        if (focusedUri != null && focusIdx > 0) {
+            val focusNesting = out[focusIdx].nestingLevel
+            for (i in out.indices) {
+                out[i] = if (i <= focusIdx) {
+                    out[i].copy(nestingLevel = 0, threadConnectors = emptyList())
+                } else {
+                    val newLevel = (out[i].nestingLevel - focusNesting).coerceAtLeast(0)
+                    val newConnectors = out[i].threadConnectors
+                        .filter { it.level >= focusNesting }
+                        .map { it.copy(level = it.level - focusNesting) }
+                    out[i].copy(nestingLevel = newLevel, threadConnectors = newConnectors)
+                }
+            }
         }
         return out.toPersistentList()
     }
@@ -840,11 +864,12 @@ data class ThreadPost(
         activeConnectors: MutableList<Boolean>,
         parentDid: Did?,
         effectiveLevel: Int,
+        parentIsInChain: Boolean,
     ) {
-        val isContinuation = parentDid != null &&
-                post.did == parentDid &&
-                level == 1 &&
-                effectiveLevel == 0
+        val isContinuation = parentIsInChain &&
+                parentDid != null &&
+                post.did == parentDid
+        val myIsInChain = parentDid == null || isContinuation
 
         val myLevel = if (isContinuation) effectiveLevel else effectiveLevel.coerceAtMost(MAX_NESTING)
 
@@ -879,7 +904,7 @@ data class ThreadPost(
 
         sortedReplies.forEachIndexed { i, reply ->
             val isLast = i == sortedReplies.lastIndex
-            val willBeContinuation = level == 0 && reply.post.did == post.did
+            val willBeContinuation = myIsInChain && reply.post.did == post.did
             val childLevel = if (willBeContinuation) {
                 myLevel
             } else {
@@ -890,7 +915,13 @@ data class ThreadPost(
                 activeConnectors.add(!isLast)
             }
 
-            reply.flattenInner(out, activeConnectors, post.did, childLevel)
+            reply.flattenInner(
+                out = out,
+                activeConnectors = activeConnectors,
+                parentDid = post.did,
+                effectiveLevel = childLevel,
+                parentIsInChain = myIsInChain,
+            )
 
             if (!willBeContinuation) {
                 activeConnectors.removeAt(activeConnectors.lastIndex)
