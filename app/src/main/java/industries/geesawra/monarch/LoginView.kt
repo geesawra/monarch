@@ -5,14 +5,20 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -43,6 +49,7 @@ import sh.christian.ozone.api.Handle
 fun LoginView(
     modifier: Modifier = Modifier,
     blueskyConn: BlueskyConn? = null,
+    onSettingsTap: () -> Unit = {},
     navigate: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -92,6 +99,14 @@ fun LoginView(
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            IconButton(onClick = onSettingsTap) {
+                Icon(Icons.Default.Settings, contentDescription = "Settings")
+            }
+        }
         Text(
             text = "Log into your Bluesky account",
             style = MaterialTheme.typography.headlineSmall,

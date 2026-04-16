@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
@@ -115,7 +116,7 @@ enum class ViewList() {
 }
 
 @AndroidEntryPoint
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 class MainActivity : ComponentActivity() {
     @Inject lateinit var pushNotificationManager: PushNotificationManager
     @Inject lateinit var altTextGenerator: AltTextGenerator
@@ -210,9 +211,10 @@ class MainActivity : ComponentActivity() {
                     timelineViewModel.loadSession()
                     if (!timelineViewModel.sessionChecked) {
                         Box(
-                            modifier = Modifier.fillMaxSize(), // Make the Box take the full available space
-                            contentAlignment = Alignment.Center // Align content (LoginView) to the center
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
                         ) {
+                            CircularWavyProgressIndicator()
                         }
 
                         return@Surface
@@ -355,9 +357,6 @@ class MainActivity : ComponentActivity() {
                                 onProfileTap = { profileDid ->
                                     navController.navigate("Profile/${profileDid.did}")
                                 },
-                                onSettingsTap = {
-                                    navController.navigate(ViewList.Settings.name)
-                                },
                                 onFollowersTap = { showFollowers, name ->
                                     val encodedName = URLEncoder.encode(name, "UTF-8")
                                     navController.navigate("FollowersList/${did.did}/$showFollowers/$encodedName")
@@ -462,6 +461,9 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     LoginView(
                                         blueskyConn = conn,
+                                        onSettingsTap = {
+                                            navController.navigate(ViewList.Settings.name)
+                                        },
                                     ) {
                                         timelineViewModel.onNewLogin()
                                         firstLoadDone.value = false

@@ -1790,7 +1790,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun updateSeenNotifications(): Result<Unit> = apiCall("Failed to update seen notifications") {
-        pdsClient!!.updateSeen(UpdateSeenRequest(seenAt = Clock.System.now()))
+        client!!.updateSeen(UpdateSeenRequest(seenAt = Clock.System.now()))
     }
 
     suspend fun getLikes(uri: AtUri, cursor: String? = null) = apiCall("Failed to fetch likes") {

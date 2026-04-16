@@ -45,7 +45,6 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.ViewStream
@@ -155,7 +154,6 @@ fun ProfileView(
     backButton: () -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
-    onSettingsTap: () -> Unit = {},
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
     onPublicationTap: () -> Unit = {},
     onDocumentTap: () -> Unit = {},
@@ -313,11 +311,6 @@ fun ProfileView(
                     },
                     scrollBehavior = scrollBehavior,
                     actions = {
-                        if (profile != null && timelineViewModel.isOwnProfile()) {
-                            IconButton(onClick = onSettingsTap) {
-                                Icon(Icons.Default.Settings, "Settings")
-                            }
-                        }
                         if (profile != null && !timelineViewModel.isOwnProfile()) {
                             ProfileOverflowMenu(timelineViewModel, profile)
                         }

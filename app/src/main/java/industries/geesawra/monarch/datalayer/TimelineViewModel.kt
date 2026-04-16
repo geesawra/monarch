@@ -352,6 +352,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     private var timelineFetchJob: Job? = null
     private var notificationsFetchJob: Job? = null
+    private var fetchAllJob: Job? = null
 
     private fun resetAllState() {
         sessionState = SessionState()
@@ -373,6 +374,9 @@ class TimelineViewModel @AssistedInject constructor(
     fun changeAppview(newAppviewProxy: String, then: () -> Unit = {}) {
         viewModelScope.launch {
             val activeDid = bskyConn.session?.did?.did ?: return@launch
+            fetchAllJob?.cancel()
+            timelineFetchJob?.cancel()
+            notificationsFetchJob?.cancel()
             accountManager.updateAccountAppviewProxy(activeDid, newAppviewProxy)
             bskyConn.resetClients()
             bskyConn.create()
@@ -559,8 +563,9 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     fun fetchAllNewData(then: () -> Unit = {}) {
+        fetchAllJob?.cancel()
         updateTimeline { it.copy(isFetchingMoreTimeline = true) }
-        viewModelScope.launch {
+        fetchAllJob = viewModelScope.launch {
             bskyConn.fetchSelf().onFailure {
                 handleError(it)
             }.onSuccess { fetched ->

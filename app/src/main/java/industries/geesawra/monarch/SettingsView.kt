@@ -797,8 +797,17 @@ fun SettingsView(
                         description = "Self-governed community spaces with collective moderation",
                     ),
                 )
-                var currentProxy by remember { mutableStateOf(timelineViewModel.appviewProxy() ?: "") }
+                var currentProxy by remember {
+                    mutableStateOf(timelineViewModel.appviewProxy() ?: settings.defaultAppviewProxy)
+                }
                 var showCustomDialog by remember { mutableStateOf(false) }
+
+                val applyAppview: (String) -> Unit = { did ->
+                    settingsViewModel.setDefaultAppviewProxy(did)
+                    if (timelineViewModel.authenticated) {
+                        timelineViewModel.changeAppview(did)
+                    }
+                }
 
                 knownAppviews.forEach { appview ->
                     ListItem(
@@ -810,7 +819,7 @@ fun SettingsView(
                                 onClick = {
                                     if (currentProxy != appview.did) {
                                         currentProxy = appview.did
-                                        timelineViewModel.changeAppview(appview.did)
+                                        applyAppview(appview.did)
                                     }
                                 }
                             )
@@ -818,7 +827,7 @@ fun SettingsView(
                         modifier = Modifier.clickable {
                             if (currentProxy != appview.did) {
                                 currentProxy = appview.did
-                                timelineViewModel.changeAppview(appview.did)
+                                applyAppview(appview.did)
                             }
                         }
                     )
@@ -865,7 +874,7 @@ fun SettingsView(
                                 onClick = {
                                     if (customDid.isNotBlank()) {
                                         currentProxy = customDid.trim()
-                                        timelineViewModel.changeAppview(customDid.trim())
+                                        applyAppview(customDid.trim())
                                         showCustomDialog = false
                                     }
                                 }
