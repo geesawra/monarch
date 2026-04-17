@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
@@ -59,6 +60,21 @@ type loggers struct {
 	zap  *zap.SugaredLogger
 	slog *slog.Logger
 	stop func()
+}
+
+func buildVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	version := bi.Main.Version
+	for _, s := range bi.Settings {
+		if s.Key == "vcs.revision" && len(s.Value) >= 7 {
+			version += " (" + s.Value[:7] + ")"
+			break
+		}
+	}
+	return version
 }
 
 func newLogger(ctx context.Context, c Config) loggers {
@@ -140,6 +156,14 @@ func main() {
 	}
 
 	ll := newLogger(ctx, c)
+	ll.zap.Infow("starting beepboop",
+		"version", buildVersion(),
+		"handle", c.Handle,
+		"log_level", c.LogLevel,
+		"log_output", c.LogOutput,
+		"loki_url", c.LokiURL,
+		"tokens_dir", c.TokensDir,
+	)
 
 	atc, err := atclient.LoginWithPassword(ctx, identity.DefaultDirectory(), syntax.AtIdentifier(c.Handle), c.Password, "", nil)
 	if err != nil {
@@ -189,7 +213,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	epShutdown := runEndpoints(ctx, ":9999", &t)
+	epShutdown := runEndpoints(ctx, ":9999", &t, ll.zap)
 
 	go func() {
 		if err := jc.ConnectAndRead(ctx, nil); err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/bluesky-social/indigo/atproto/syntax"
 	"github.com/empijei/srpc"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 )
 
 type subscriptionRequest struct {
@@ -30,7 +31,7 @@ func (sr subscriptionRequest) Validate() error {
 	return nil
 }
 
-func runEndpoints(ctx context.Context, bind string, t *tokens) func() {
+func runEndpoints(ctx context.Context, bind string, t *tokens, l *zap.SugaredLogger) func() {
 	mux := http.NewServeMux()
 	ep := srpc.NewEndpoint(http.MethodPost, "/subscribe", srpc.NewCodecJSON[struct{}](), srpc.NewCodecJSON[subscriptionRequest]())
 
@@ -53,7 +54,7 @@ func runEndpoints(ctx context.Context, bind string, t *tokens) func() {
 	}
 
 	go func() {
-		log.Printf("Server listening on %s\n", srv.Addr)
+		l.Infow("endpoints listening", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
