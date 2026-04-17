@@ -129,6 +129,11 @@ func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender,
 		m.eventsReceived.Add(ctx, 1, attrCollection(e.Commit.Collection))
 		start := time.Now()
 
+		if e.Commit.Collection == "app.bsky.feed.post" && !t.anyRegisteredIn(e.Commit.Record) {
+			m.eventsSkipped.Add(ctx, 1, attrReason("no_registered_in_record"))
+			return nil
+		}
+
 		subj, uri, err := subject(e)
 		if err != nil {
 			return fmt.Errorf("read event subject: %w", err)
@@ -385,14 +390,13 @@ func (eh *eventHandler) handleReply(
 				return nil, fmt.Errorf("parse quoted post uri %q: %w", recordURI, err)
 			}
 
-			qpost, err := eh.getRecord(ctx, recordURI)
-			if err != nil {
-				return nil, fmt.Errorf("get quoted post: %w", err)
-			}
-
 			did := ruri.Authority().String()
 			if did != e.Did {
 				if tokens := eh.t.tokensFor(did); len(tokens) > 0 {
+					qpost, err := eh.getRecord(ctx, recordURI)
+					if err != nil {
+						return nil, fmt.Errorf("get quoted post: %w", err)
+					}
 					notifyDIDs[did] = replyData{
 						kind:              "app.bsky.feed.quote",
 						quotedPostContent: qpost.Text,

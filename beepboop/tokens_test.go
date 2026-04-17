@@ -142,3 +142,38 @@ func TestNewTokensInvalidPath(t *testing.T) {
 	_, err := newTokens("/dev/null/impossible", nil)
 	tst.Err("", err, t)
 }
+
+func TestAnyRegisteredIn(t *testing.T) {
+	dir := t.TempDir()
+	tk := tst.Do(newTokens(dir, nil))(t)
+
+	tst.Is(false, tk.anyRegisteredIn([]byte("no one here")), t)
+
+	tk.storeDID("did:plc:alice", "tok-a")
+	tst.Is(true, tk.anyRegisteredIn([]byte("at://did:plc:alice/app.bsky.feed.post/abc")), t)
+	tst.Is(false, tk.anyRegisteredIn([]byte("at://did:plc:stranger/app.bsky.feed.post/abc")), t)
+
+	tk.storeDID("did:plc:bob", "tok-b1")
+	tk.storeDID("did:plc:bob", "tok-b2")
+	tst.Is(true, tk.anyRegisteredIn([]byte(`{"did":"did:plc:bob"}`)), t)
+
+	tk.removeToken("tok-a")
+	tst.Is(false, tk.anyRegisteredIn([]byte("at://did:plc:alice/app.bsky.feed.post/abc")), t)
+	tst.Is(true, tk.anyRegisteredIn([]byte(`{"did":"did:plc:bob"}`)), t)
+
+	tk.removeToken("tok-b1")
+	tst.Is(true, tk.anyRegisteredIn([]byte(`{"did":"did:plc:bob"}`)), t)
+	tk.removeToken("tok-b2")
+	tst.Is(false, tk.anyRegisteredIn([]byte(`{"did":"did:plc:bob"}`)), t)
+}
+
+func TestAnyRegisteredInPersistsAcrossReopen(t *testing.T) {
+	dir := t.TempDir()
+
+	tk1 := tst.Do(newTokens(dir, nil))(t)
+	tk1.storeDID("did:plc:alice", "tok-a")
+
+	tk2 := tst.Do(newTokens(dir, nil))(t)
+	tst.Is(true, tk2.anyRegisteredIn([]byte("did:plc:alice")), t)
+	tst.Is(false, tk2.anyRegisteredIn([]byte("did:plc:other")), t)
+}

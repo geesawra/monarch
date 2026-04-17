@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 type tokens struct {
 	mu               sync.RWMutex
 	d                *diskv.Diskv
+	set              map[string]struct{}
 	tokensRegistered metric.Int64UpDownCounter
 }
 
@@ -36,16 +38,19 @@ func newTokens(path string, tokensRegistered metric.Int64UpDownCounter) (tokens,
 		CacheSizeMax: 1024 * 1024,
 	})
 
+	set := map[string]struct{}{}
+	cancel := make(chan struct{})
+	var count int64
+	for did := range d.Keys(cancel) {
+		set[did] = struct{}{}
+		count++
+	}
+
 	if tokensRegistered != nil {
-		cancel := make(chan struct{})
-		var count int64
-		for range d.Keys(cancel) {
-			count++
-		}
 		tokensRegistered.Add(context.Background(), count)
 	}
 
-	return tokens{d: d, tokensRegistered: tokensRegistered}, nil
+	return tokens{d: d, set: set, tokensRegistered: tokensRegistered}, nil
 }
 
 func (t *tokens) storeDID(did, fcmToken string) {
@@ -66,8 +71,11 @@ func (t *tokens) storeDID(did, fcmToken string) {
 		t.d.WriteString(did, fcmToken)
 	}
 
-	if isNew && t.tokensRegistered != nil {
-		t.tokensRegistered.Add(context.Background(), 1)
+	if isNew {
+		t.set[did] = struct{}{}
+		if t.tokensRegistered != nil {
+			t.tokensRegistered.Add(context.Background(), 1)
+		}
 	}
 }
 
@@ -75,11 +83,26 @@ func (t *tokens) tokensFor(did string) []string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
+	if _, ok := t.set[did]; !ok {
+		return nil
+	}
+
 	v := t.d.ReadString(did)
 	if v == "" {
 		return nil
 	}
 	return strings.Split(v, "\n")
+}
+
+func (t *tokens) anyRegisteredIn(b []byte) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for did := range t.set {
+		if bytes.Contains(b, []byte(did)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *tokens) removeToken(fcmToken string) {
@@ -111,6 +134,7 @@ func (t *tokens) removeToken(fcmToken string) {
 
 		if len(remaining) == 0 {
 			t.d.Erase(did)
+			delete(t.set, did)
 			if t.tokensRegistered != nil {
 				t.tokensRegistered.Add(context.Background(), -1)
 			}

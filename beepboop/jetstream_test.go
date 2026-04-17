@@ -654,6 +654,24 @@ func TestHandleReply(t *testing.T) {
 			},
 			wantNil: true,
 		},
+		{
+			name:   "quote without registered quoted author does not fetch record",
+			tokens: map[string]string{},
+			poster: "did:plc:quoter",
+			post: &bsky.FeedPost{
+				Text:      "quoting nobody relevant",
+				CreatedAt: "2026-01-01T00:00:00Z",
+				Embed: &bsky.FeedPost_Embed{
+					EmbedRecord: &bsky.EmbedRecord{
+						Record: &atproto.RepoStrongRef{
+							Uri: "at://did:plc:unregistered/app.bsky.feed.post/nomock",
+							Cid: "cidx",
+						},
+					},
+				},
+			},
+			wantNil: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -817,6 +835,20 @@ func TestHandleEvent(t *testing.T) {
 			event:   makeEvent("did:plc:x", "app.bsky.unknown.thing", "rk6", struct{}{}),
 			tokens:  map[string]string{},
 			wantErr: "unknown collection",
+		},
+		{
+			name: "post skipped before unmarshal when no registered DID in record",
+			event: &models.Event{
+				Did:  "did:plc:poster",
+				Kind: models.EventKindCommit,
+				Commit: &models.Commit{
+					Collection: "app.bsky.feed.post",
+					Operation:  models.CommitOperationCreate,
+					RKey:       "rkey-malformed",
+					Record:     []byte(`{this is not valid json at all`),
+				},
+			},
+			tokens: map[string]string{"did:plc:someone-else": "tok-else"},
 		},
 		{
 			name: "removes token on entity not found error",
