@@ -143,8 +143,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.util.concurrent.atomic.AtomicLong
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.MutableStateFlow
 import sh.christian.ozone.BlueskyApi
@@ -163,7 +165,10 @@ import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.model.Blob
 import sh.christian.ozone.api.model.JsonContent
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
+import sh.christian.ozone.api.response.AtpErrorDescription
+import sh.christian.ozone.api.response.AtpException
 import sh.christian.ozone.api.response.AtpResponse
+import sh.christian.ozone.api.response.StatusCode
 import sh.christian.ozone.oauth.OAuthApi
 import sh.christian.ozone.oauth.OAuthClient
 import sh.christian.ozone.oauth.OAuthCodeChallengeMethod
@@ -184,6 +189,73 @@ enum class AuthData {
 }
 
 class LoginException(message: String?) : Exception(message)
+
+/**
+ * Wraps an [AtpException] from a failed `AtpResponse.Failure` with the surrounding call-site
+ * context. Throwing this (instead of a plain `Exception` with a concatenated message) lets the
+ * refresh classifier type-check `cause` against `AtpException` and pull the structured
+ * `statusCode` / `error` fields out, which is minification-safe (unlike `simpleName`).
+ */
+class ApiCallFailure(
+    val callContext: String,
+    val atp: AtpException,
+) : Exception("$callContext: ${atp.message}", atp)
+
+/**
+ * Kinds of authentication failure the refresh path cares about. Derived from
+ * `AtpException.statusCode` (type) plus `AtpException.error?.error` (string), both of which
+ * survive R8 obfuscation when the corresponding ozone classes are `-keep`-ed.
+ */
+private enum class AuthError { DpopNonce, ExpiredToken, InvalidGrant, Other }
+
+private fun unwrapAtp(t: Throwable): AtpException? {
+    var cur: Throwable? = t
+    while (cur != null) {
+        if (cur is AtpException) return cur
+        cur = cur.cause
+    }
+    return null
+}
+
+private fun classifyAuthError(t: Throwable): AuthError {
+    val atp = unwrapAtp(t)
+    if (atp != null) {
+        val kind = atp.error?.error
+        if (atp.statusCode is StatusCode.InvalidRequest && kind == "invalid_grant") {
+            return AuthError.InvalidGrant
+        }
+        if (kind == "use_dpop_nonce") return AuthError.DpopNonce
+        if (kind == "ExpiredToken" || kind == "InvalidToken" || kind == "invalid_token") {
+            return AuthError.ExpiredToken
+        }
+        if (atp.statusCode is StatusCode.AuthenticationRequired) return AuthError.ExpiredToken
+        return AuthError.Other
+    }
+    // Fallback: no AtpException in cause chain (e.g. pre-wrap error path).
+    val msg = t.message.orEmpty()
+    return when {
+        msg.contains("invalid_grant", ignoreCase = true) -> AuthError.InvalidGrant
+        msg.contains("use_dpop_nonce", ignoreCase = true)
+            || msg.contains("DPoP", ignoreCase = true) -> AuthError.DpopNonce
+        msg.contains("ExpiredToken", ignoreCase = true)
+            || msg.contains("InvalidToken", ignoreCase = true)
+            || msg.contains("invalid_token", ignoreCase = true)
+            || msg.contains("refresh token", ignoreCase = true) -> AuthError.ExpiredToken
+        else -> AuthError.Other
+    }
+}
+
+private fun summarizeAuthError(t: Throwable): String {
+    val atp = unwrapAtp(t)
+    return if (atp != null) {
+        "${atp.statusCode::class.simpleName}(${atp.error?.error ?: "<no-error>"})"
+    } else {
+        "${t::class.simpleName}: ${t.message?.take(80) ?: "<no-message>"}"
+    }
+}
+
+private fun tokenTail(t: String?): String =
+    if (t.isNullOrEmpty()) "<empty>" else "…" + t.takeLast(6)
 
 /**
  * In-memory "who am I" record for the active session. Credentials live separately in
@@ -383,6 +455,15 @@ class BlueskyConn(val context: Context) {
     var session: SessionData? = null
     var oauthToken: OAuthToken? = null
     var createMutex: Mutex = Mutex()
+    // Serializes the auth-recovery path. When multiple concurrent XRPC calls hit an expired
+    // access token simultaneously, only one coroutine at a time goes through refresh; the
+    // others reconverge on the refreshed tokens via [refreshGeneration] and just retry.
+    private val refreshMutex: Mutex = Mutex()
+    // Monotonic counter bumped by every app-driven token refresh. `retryOnDpopHiccup` snapshots
+    // the value before running `block()` and compares it after a failure to detect whether
+    // another coroutine has already refreshed in the meantime (in which case we skip refresh
+    // and go straight to retry, avoiding a second POST that would burn the single-use token).
+    private val refreshGeneration: AtomicLong = AtomicLong(0L)
     var pdsURL: String? = null
     var appviewProxy: String? = null
 
@@ -415,33 +496,131 @@ class BlueskyConn(val context: Context) {
     }
 
     /**
-     * Retry a call once after a short delay if it fails with a DPoP-related error.
+     * Wrap an XRPC call with single-flight auth recovery.
      *
-     * The SDK's [BlueskyAuthPlugin] already retries once internally on `use_dpop_nonce`, but
-     * under concurrent requests or repeated nonce rotations that retry can still surface an
-     * error: the fresh nonce from the first round-trip hasn't fully propagated into
-     * [sharedAuthTokens] by the time a sibling in-flight request signs its DPoP header. A
-     * brief delay lets the nonce settle, and the second attempt signs with the latest nonce.
+     * On auth-flavored failures, coordinates retries across concurrent callers via
+     * [refreshMutex] + [refreshGeneration]:
+     *   - `DpopNonce` → brief settle delay, retry.
+     *   - `ExpiredToken` → acquire the mutex, then check if another coroutine already bumped
+     *     the generation counter (i.e. already refreshed). If so, just retry with the current
+     *     tokens. Otherwise, drive the refresh ourselves through [actuallyRefresh].
+     *   - `InvalidGrant` → refresh token permanently rejected; clear the session via
+     *     [handleInvalidGrant] and surface as [LoginException] so the UI navigates to login.
+     *   - Anything else → surface the original failure unchanged.
      *
-     * Transparent to callers — only retries once, and only for errors whose message mentions
-     * DPoP. Persistent failures surface normally.
+     * Only one coroutine at a time can be in the recovery critical section, which prevents
+     * two parallel requests from each POSTing the same single-use refresh token and killing
+     * the session.
      */
     private suspend fun <T> retryOnDpopHiccup(block: suspend () -> Result<T>): Result<T> {
+        val genBefore = refreshGeneration.get()
         val first = block()
         if (first.isSuccess) return first
         val err = first.exceptionOrNull() ?: return first
-        val msg = err.message ?: return first
-        val isDpop = msg.contains("DPoP", ignoreCase = true) || msg.contains("use_dpop_nonce")
-        val isAuthRefresh = msg.contains("invalid_grant", ignoreCase = true)
-                || msg.contains("invalid_token", ignoreCase = true)
-                || msg.contains("refresh token", ignoreCase = true)
-                || msg.contains("ExpiredToken", ignoreCase = true)
-        if (!isDpop && !isAuthRefresh) {
-            return first
+
+        return when (classifyAuthError(err)) {
+            AuthError.Other -> first
+            AuthError.DpopNonce -> {
+                delay(150)
+                block()
+            }
+            AuthError.InvalidGrant -> {
+                Log.w("BlueskyAuth", "refresh-failed gen=$genBefore cause=${summarizeAuthError(err)} terminal=true")
+                handleInvalidGrant(err)
+                Result.failure(LoginException("Session expired: ${summarizeAuthError(err)}"))
+            }
+            AuthError.ExpiredToken -> {
+                val recovery: Result<Unit> = refreshMutex.withLock {
+                    val genNow = refreshGeneration.get()
+                    if (genNow != genBefore) {
+                        Log.d("BlueskyAuth", "refresh-skipped gen=$genBefore (current=$genNow) cause=${summarizeAuthError(err)}")
+                        Result.success(Unit)
+                    } else {
+                        Log.d("BlueskyAuth", "refresh-start gen=$genBefore cause=${summarizeAuthError(err)}")
+                        val refreshResult = runCatching { actuallyRefresh() }
+                        val rErr = refreshResult.exceptionOrNull()
+                        when {
+                            rErr == null -> Result.success(Unit)
+                            classifyAuthError(rErr) == AuthError.InvalidGrant -> {
+                                Log.w("BlueskyAuth", "refresh-failed gen=$genBefore cause=${summarizeAuthError(rErr)} terminal=true")
+                                handleInvalidGrant(rErr)
+                                Result.failure(LoginException("Session expired: ${summarizeAuthError(rErr)}"))
+                            }
+                            else -> {
+                                Log.w("BlueskyAuth", "refresh-failed gen=$genBefore cause=${summarizeAuthError(rErr)} terminal=false")
+                                Result.failure(rErr)
+                            }
+                        }
+                    }
+                }
+                if (recovery.isFailure) {
+                    @Suppress("UNCHECKED_CAST")
+                    return recovery as Result<T>
+                }
+                block()
+            }
         }
-        Log.d("BlueskyAuth", "Retrying after transient auth error: $msg")
-        delay(if (isAuthRefresh) 300 else 150)
-        return block()
+    }
+
+    /**
+     * Actively drive a token refresh through the shared `OAuthApi`. Called when the app
+     * detects an expired-token failure and holds [refreshMutex]. Persists the rotated
+     * credentials to DataStore **before** publishing to [sharedAuthTokens], so a crash
+     * between refresh and persist cannot strand the device with a dead refresh token in
+     * DataStore but a working one in memory.
+     */
+    private suspend fun actuallyRefresh() {
+        val tokens = sharedAuthTokens?.value as? BlueskyAuthPlugin.Tokens.Dpop
+            ?: throw LoginException("No DPoP tokens to refresh")
+        val oauthApi = sharedOAuthApi ?: throw LoginException("OAuth API not initialized")
+        val refreshed = oauthApi.refreshToken(
+            clientId = tokens.clientId,
+            nonce = tokens.nonce,
+            refreshToken = tokens.refresh,
+            keyPair = tokens.keyPair,
+        )
+        val previous = oauthToken ?: throw LoginException("No in-memory OAuthToken to merge refresh into")
+        val updated = previous.copy(
+            accessToken = refreshed.accessToken,
+            refreshToken = refreshed.refreshToken,
+            nonce = refreshed.nonce,
+            keyPair = refreshed.keyPair,
+        )
+        val updatedJson = BlueskyJson.encodeToString(OAuthToken.serializer(), updated)
+        context.updateStoredAccountOAuthToken(previous.subject.did, updatedJson)
+        this.oauthToken = updated
+
+        val newTokens = BlueskyAuthPlugin.Tokens.Dpop(
+            auth = refreshed.accessToken,
+            refresh = refreshed.refreshToken,
+            pdsUrl = refreshed.pds,
+            keyPair = refreshed.keyPair,
+            clientId = refreshed.clientId,
+            nonce = refreshed.nonce,
+        )
+        sharedAuthTokens?.value = newTokens
+        val bumped = refreshGeneration.incrementAndGet()
+        Log.d("BlueskyAuth", "refresh-done gen=$bumped token=${tokenTail(refreshed.accessToken)}")
+    }
+
+    /**
+     * Handle a terminal refresh failure (`invalid_grant`): the refresh token has been
+     * permanently rejected by the auth server. Tear down the in-memory session and remove
+     * the now-dead account from DataStore. The subsequent [LoginException] return propagates
+     * through `TimelineViewModel.handleError` → `sessionState.loginError`, which the login
+     * screen observer routes to.
+     */
+    private suspend fun handleInvalidGrant(cause: Throwable) {
+        Log.w("BlueskyAuth", "invalid_grant: signing out active account, cause=${summarizeAuthError(cause)}")
+        val activeDid = session?.did?.did
+        clearInMemorySession()
+        pdsURL = null
+        appviewProxy = null
+        if (activeDid != null) {
+            runCatching { context.removeStoredAccount(activeDid) }.onFailure {
+                Log.w("BlueskyAuth", "Failed to remove stored account on invalid_grant: ${it.message}")
+            }
+        }
     }
 
     fun appviewName(): String {
@@ -807,7 +986,7 @@ class BlueskyConn(val context: Context) {
     ): Result<T> = runCatching {
         create().getOrThrow()
         when (val ret = block()) {
-            is AtpResponse.Failure<*> -> throw Exception("$errorMsg: ${ret.error?.message}")
+            is AtpResponse.Failure<*> -> throw ApiCallFailure(errorMsg, ret.asException())
             is AtpResponse.Success -> ret.response
         }
     }
@@ -1789,20 +1968,28 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun updateSeenNotifications(): Result<Unit> = apiCall("Failed to update seen notifications") {
-        client!!.updateSeen(UpdateSeenRequest(seenAt = Clock.System.now()))
+    suspend fun updateSeenNotifications(): Result<Unit> = retryOnDpopHiccup {
+        apiCall("Failed to update seen notifications") {
+            client!!.updateSeen(UpdateSeenRequest(seenAt = Clock.System.now()))
+        }
     }
 
-    suspend fun getLikes(uri: AtUri, cursor: String? = null) = apiCall("Failed to fetch likes") {
-        client!!.getLikes(GetLikesQueryParams(uri = uri, cursor = cursor))
+    suspend fun getLikes(uri: AtUri, cursor: String? = null) = retryOnDpopHiccup {
+        apiCall("Failed to fetch likes") {
+            client!!.getLikes(GetLikesQueryParams(uri = uri, cursor = cursor))
+        }
     }
 
-    suspend fun getRepostedBy(uri: AtUri, cursor: String? = null) = apiCall("Failed to fetch reposts") {
-        client!!.getRepostedBy(GetRepostedByQueryParams(uri = uri, cursor = cursor))
+    suspend fun getRepostedBy(uri: AtUri, cursor: String? = null) = retryOnDpopHiccup {
+        apiCall("Failed to fetch reposts") {
+            client!!.getRepostedBy(GetRepostedByQueryParams(uri = uri, cursor = cursor))
+        }
     }
 
-    suspend fun getQuotes(uri: AtUri, cursor: String? = null) = apiCall("Failed to fetch quotes") {
-        client!!.getQuotes(GetQuotesQueryParams(uri = uri, cursor = cursor))
+    suspend fun getQuotes(uri: AtUri, cursor: String? = null) = retryOnDpopHiccup {
+        apiCall("Failed to fetch quotes") {
+            client!!.getQuotes(GetQuotesQueryParams(uri = uri, cursor = cursor))
+        }
     }
 
     suspend fun getPosts(uri: List<AtUri>): Result<List<PostView>> = retryOnDpopHiccup {
@@ -1888,10 +2075,11 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> =
+    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> = retryOnDpopHiccup {
         apiCall("Typeahead search failed") {
             client!!.searchActorsTypeahead(SearchActorsTypeaheadQueryParams(q = query, limit = 5))
         }.map { it.actors }
+    }
 
     suspend fun getAuthorFeed(
         did: Did,
@@ -1935,24 +2123,29 @@ class BlueskyConn(val context: Context) {
         return deleteRecord(followUri.rkey(), "app.bsky.graph.follow")
     }
 
-    suspend fun getFollowers(did: Did, cursor: String? = null) =
+    suspend fun getFollowers(did: Did, cursor: String? = null) = retryOnDpopHiccup {
         apiCall("Could not get followers") {
             client!!.getFollowers(app.bsky.graph.GetFollowersQueryParams(actor = did, cursor = cursor))
         }
+    }
 
-    suspend fun getFollows(did: Did, cursor: String? = null) =
+    suspend fun getFollows(did: Did, cursor: String? = null) = retryOnDpopHiccup {
         apiCall("Could not get follows") {
             client!!.getFollows(app.bsky.graph.GetFollowsQueryParams(actor = did, cursor = cursor))
         }
-
-    suspend fun muteActor(did: Did): Result<Unit> = apiCall("Could not mute") {
-        pdsClient!!.muteActor(app.bsky.graph.MuteActorRequest(actor = did))
     }
 
-    suspend fun getProfileRecord(): Result<Profile> =
+    suspend fun muteActor(did: Did): Result<Unit> = retryOnDpopHiccup {
+        apiCall("Could not mute") {
+            pdsClient!!.muteActor(app.bsky.graph.MuteActorRequest(actor = did))
+        }
+    }
+
+    suspend fun getProfileRecord(): Result<Profile> = retryOnDpopHiccup {
         apiCall("Failed fetching profile record") {
             pdsClient!!.getRecord(GetRecordQueryParams(repo = session!!.did, collection = Nsid("app.bsky.actor.profile"), rkey = RKey("self")))
         }.map { it.value.decodeAs() }
+    }
 
     suspend fun updateProfile(
         displayName: String?,
@@ -2021,8 +2214,10 @@ class BlueskyConn(val context: Context) {
         }.map { it.actors to it.cursor }
     }
 
-    suspend fun unmuteActor(did: Did): Result<Unit> = apiCall("Could not unmute") {
-        pdsClient!!.unmuteActor(app.bsky.graph.UnmuteActorRequest(actor = did))
+    suspend fun unmuteActor(did: Did): Result<Unit> = retryOnDpopHiccup {
+        apiCall("Could not unmute") {
+            pdsClient!!.unmuteActor(app.bsky.graph.UnmuteActorRequest(actor = did))
+        }
     }
 
     private suspend fun getOrCreateDeviceId(): String {
@@ -2129,8 +2324,9 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> =
+    private suspend fun deleteRecord(rKey: RKey, collection: String): Result<Unit> = retryOnDpopHiccup {
         apiCall("Could not delete record") {
             pdsClient!!.deleteRecord(DeleteRecordRequest(repo = session!!.handle, collection = Nsid(collection), rkey = rKey))
         }.map { }
+    }
 }

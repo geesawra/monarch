@@ -83,6 +83,27 @@ fi
 echo "==> fetching and checking out $OZONE_REF"
 git -C "$OZONE_SRC" fetch --quiet --all --tags
 git -C "$OZONE_SRC" checkout --quiet --detach "$OZONE_REF"
+# Reset to the pinned ref and wipe working-tree leftovers so reruns don't stack
+# prior patches on top of already-patched sources.
+git -C "$OZONE_SRC" reset --quiet --hard "$OZONE_REF"
+git -C "$OZONE_SRC" clean -fdq
+
+# --- apply Monarch-local patches -------------------------------------------
+#
+# Small in-repo diffs against the pinned OZONE_REF live in scripts/ozone-patches/
+# and are applied here before publishing. Keeps the SDK unforked — just the patch
+# files travel with the app. If a patch fails to apply after an OZONE_REF bump,
+# regenerate it (edit the ozone clone, `git diff > scripts/ozone-patches/NNNN-*.patch`).
+
+PATCH_DIR="$MONARCH_ROOT/scripts/ozone-patches"
+if [[ -d "$PATCH_DIR" ]]; then
+  shopt -s nullglob
+  for patch in "$PATCH_DIR"/*.patch; do
+    echo "==> applying $(basename "$patch")"
+    git -C "$OZONE_SRC" apply --index --whitespace=nowarn "$patch"
+  done
+  shopt -u nullglob
+fi
 
 # --- publish ---------------------------------------------------------------
 

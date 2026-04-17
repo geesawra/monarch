@@ -1,0 +1,44 @@
+--- a/bluesky/src/commonMain/kotlin/sh/christian/ozone/api/BlueskyAuthPlugin.kt
++++ b/bluesky/src/commonMain/kotlin/sh/christian/ozone/api/BlueskyAuthPlugin.kt
+@@ -18,6 +18,8 @@
+ import io.ktor.util.AttributeKey
+ import io.ktor.utils.io.KtorDsl
+ import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.sync.Mutex
++import kotlinx.coroutines.sync.withLock
+ import kotlinx.serialization.json.Json
+ import sh.christian.ozone.BlueskyJson
+ import sh.christian.ozone.api.response.AtpErrorDescription
+@@ -34,6 +36,11 @@
+   private val oauthApi: OAuthApi,
+   private val authTokens: MutableStateFlow<Tokens?>,
+ ) {
++  // Monarch local patch: serializes concurrent refreshExpiredToken calls so
++  // two in-flight XRPC calls racing to refresh the same single-use refresh
++  // token don't invalidate each other's session.
++  private val refreshMutex: Mutex = Mutex()
++
+   @KtorDsl
+   class Config(
+     var json: Json = BlueskyJson,
+@@ -113,7 +120,19 @@
+           val newTokens = when (response.getOrNull()?.error) {
+             "ExpiredToken",
+             "InvalidToken",
+-            "invalid_token" -> refreshExpiredToken(plugin, scope)
++            "invalid_token" -> {
++              // Monarch local patch: serialize refresh via plugin.refreshMutex.
++              // Double-check: if another coroutine already refreshed while we
++              // were blocked, its new Tokens instance will be a different
++              // reference than what we saw before locking — reuse it rather
++              // than POSTing a now-consumed refresh token.
++              val before = plugin.authTokens.value
++              plugin.refreshMutex.withLock {
++                val current = plugin.authTokens.value
++                if (current != null && current !== before) current
++                else refreshExpiredToken(plugin, scope)
++              }
++            }
+             "use_dpop_nonce" -> refreshDpopNonce(plugin, result.response)
+             else -> null
+           }

@@ -20,3 +20,25 @@
 # Please add these rules to your existing keep rules in order to suppress warnings.
 # This is generated automatically by the Android Gradle plugin.
 -dontwarn libcore.icu.NativePluralRules
+
+# Keep ozone response types so AtpException.message renders readable status-code
+# names (e.g. "AuthenticationRequired") in release builds instead of minified
+# gibberish, and so type-based classification of auth errors survives R8.
+-keep public class sh.christian.ozone.api.response.StatusCode { *; }
+-keep public class sh.christian.ozone.api.response.StatusCode$* { *; }
+-keep class sh.christian.ozone.api.response.AtpException { *; }
+-keep class sh.christian.ozone.api.response.AtpErrorDescription { *; }
+-keepnames class sh.christian.ozone.api.response.AtpException
+-keep class sh.christian.ozone.api.response.**$$serializer { *; }
+
+# OAuthToken is round-tripped through JSON in DataStore; field renames would
+# silently produce malformed persisted credentials.
+-keep class sh.christian.ozone.oauth.OAuthToken { *; }
+-keep class sh.christian.ozone.oauth.OAuthToken$* { *; }
+-keep class sh.christian.ozone.oauth.DpopKeyPair { *; }
+-keep class sh.christian.ozone.oauth.OAuthScope { *; }
+-keep class sh.christian.ozone.oauth.**$$serializer { *; }
+
+-keep class sh.christian.ozone.api.BlueskyAuthPlugin { *; }
+-keep class sh.christian.ozone.api.BlueskyAuthPlugin$Tokens { *; }
+-keep class sh.christian.ozone.api.BlueskyAuthPlugin$Tokens$* { *; }

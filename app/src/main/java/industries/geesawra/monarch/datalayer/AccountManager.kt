@@ -65,6 +65,32 @@ internal suspend fun Context.updateStoredAccountOAuthToken(did: String, oauthTok
     }
 }
 
+/**
+ * Remove one account from the persisted list. Used by `BlueskyConn` on terminal auth
+ * failures (e.g. `invalid_grant` when the refresh token is permanently rejected) to
+ * drop the dead account so the user is sent back to the login screen. If the removed
+ * account was the active one, promote the next remaining account to active or clear
+ * the active-DID key entirely.
+ */
+internal suspend fun Context.removeStoredAccount(did: String) {
+    accountsDataStore.edit { prefs ->
+        val accountsJson = prefs[ACCOUNTS_LIST_KEY]
+        val accounts = accountsJson
+            ?.let { runCatching { Json.decodeFromString<List<StoredAccount>>(it) }.getOrNull() }
+            ?: emptyList()
+        val remaining = accounts.filterNot { it.did == did }
+        prefs[ACCOUNTS_LIST_KEY] = Json.encodeToString(remaining)
+        if (prefs[ACTIVE_DID_KEY] == did) {
+            val next = remaining.firstOrNull()
+            if (next != null) {
+                prefs[ACTIVE_DID_KEY] = next.did
+            } else {
+                prefs.remove(ACTIVE_DID_KEY)
+            }
+        }
+    }
+}
+
 @Singleton
 class AccountManager @Inject constructor(
     @param:ApplicationContext private val context: Context
