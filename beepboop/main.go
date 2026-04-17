@@ -14,6 +14,7 @@ import (
 	"github.com/bluesky-social/indigo/atproto/syntax"
 	"github.com/bluesky-social/jetstream/pkg/client"
 	"github.com/bluesky-social/jetstream/pkg/client/schedulers/parallel"
+	slogzap "github.com/samber/slog-zap"
 	"github.com/sethvargo/go-envconfig"
 	zaploki "github.com/th1cha/zap-loki"
 	"go.uber.org/zap"
@@ -129,11 +130,12 @@ func main() {
 		log.Fatal("initialize firebase messaging:", err)
 	}
 
-	_ = msg
+	zapSlog := slog.New(slogzap.Option{Level: slog.LevelDebug, Logger: l}.NewZapHandler())
+
 	sch := parallel.NewScheduler(
 		runtime.NumCPU()*8,
-		"processor",
-		slog.Default(),
+		"jetstream_processor",
+		zapSlog,
 		handleEvent(l, atc, msg, &t, m),
 	)
 
