@@ -453,7 +453,10 @@ private fun InnerTimelineView(
     val scrollBehavior = if (isExpandedScreen) {
         TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     } else {
-        TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+        TopAppBarDefaults.enterAlwaysScrollBehavior(
+            state = rememberTopAppBarState(),
+            snapAnimationSpec = null,
+        )
     }
     val timelineState = rememberLazyListState()
     val notificationsState = rememberLazyListState()
