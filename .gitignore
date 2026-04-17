@@ -15,6 +15,7 @@
 local.properties
 secrets
 beepboop/tokens
+beepboop/beepboop
 app/google-services.json
 .vscode
 .idea/deploymentTargetSelector.xml

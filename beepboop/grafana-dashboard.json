@@ -191,6 +191,51 @@
           "legendFormat": "delay"
         }
       ]
+    },
+    {
+      "title": "Post Unmarshal Bypass Rate (%)",
+      "description": "Fraction of app.bsky.feed.post events dropped by the pre-unmarshal DID byte-scan before json.Unmarshal runs. Higher is better — it measures how much of the global post firehose is recognised as irrelevant for free.",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 32 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.9 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_events_skipped_total{reason=\"no_registered_in_record\"}[5m])) / sum(rate(beepboop_events_received_total{collection=\"app.bsky.feed.post\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "title": "Post Events: Bypassed vs Unmarshalled (rate/min)",
+      "description": "Breaks down app.bsky.feed.post throughput into events dropped by the byte-scan versus events that proceed through json.Unmarshal + handleReply.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 32 },
+      "fieldConfig": {
+        "defaults": { "unit": "opm" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(beepboop_events_skipped_total{reason=\"no_registered_in_record\"}[5m])) * 60",
+          "legendFormat": "bypassed"
+        },
+        {
+          "expr": "(sum(rate(beepboop_events_received_total{collection=\"app.bsky.feed.post\"}[5m])) - sum(rate(beepboop_events_skipped_total{reason=\"no_registered_in_record\"}[5m]))) * 60",
+          "legendFormat": "unmarshalled"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
