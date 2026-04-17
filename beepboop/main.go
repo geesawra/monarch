@@ -14,7 +14,7 @@ import (
 	"github.com/bluesky-social/indigo/atproto/syntax"
 	"github.com/bluesky-social/jetstream/pkg/client"
 	"github.com/bluesky-social/jetstream/pkg/client/schedulers/parallel"
-	slogzap "github.com/samber/slog-zap"
+	slogzap "github.com/samber/slog-zap/v2"
 	"github.com/sethvargo/go-envconfig"
 	zaploki "github.com/th1cha/zap-loki"
 	"go.uber.org/zap"
@@ -26,6 +26,7 @@ type Config struct {
 	FirebaseKeyJSON string `env:"FIREBASE_KEY_JSON,required"`
 	Handle          string `env:"HANDLE,required"`
 	Password        string `env:"PASSWORD,required"`
+	LogLevel        string `env:"LOG_LEVEL,default=info"`
 	LogOutput       string `env:"LOG_OUTPUT,default=stdout"`
 	LokiURL         string `env:"LOKI_URL"`
 	LokiUsername    string `env:"LOKI_USERNAME"`
@@ -33,9 +34,38 @@ type Config struct {
 	TokensDir       string `env:"TOKENS_DIR,required"`
 }
 
-func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
+func parseLogLevel(s string) zapcore.Level {
+	var lvl zapcore.Level
+	if err := lvl.UnmarshalText([]byte(s)); err != nil {
+		log.Fatalf("invalid LOG_LEVEL %q: %v", s, err)
+	}
+	return lvl
+}
+
+func zapToSlogLevel(z zapcore.Level) slog.Level {
+	switch z {
+	case zapcore.DebugLevel:
+		return slog.LevelDebug
+	case zapcore.InfoLevel:
+		return slog.LevelInfo
+	case zapcore.WarnLevel:
+		return slog.LevelWarn
+	default:
+		return slog.LevelError
+	}
+}
+
+type loggers struct {
+	zap  *zap.SugaredLogger
+	slog *slog.Logger
+	stop func()
+}
+
+func newLogger(ctx context.Context, c Config) loggers {
+	level := parseLogLevel(c.LogLevel)
+
 	cfg := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zapcore.InfoLevel),
+		Level:       zap.NewAtomicLevelAt(level),
 		Development: false,
 		Encoding:    "json",
 		EncoderConfig: zapcore.EncoderConfig{
@@ -54,6 +84,11 @@ func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
 	}
 
 	noop := func() {}
+	slogLevel := zapToSlogLevel(level)
+
+	mkSlog := func(l *zap.Logger) *slog.Logger {
+		return slog.New(slogzap.Option{Level: slogLevel, Logger: l}.NewZapHandler())
+	}
 
 	switch c.LogOutput {
 	case "loki":
@@ -63,7 +98,8 @@ func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
 	default:
 		cfg.OutputPaths = []string{"stdout"}
 		l, _ := cfg.Build()
-		return l.Sugar(), noop
+		sl := l.Sugar()
+		return loggers{zap: sl, slog: mkSlog(l), stop: noop}
 	}
 
 	if c.LokiURL == "" {
@@ -91,7 +127,8 @@ func newLogger(ctx context.Context, c Config) (*zap.SugaredLogger, func()) {
 		log.Fatalln("create logger:", err)
 	}
 
-	return l.Sugar(), lp.Stop
+	sl := l.Sugar()
+	return loggers{zap: sl, slog: mkSlog(l), stop: lp.Stop}
 }
 
 func main() {
@@ -102,7 +139,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	l, stopLogger := newLogger(ctx, c)
+	ll := newLogger(ctx, c)
 
 	atc, err := atclient.LoginWithPassword(ctx, identity.DefaultDirectory(), syntax.AtIdentifier(c.Handle), c.Password, "", nil)
 	if err != nil {
@@ -130,13 +167,11 @@ func main() {
 		log.Fatal("initialize firebase messaging:", err)
 	}
 
-	zapSlog := slog.New(slogzap.Option{Level: slog.LevelDebug, Logger: l}.NewZapHandler())
-
 	sch := parallel.NewScheduler(
 		runtime.NumCPU()*8,
 		"jetstream_processor",
-		zapSlog,
-		handleEvent(l, atc, msg, &t, m),
+		ll.slog,
+		handleEvent(ll.zap, atc, msg, &t, m),
 	)
 
 	jc, err := client.NewClient(
@@ -146,7 +181,7 @@ func main() {
 			"app.bsky.graph.follow",
 			"app.bsky.feed.post",
 		),
-		slog.Default(),
+		ll.slog,
 		sch,
 	)
 
@@ -162,6 +197,6 @@ func main() {
 		}
 	}()
 
-	shutdown(l, 15*time.Second, os.Exit, epShutdown, sch.Shutdown, stopLogger)
+	shutdown(ll.zap, 15*time.Second, os.Exit, epShutdown, sch.Shutdown, ll.stop)
 
 }

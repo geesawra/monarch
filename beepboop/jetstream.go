@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,6 +22,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 )
+
+var errRecordNotFound = errors.New("record not found")
+var errProfileNotFound = errors.New("profile not found")
 
 func jurl() string {
 	hosts := []string{
@@ -161,6 +165,10 @@ func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender,
 				return nil, fmt.Errorf("unknown collection %s", e.Commit.Collection)
 			}
 		}()
+		if errors.Is(err, errRecordNotFound) || errors.Is(err, errProfileNotFound) {
+			m.eventsSkipped.Add(ctx, 1, attrReason("not_found"))
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("create message from event: %w", err)
 		}
@@ -223,7 +231,7 @@ func (eh *eventHandler) getProfile(ctx context.Context, did string) (*bsky.Actor
 	item := eh.profileCache.Get(did)
 	if item == nil {
 		eh.m.cacheMisses.Add(ctx, 1, attrCache("profile"))
-		return nil, fmt.Errorf("profile not found: %s", did)
+		return nil, fmt.Errorf("%w: %s", errProfileNotFound, did)
 	}
 	if cached {
 		eh.m.cacheHits.Add(ctx, 1, attrCache("profile"))
@@ -240,7 +248,7 @@ func (eh *eventHandler) getRecord(ctx context.Context, uri string) (*bsky.FeedPo
 	item := eh.recordCache.Get(uri)
 	if item == nil {
 		eh.m.cacheMisses.Add(ctx, 1, attrCache("record"))
-		return nil, fmt.Errorf("record not found: %s", uri)
+		return nil, fmt.Errorf("%w: %s", errRecordNotFound, uri)
 	}
 	if cached {
 		eh.m.cacheHits.Add(ctx, 1, attrCache("record"))
