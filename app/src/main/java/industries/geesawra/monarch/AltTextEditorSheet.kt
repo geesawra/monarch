@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -81,6 +83,7 @@ fun AltTextEditorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.ime.add(WindowInsets.navigationBars))
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
@@ -111,7 +114,7 @@ fun AltTextEditorSheet(
                     val remaining = ALT_TEXT_MAX_CHARS - text.length
                     Text("$remaining characters remaining")
                 },
-                minLines = 3,
+                minLines = 5,
                 maxLines = 8,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
