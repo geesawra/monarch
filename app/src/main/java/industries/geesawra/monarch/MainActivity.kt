@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
@@ -210,19 +209,22 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     timelineViewModel.loadSession()
-                    if (!timelineViewModel.sessionChecked) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularWavyProgressIndicator()
-                        }
 
-                        return@Surface
+                    val sessionChecked = timelineViewModel.sessionChecked
+                    val authenticated = timelineViewModel.authenticated
+                    LaunchedEffect(sessionChecked, authenticated) {
+                        if (sessionChecked && !authenticated) {
+                            navController.navigate(ViewList.Login.name) {
+                                popUpTo(ViewList.Main.name) { inclusive = true }
+                            }
+                        }
                     }
 
-                    val initialRoute =
-                        if (timelineViewModel.authenticated) ViewList.Main.name else ViewList.Login.name
+                    val initialRoute = when {
+                        !timelineViewModel.sessionChecked -> ViewList.Main.name
+                        timelineViewModel.authenticated -> ViewList.Main.name
+                        else -> ViewList.Login.name
+                    }
 
                     NavHost(
                         navController = navController,

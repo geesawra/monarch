@@ -382,7 +382,7 @@ class TimelineViewModel @AssistedInject constructor(
             accountManager.updateAccountAppviewProxy(activeDid, newAppviewProxy)
             bskyConn.resetClients()
             bskyConn.create()
-            fetchAllNewData(then)
+            fetchAllNewData(then = then)
         }
     }
 
@@ -498,7 +498,7 @@ class TimelineViewModel @AssistedInject constructor(
                 pushNotificationManager.getAndRegisterToken(did)
             }
 
-            fetchAllNewData(then)
+            fetchAllNewData(then = then)
         }
     }
 
@@ -1012,10 +1012,10 @@ class TimelineViewModel @AssistedInject constructor(
         return notif.new() && (seenNotificationsAt == null || notif.createdAt() > seenNotificationsAt!!)
     }
 
-    fun updateSeenNotifications() {
-        updateNotifications { it.copy(seenNotificationsAt = Clock.System.now()) }
-        viewModelScope.launch {
-            bskyConn.updateSeenNotifications().onFailure {
+    fun updateSeenNotifications(seenAt: Instant = Clock.System.now()): Job {
+        updateNotifications { it.copy(seenNotificationsAt = seenAt) }
+        return viewModelScope.launch {
+            bskyConn.updateSeenNotifications(seenAt).onFailure {
                 handleError(it)
             }.onSuccess {
                 updateNotifications { it.copy(unreadNotificationsAmt = 0) }

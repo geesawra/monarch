@@ -176,6 +176,7 @@ import sh.christian.ozone.oauth.OAuthCodeChallengeMethod
 import sh.christian.ozone.oauth.OAuthScope
 import sh.christian.ozone.oauth.OAuthToken
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 
@@ -1992,9 +1993,9 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun updateSeenNotifications(): Result<Unit> = retryOnDpopHiccup {
+    suspend fun updateSeenNotifications(seenAt: Instant = Clock.System.now()): Result<Unit> = retryOnDpopHiccup {
         apiCall("Failed to update seen notifications") {
-            client!!.updateSeen(UpdateSeenRequest(seenAt = Clock.System.now()))
+            client!!.updateSeen(UpdateSeenRequest(seenAt = seenAt))
         }
     }
 
