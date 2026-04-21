@@ -36,6 +36,7 @@ enum class AppTheme {
     Reddwarf,
     Catppuccin,
     Evergarden,
+    BlueHeeler,
 }
 
 enum class PostTextSize {

@@ -33,6 +33,7 @@ fun MonarchTheme(
             AppTheme.Reddwarf -> if (darkTheme) ReddwarfDarkColorScheme else ReddwarfLightColorScheme
             AppTheme.Catppuccin -> if (darkTheme) CatppuccinDarkColorScheme else CatppuccinLightColorScheme
             AppTheme.Evergarden -> if (darkTheme) EvergardenDarkColorScheme else EvergardenLightColorScheme
+            AppTheme.BlueHeeler -> if (darkTheme) BlueHeelerDarkColorScheme else BlueHeelerLightColorScheme
         }
     }
 
