@@ -3,6 +3,7 @@
 package industries.geesawra.monarch
 
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -191,6 +192,11 @@ fun ProfileView(
     val isLoading = localIsFetchingProfile && profile == null
     val wasEdited = remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var showDraftsSheet by remember { mutableStateOf(false) }
+    var localDeviceId by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        localDeviceId = timelineViewModel.deviceId()
+    }
     var isMediaFeedMode by remember { mutableStateOf(false) }
     var mediaFeedSnapshot by remember { mutableStateOf<ImmutableList<SkeetData>?>(null) }
     val isPublicationsTab = localIsPublicationsTab
@@ -242,6 +248,56 @@ fun ProfileView(
         )
     }
 
+    if (showDraftsSheet) {
+        DraftsListSheet(
+            timelineViewModel = timelineViewModel,
+            localDeviceId = localDeviceId,
+            onDismiss = { showDraftsSheet = false },
+            onLoadDraft = { draftView ->
+                showDraftsSheet = false
+                val post = draftView.draft.posts.firstOrNull() ?: return@DraftsListSheet
+                profileTextFieldState.edit {
+                    replace(0, length, post.text)
+                    selection = androidx.compose.ui.text.TextRange(post.text.length)
+                }
+                val isFromThisDevice = draftView.draft.deviceId == null || draftView.draft.deviceId == localDeviceId
+                if (isFromThisDevice) {
+                    val imageUris = post.embedImages?.map { it.localRef.path.toUri() } ?: emptyList()
+                    val videoUris = post.embedVideos?.map { it.localRef.path.toUri() } ?: emptyList()
+                    if (videoUris.isNotEmpty()) {
+                        profileMediaSelected.value = videoUris
+                        profileMediaSelectedIsVideo.value = true
+                    } else {
+                        profileMediaSelected.value = imageUris
+                        profileMediaSelectedIsVideo.value = false
+                    }
+                } else {
+                    profileMediaSelected.value = emptyList()
+                    profileMediaSelectedIsVideo.value = false
+                }
+                val embedRecord = post.embedRecords?.firstOrNull()
+                if (embedRecord != null) {
+                    isQuotePost.value = true
+                    coroutineScope.launch {
+                        val postViews = timelineViewModel.fetchPostViews(listOf(embedRecord.record.uri))
+                        val quotePost = postViews?.firstOrNull()
+                        if (quotePost != null) {
+                            inReplyTo.value = SkeetData.fromPostView(quotePost, quotePost.author)
+                        }
+                    }
+                } else {
+                    isQuotePost.value = false
+                    inReplyTo.value = null
+                }
+                timelineViewModel.setActiveDraftId(draftView.id)
+                wasEdited.value = true
+                coroutineScope.launch {
+                    scaffoldState.bottomSheetState.expand()
+                }
+            },
+        )
+    }
+
     // Show avatar in top bar once the header item is scrolled past
     val showAvatarInBar by remember {
         derivedStateOf {
@@ -275,6 +331,7 @@ fun ProfileView(
                 mediaAltTexts = profileMediaAltTexts,
                 threadgateRules = profileThreadgateRules,
                 linkPreview = profileLinkPreview,
+                onDraftsClick = { showDraftsSheet = true },
             )
         },
     ) { scaffoldPadding ->
