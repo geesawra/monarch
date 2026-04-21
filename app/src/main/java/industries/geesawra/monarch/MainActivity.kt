@@ -3,6 +3,7 @@ package industries.geesawra.monarch
 import android.app.Application
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -340,11 +341,16 @@ class MainActivity : ComponentActivity() {
                             route = "Profile/{did}",
                             arguments = listOf(navArgument("did") { type = NavType.StringType }),
                         ) { backStackEntry ->
-                            val did = Did(backStackEntry.arguments!!.getString("did")!!)
-                            LaunchedEffect(did) {
-                                timelineViewModel.openProfile(did)
+                            val rawDid = backStackEntry.arguments!!.getString("did")!!
+                            LaunchedEffect(rawDid) {
+                                if (rawDid.startsWith("did:")) {
+                                    timelineViewModel.openProfile(Did(rawDid))
+                                } else {
+                                    timelineViewModel.openProfileByHandle(rawDid)
+                                }
                             }
                             ProfileView(
+                                profileKey = rawDid,
                                 timelineViewModel = timelineViewModel,
                                 settingsState = settings,
                                 coroutineScope = rememberCoroutineScope(),
@@ -357,9 +363,13 @@ class MainActivity : ComponentActivity() {
                                 onProfileTap = { profileDid ->
                                     navController.navigate("Profile/${profileDid.did}")
                                 },
+                                onHandleTap = { handle ->
+                                    navController.navigate("Profile/$handle")
+                                },
                                 onFollowersTap = { showFollowers, name ->
                                     val encodedName = URLEncoder.encode(name, "UTF-8")
-                                    navController.navigate("FollowersList/${did.did}/$showFollowers/$encodedName")
+                                    val profileDid = timelineViewModel.profileUser?.did?.did ?: rawDid
+                                    navController.navigate("FollowersList/$profileDid/$showFollowers/$encodedName")
                                 },
                                 onPublicationTap = {
                                     navController.navigate(ViewList.DocumentList.name)
@@ -490,13 +500,27 @@ class MainActivity : ComponentActivity() {
                                 val segments = deepLinkUri.pathSegments
                                 if (segments.size >= 2 && segments[0] == "profile") {
                                     val actor = segments[1]
-                                    if (segments.size >= 4 && segments[2] == "post") {
-                                        val rkey = segments[3]
-                                        val atUri = "at://$actor/app.bsky.feed.post/$rkey"
-                                        timelineViewModel.startThread(SkeetData(uri = AtUri(atUri)))
-                                        navController.navigate(ViewList.ShowThread.name)
+                                    val resolvedDid = if (actor.startsWith("did:")) {
+                                        Did(actor)
                                     } else {
-                                        navController.navigate("Profile/$actor")
+                                        BlueskyConn.resolveHandleToDid(actor).getOrElse {
+                                            Toast.makeText(
+                                                context,
+                                                "Could not find profile '@$actor': ${it.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            null
+                                        }
+                                    }
+                                    if (resolvedDid != null) {
+                                        if (segments.size >= 4 && segments[2] == "post") {
+                                            val rkey = segments[3]
+                                            val atUri = "at://${resolvedDid.did}/app.bsky.feed.post/$rkey"
+                                            timelineViewModel.startThread(SkeetData(uri = AtUri(atUri)))
+                                            navController.navigate(ViewList.ShowThread.name)
+                                        } else {
+                                            navController.navigate("Profile/${resolvedDid.did}")
+                                        }
                                     }
                                 }
                                 ni.data = null

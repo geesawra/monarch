@@ -120,6 +120,7 @@ data class ProfileState(
     val isFetchingProfile: Boolean = false,
     val isFetchingProfileFeed: Boolean = false,
     val profileNotFound: Boolean = false,
+    val profileKey: String? = null,
 )
 
 data class FollowersState(
@@ -286,6 +287,7 @@ class TimelineViewModel @AssistedInject constructor(
     val isFetchingProfile: Boolean get() = profileState.isFetchingProfile
     val isFetchingProfileFeed: Boolean get() = profileState.isFetchingProfileFeed
     val profileNotFound: Boolean get() = profileState.profileNotFound
+    val currentProfileKey: String? get() = profileState.profileKey
 
     val followersListDid: Did? get() = followersState.followersListDid
     val followersListName: String? get() = followersState.followersListName
@@ -1656,13 +1658,14 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun openProfile(did: Did) {
+    fun openProfile(did: Did, key: String? = null) {
         val cachedProfile = if (did == bskyConn.session?.did) user else null
         updateProfile {
             ProfileState(
                 profileUser = cachedProfile,
                 isFetchingProfile = true,
                 isFetchingProfileFeed = true,
+                profileKey = key ?: did.did,
             )
         }
 
@@ -1676,6 +1679,25 @@ class TimelineViewModel @AssistedInject constructor(
         }
 
         fetchProfileFeed(did, fresh = true)
+    }
+
+    fun openProfileByHandle(handle: String) {
+        updateProfile {
+            ProfileState(
+                isFetchingProfile = true,
+                isFetchingProfileFeed = true,
+                profileKey = handle,
+            )
+        }
+
+        viewModelScope.launch {
+            BlueskyConn.resolveHandleToDid(handle).onFailure { err ->
+                handleError(err)
+                updateProfile { it.copy(isFetchingProfile = false, profileNotFound = true) }
+            }.onSuccess { did ->
+                openProfile(did, key = handle)
+            }
+        }
     }
 
     fun setPublicationsTabActive(active: Boolean) {

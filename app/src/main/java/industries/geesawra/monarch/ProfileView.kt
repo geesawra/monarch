@@ -88,6 +88,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -154,21 +155,45 @@ fun ProfileView(
     backButton: () -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
+    onHandleTap: (String) -> Unit = {},
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
     onPublicationTap: () -> Unit = {},
     onDocumentTap: () -> Unit = {},
+    profileKey: String,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val listStates = profileNavTabs.associate { it.filter to rememberLazyListState() }
-    val currentFilter = timelineViewModel.profileFeedFilter
+
+    val vmKey = timelineViewModel.currentProfileKey
+    val isOurData = vmKey == profileKey
+
+    var localProfile by remember(profileKey) { mutableStateOf<ProfileViewDetailed?>(null) }
+    var localIsFetchingProfile by remember(profileKey) { mutableStateOf(false) }
+    var localProfileNotFound by remember(profileKey) { mutableStateOf(false) }
+    var localFeedFilter by remember(profileKey) { mutableStateOf<GetAuthorFeedFilter?>(null) }
+    var localIsPublicationsTab by remember(profileKey) { mutableStateOf(false) }
+    var localPosts by remember(profileKey) { mutableStateOf<ImmutableList<SkeetData>>(persistentListOf()) }
+    var localIsFetchingProfileFeed by remember(profileKey) { mutableStateOf(false) }
+
+    if (isOurData) {
+        localProfile = timelineViewModel.profileUser
+        localIsFetchingProfile = timelineViewModel.isFetchingProfile
+        localProfileNotFound = timelineViewModel.profileNotFound
+        localFeedFilter = timelineViewModel.profileFeedFilter
+        localIsPublicationsTab = timelineViewModel.publicationsState.isTabActive
+        localPosts = timelineViewModel.profilePosts
+        localIsFetchingProfileFeed = timelineViewModel.isFetchingProfileFeed
+    }
+
+    val currentFilter = localFeedFilter
     val listState = listStates[currentFilter] ?: rememberLazyListState()
-    val profile = timelineViewModel.profileUser
-    val isLoading = timelineViewModel.isFetchingProfile && profile == null
+    val profile = localProfile
+    val isLoading = localIsFetchingProfile && profile == null
     val wasEdited = remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isMediaFeedMode by remember { mutableStateOf(false) }
     var mediaFeedSnapshot by remember { mutableStateOf<ImmutableList<SkeetData>?>(null) }
-    val isPublicationsTab = timelineViewModel.publicationsState.isTabActive
+    val isPublicationsTab = localIsPublicationsTab
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
@@ -351,7 +376,7 @@ fun ProfileView(
             },
             bottomBar = {
                 NavigationBar {
-                    val currentFilter = timelineViewModel.profileFeedFilter
+                    val currentFilter = localFeedFilter
                     profileNavTabs.forEach { tab ->
                         NavigationBarItem(
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
@@ -380,7 +405,7 @@ fun ProfileView(
             },
         ) { padding ->
             if (profile == null) {
-                if (timelineViewModel.profileNotFound) {
+                if (localProfileNotFound) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -400,7 +425,7 @@ fun ProfileView(
             }
 
             if (isMediaFeedMode) {
-                val posts = (mediaFeedSnapshot!! + timelineViewModel.profilePosts.filter { post ->
+                val posts = (mediaFeedSnapshot!! + localPosts.filter { post ->
                     mediaFeedSnapshot!!.none { it.cid == post.cid }
                 }).toPersistentList()
                 Dialog(
@@ -409,8 +434,8 @@ fun ProfileView(
                 ) {
                     MediaFeedView(
                         posts = posts,
-                        isLoading = timelineViewModel.isFetchingProfileFeed,
-                        onLoadMore = { timelineViewModel.fetchProfileFeed() },
+                        isLoading = localIsFetchingProfileFeed,
+                        onLoadMore = { timelineViewModel.fetchProfileFeed(profile.did) },
                         onProfileTap = { did ->
                             isMediaFeedMode = false
                             onProfileTap(did)
@@ -427,11 +452,13 @@ fun ProfileView(
                     Box(modifier = contentModifier) {
                         ProfileContent(
                             profile = profile,
+                            profileKey = profileKey,
                             timelineViewModel = timelineViewModel,
                             settingsState = settingsState,
                             listState = listState,
                             onThreadTap = onThreadTap,
                             onProfileTap = onProfileTap,
+                            onHandleTap = onHandleTap,
                             onReplyTap = { skeetData, quotePost ->
                                 inReplyTo.value = skeetData
                                 isQuotePost.value = quotePost
@@ -443,6 +470,7 @@ fun ProfileView(
                             isPublicationsTab = isPublicationsTab,
                             onPublicationTap = onPublicationTap,
                             onDocumentTap = onDocumentTap,
+                            onLoadMore = { timelineViewModel.fetchProfileFeed(profile.did) },
                         )
                     }
                 }
@@ -481,18 +509,34 @@ private fun ProfileOverflowMenu(
 internal fun ProfileContent(
     modifier: Modifier = Modifier,
     profile: ProfileViewDetailed,
+    profileKey: String,
     timelineViewModel: TimelineViewModel,
     settingsState: SettingsState = SettingsState(),
     listState: LazyListState,
     onThreadTap: (SkeetData) -> Unit,
     onProfileTap: (Did) -> Unit,
+    onHandleTap: (String) -> Unit = {},
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
     onFollowersTap: (showFollowers: Boolean, name: String) -> Unit = { _, _ -> },
     isPublicationsTab: Boolean = false,
     onPublicationTap: () -> Unit = {},
     onDocumentTap: () -> Unit = {},
+    onLoadMore: () -> Unit = {},
 ) {
-    val posts = timelineViewModel.profilePosts
+    val vmKey = timelineViewModel.currentProfileKey
+    val isOurData = vmKey == profileKey
+
+    var localPosts by remember(profileKey) { mutableStateOf<ImmutableList<SkeetData>>(persistentListOf()) }
+    var localIsFetchingProfileFeed by remember(profileKey) { mutableStateOf(false) }
+    var localPublicationsState by remember(profileKey) { mutableStateOf(timelineViewModel.publicationsState) }
+
+    if (isOurData) {
+        localPosts = timelineViewModel.profilePosts
+        localIsFetchingProfileFeed = timelineViewModel.isFetchingProfileFeed
+        localPublicationsState = timelineViewModel.publicationsState
+    }
+
+    val posts = localPosts
     val avatarClipShape = settingsState.avatarClipShape
 
     LazyColumn(
@@ -510,6 +554,7 @@ internal fun ProfileContent(
                 timelineViewModel = timelineViewModel,
                 avatarShape = avatarClipShape,
                 onProfileTap = onProfileTap,
+                onHandleTap = onHandleTap,
                 onFollowersTap = {
                     onFollowersTap(true, profile.displayName ?: profile.handle.handle)
                 },
@@ -520,7 +565,7 @@ internal fun ProfileContent(
         }
 
         if (isPublicationsTab) {
-            val pubState = timelineViewModel.publicationsState
+            val pubState = localPublicationsState
 
             if (pubState.isFetchingPublications) {
                 item(key = "pub_loading") { LoadingBox() }
@@ -584,7 +629,7 @@ internal fun ProfileContent(
                 }
             }
 
-            if (timelineViewModel.isFetchingProfileFeed) {
+            if (localIsFetchingProfileFeed) {
                 item(key = "loading") {
                     LoadingBox()
                 }
@@ -596,7 +641,7 @@ internal fun ProfileContent(
         OnEndOfListReached(
             listState = listState,
             items = posts,
-            onEndReached = { timelineViewModel.fetchProfileFeed() },
+            onEndReached = onLoadMore,
         )
     }
 }
@@ -607,6 +652,7 @@ internal fun ProfileHeader(
     timelineViewModel: TimelineViewModel,
     avatarShape: Shape = CircleShape,
     onProfileTap: (Did) -> Unit = {},
+    onHandleTap: (String) -> Unit = {},
     onFollowersTap: () -> Unit = {},
     onFollowingTap: () -> Unit = {},
 ) {
@@ -780,7 +826,11 @@ internal fun ProfileHeader(
                 Spacer(modifier = Modifier.height(8.dp))
                 val primaryColor = MaterialTheme.colorScheme.primary
                 val bioAnnotated = remember(profile.description, primaryColor) {
-                    buildBioAnnotatedString(profile.description.orEmpty(), primaryColor, onProfileTap)
+                    buildBioAnnotatedString(
+                        profile.description.orEmpty(),
+                        primaryColor,
+                        onMentionTap = { handle -> onHandleTap(handle) }
+                    )
                 }
                 SelectionContainer {
                     Text(
@@ -1119,7 +1169,7 @@ private val bioTokenPattern = Regex(
 private fun buildBioAnnotatedString(
     text: String,
     primary: Color,
-    onProfileTap: (Did) -> Unit,
+    onMentionTap: (String) -> Unit,
 ): AnnotatedString {
     val linkStyles = TextLinkStyles(style = SpanStyle(color = primary))
     val accentStyle = SpanStyle(color = primary)
@@ -1141,7 +1191,7 @@ private fun buildBioAnnotatedString(
                     withLink(LinkAnnotation.Clickable(
                         tag = "mention:$handle",
                         styles = linkStyles,
-                        linkInteractionListener = { onProfileTap(Did(handle)) },
+                        linkInteractionListener = { onMentionTap(handle) },
                     )) { append(token) }
                 }
 

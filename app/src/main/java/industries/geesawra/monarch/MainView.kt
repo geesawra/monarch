@@ -96,6 +96,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
+import app.bsky.actor.ProfileViewDetailed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
@@ -147,7 +148,7 @@ import kotlin.time.ExperimentalTime
 private sealed class DetailPaneContent {
     data object Empty : DetailPaneContent()
     data object Thread : DetailPaneContent()
-    data class Profile(val did: Did) : DetailPaneContent()
+    data class Profile(val identifier: String) : DetailPaneContent()
 }
 
 private data class FeedItem(val uri: String, val displayName: String, val avatar: String?)
@@ -594,8 +595,13 @@ private fun InnerTimelineView(
             }
 
             val expandedOnProfileTap: (Did) -> Unit = { did ->
-                detailPaneContent = DetailPaneContent.Profile(did)
+                detailPaneContent = DetailPaneContent.Profile(did.did)
                 timelineViewModel.openProfile(did)
+            }
+
+            val expandedOnHandleTap: (String) -> Unit = { handle ->
+                detailPaneContent = DetailPaneContent.Profile(handle)
+                timelineViewModel.openProfileByHandle(handle)
             }
 
             val narrowScreen = isNarrowScreen()
@@ -1054,10 +1060,11 @@ private fun InnerTimelineView(
                                                         onClose = { detailPaneContent = DetailPaneContent.Empty },
                                                     )
                                                     is DetailPaneContent.Profile -> DetailProfilePane(
-                                                        did = content.did,
+                                                        identifier = content.identifier,
                                                         timelineViewModel = timelineViewModel,
                                                         settingsState = settingsState,
                                                         onProfileTap = expandedOnProfileTap,
+                                                        onHandleTap = expandedOnHandleTap,
                                                         onThreadTap = expandedOnSeeMoreTap,
                                                         onReplyTap = onReplyTap,
                                                         onClose = { detailPaneContent = DetailPaneContent.Empty },
@@ -1280,17 +1287,31 @@ private fun DetailThreadPane(
 @Composable
 @Suppress("UNUSED_PARAMETER")
 private fun DetailProfilePane(
-    did: Did,
+    identifier: String,
     timelineViewModel: TimelineViewModel,
     settingsState: SettingsState,
     onProfileTap: (Did) -> Unit,
+    onHandleTap: (String) -> Unit,
     onThreadTap: (SkeetData) -> Unit,
     onReplyTap: (SkeetData, Boolean) -> Unit,
     onClose: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    val profile = timelineViewModel.profileUser
-    val isLoading = timelineViewModel.isFetchingProfile && profile == null
+    val vmKey = timelineViewModel.currentProfileKey
+    val isOurData = vmKey == identifier
+
+    var localProfile by remember(identifier) { mutableStateOf<ProfileViewDetailed?>(null) }
+    var localIsFetchingProfile by remember(identifier) { mutableStateOf(false) }
+    var localProfileNotFound by remember(identifier) { mutableStateOf(false) }
+
+    if (isOurData) {
+        localProfile = timelineViewModel.profileUser
+        localIsFetchingProfile = timelineViewModel.isFetchingProfile
+        localProfileNotFound = timelineViewModel.profileNotFound
+    }
+
+    val profile = localProfile
+    val isLoading = localIsFetchingProfile && profile == null
     val listState = rememberLazyListState()
 
     Scaffold(
@@ -1327,7 +1348,7 @@ private fun DetailProfilePane(
             ) {
                 if (isLoading) {
                     CircularWavyProgressIndicator()
-                } else if (timelineViewModel.profileNotFound) {
+                } else if (localProfileNotFound) {
                     Text("Profile not found")
                 }
             }
@@ -1335,16 +1356,25 @@ private fun DetailProfilePane(
             PullToRefreshBox(
                 modifier = Modifier.padding(padding),
                 isRefreshing = false,
-                onRefresh = { timelineViewModel.openProfile(did) },
+                onRefresh = {
+                    if (identifier.startsWith("did:")) {
+                        timelineViewModel.openProfile(Did(identifier))
+                    } else {
+                        timelineViewModel.openProfileByHandle(identifier)
+                    }
+                },
             ) {
                 ProfileContent(
                     profile = profile,
+                    profileKey = identifier,
                     timelineViewModel = timelineViewModel,
                     settingsState = settingsState,
                     listState = listState,
                     onThreadTap = onThreadTap,
                     onProfileTap = onProfileTap,
+                    onHandleTap = onHandleTap,
                     onReplyTap = onReplyTap,
+                    onLoadMore = { timelineViewModel.fetchProfileFeed(profile.did) },
                 )
             }
         }

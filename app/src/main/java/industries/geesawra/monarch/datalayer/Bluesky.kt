@@ -361,21 +361,27 @@ class BlueskyConn(val context: Context) {
             }
         }
 
+        suspend fun resolveHandleToDid(handle: String): Result<Did> {
+            return runCatching {
+                val api = XrpcBlueskyApi()
+                val rawId = api.resolveHandle(
+                    ResolveHandleQueryParams(handle = Handle(handle))
+                )
+                when (rawId) {
+                    is AtpResponse.Failure<*> -> {
+                        throw Exception("Failed to resolve handle: ${rawId.error?.message}")
+                    }
+                    is AtpResponse.Success<ResolveHandleResponse> -> Did(rawId.response.did.did)
+                }
+            }
+        }
+
         suspend fun pdsForHandle(handleOrDid: String): Result<String> {
             return runCatching {
                 val did = if (handleOrDid.startsWith("did:")) {
                     handleOrDid
                 } else {
-                    val api = XrpcBlueskyApi()
-                    val rawId = api.resolveHandle(
-                        ResolveHandleQueryParams(handle = Handle(handleOrDid))
-                    )
-                    when (rawId) {
-                        is AtpResponse.Failure<*> -> {
-                            return Result.failure(Exception("Failed to resolve handle: ${rawId.error?.message}"))
-                        }
-                        is AtpResponse.Success<ResolveHandleResponse> -> rawId.response.did.did
-                    }
+                    resolveHandleToDid(handleOrDid).getOrThrow().did
                 }
 
                 val httpClient = createRetryHttpClient()
