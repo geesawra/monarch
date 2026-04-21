@@ -7,6 +7,7 @@ import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toLowerCase
@@ -188,6 +189,21 @@ enum class AuthData {
     OAuthInFlightAuthServerURL,
 }
 
+/**
+ * Like [suspendRunCatching] but rethrows [CancellationException] so that coroutine cancellation
+ * is never swallowed and turned into a [Result.failure]. This prevents "job was cancelled"
+ * errors from leaking to the user as snackbars/toasts.
+ */
+inline fun <T> suspendRunCatching(block: () -> T): Result<T> {
+    return try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        Result.failure(e)
+    }
+}
+
 class LoginException(message: String?) : Exception(message)
 
 /**
@@ -239,8 +255,7 @@ private fun classifyAuthError(t: Throwable): AuthError {
             || msg.contains("DPoP", ignoreCase = true) -> AuthError.DpopNonce
         msg.contains("ExpiredToken", ignoreCase = true)
             || msg.contains("InvalidToken", ignoreCase = true)
-            || msg.contains("invalid_token", ignoreCase = true)
-            || msg.contains("refresh token", ignoreCase = true) -> AuthError.ExpiredToken
+            || msg.contains("invalid_token", ignoreCase = true) -> AuthError.ExpiredToken
         else -> AuthError.Other
     }
 }
@@ -362,7 +377,7 @@ class BlueskyConn(val context: Context) {
         }
 
         suspend fun resolveHandleToDid(handle: String): Result<Did> {
-            return runCatching {
+            return suspendRunCatching {
                 val api = XrpcBlueskyApi()
                 val rawId = api.resolveHandle(
                     ResolveHandleQueryParams(handle = Handle(handle))
@@ -377,7 +392,7 @@ class BlueskyConn(val context: Context) {
         }
 
         suspend fun pdsForHandle(handleOrDid: String): Result<String> {
-            return runCatching {
+            return suspendRunCatching {
                 val did = if (handleOrDid.startsWith("did:")) {
                     handleOrDid
                 } else {
@@ -415,7 +430,7 @@ class BlueskyConn(val context: Context) {
         }
 
         suspend fun authServerForPds(pdsURL: String): Result<String> {
-            return runCatching {
+            return suspendRunCatching {
                 val httpClient = createRetryHttpClient()
                 val endpoint = pdsURL.trimEnd('/') + "/.well-known/oauth-protected-resource"
                 val response = httpClient.get(endpoint)
@@ -543,7 +558,7 @@ class BlueskyConn(val context: Context) {
                         Result.success(Unit)
                     } else {
                         Log.d("BlueskyAuth", "refresh-start gen=$genBefore cause=${summarizeAuthError(err)}")
-                        val refreshResult = runCatching { actuallyRefresh() }
+                        val refreshResult = actuallyRefresh()
                         val rErr = refreshResult.exceptionOrNull()
                         when {
                             rErr == null -> Result.success(Unit)
@@ -575,17 +590,19 @@ class BlueskyConn(val context: Context) {
      * between refresh and persist cannot strand the device with a dead refresh token in
      * DataStore but a working one in memory.
      */
-    private suspend fun actuallyRefresh() {
+    private suspend fun actuallyRefresh(): Result<Unit> = suspendRunCatching {
         val tokens = sharedAuthTokens?.value as? BlueskyAuthPlugin.Tokens.Dpop
-            ?: throw LoginException("No DPoP tokens to refresh")
-        val oauthApi = sharedOAuthApi ?: throw LoginException("OAuth API not initialized")
+            ?: throw LoginException("Auth state missing: no DPoP tokens available")
+        val oauthApi = sharedOAuthApi
+            ?: throw LoginException("Auth state missing: OAuth API not initialized")
         val refreshed = oauthApi.refreshToken(
             clientId = tokens.clientId,
             nonce = tokens.nonce,
             refreshToken = tokens.refresh,
             keyPair = tokens.keyPair,
         )
-        val previous = oauthToken ?: throw LoginException("No in-memory OAuthToken to merge refresh into")
+        val previous = oauthToken
+            ?: throw LoginException("Auth state missing: no in-memory OAuthToken to merge refresh into")
         val updated = previous.copy(
             accessToken = refreshed.accessToken,
             refreshToken = refreshed.refreshToken,
@@ -623,7 +640,7 @@ class BlueskyConn(val context: Context) {
         pdsURL = null
         appviewProxy = null
         if (activeDid != null) {
-            runCatching { context.removeStoredAccount(activeDid) }.onFailure {
+            suspendRunCatching { context.removeStoredAccount(activeDid) }.onFailure {
                 Log.w("BlueskyAuth", "Failed to remove stored account on invalid_grant: ${it.message}")
             }
         }
@@ -760,7 +777,7 @@ class BlueskyConn(val context: Context) {
         handle: String,
         appviewProxy: String,
     ): Result<String> {
-        return runCatching {
+        return suspendRunCatching {
             val pdsURL = pdsForHandle(handle).getOrElse {
                 return Result.failure(it)
             }
@@ -813,7 +830,7 @@ class BlueskyConn(val context: Context) {
         code: String,
         state: String,
     ): Result<StoredAccount> {
-        return runCatching {
+        return suspendRunCatching {
             val prefs = context.dataStore.data.first()
             val expectedState = prefs[OAUTH_IN_FLIGHT_STATE]
                 ?: return Result.failure(Exception("No OAuth login in progress"))
@@ -975,7 +992,7 @@ class BlueskyConn(val context: Context) {
                 this@BlueskyConn.oauthToken = updated
 
                 if (accessChanged || refreshChanged) {
-                    runCatching {
+                    suspendRunCatching {
                         val updatedJson = BlueskyJson.encodeToString(OAuthToken.serializer(), updated)
                         context.updateStoredAccountOAuthToken(previous.subject.did, updatedJson)
                     }.onFailure {
@@ -989,7 +1006,7 @@ class BlueskyConn(val context: Context) {
     private suspend inline fun <reified T : Any> apiCall(
         errorMsg: String,
         crossinline block: suspend () -> AtpResponse<T>
-    ): Result<T> = runCatching {
+    ): Result<T> = suspendRunCatching {
         create().getOrThrow()
         when (val ret = block()) {
             is AtpResponse.Failure<*> -> throw ApiCallFailure(errorMsg, ret.asException())
@@ -1019,7 +1036,7 @@ class BlueskyConn(val context: Context) {
             val account = context.readActiveStoredAccount()
                 ?: return Result.failure(Exception("No active account"))
 
-            val token = runCatching {
+            val token = suspendRunCatching {
                 BlueskyJson.decodeFromString(OAuthToken.serializer(), account.oauthTokenJson)
             }.getOrElse {
                 return Result.failure(LoginException("Failed to deserialize OAuth token: ${it.message}"))
@@ -1044,7 +1061,8 @@ class BlueskyConn(val context: Context) {
 
             Log.d("BlueskyAuth", "Clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}, handle=${account.handle}")
             return Result.success(Unit)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             Log.d("BlueskyAuth", "create() failed: ${e::class.simpleName}: ${e.message}")
             return Result.failure(e)
         } finally {
@@ -1076,7 +1094,7 @@ class BlueskyConn(val context: Context) {
         threadgateRules: List<ThreadgateAllowUnion>? = null,
         onVideoStatus: (VideoUploadStatus, Long?) -> Unit = { _, _ -> },
     ): Result<AtUri> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1205,7 +1223,7 @@ class BlueskyConn(val context: Context) {
         onProgress: (Int, Int) -> Unit = { _, _ -> },
         onVideoStatus: (VideoUploadStatus, Long?) -> Unit = { _, _ -> },
     ): Result<List<PostResult>> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1329,7 +1347,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun fetchRecord(uri: AtUri): Result<JsonContent> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1464,7 +1482,7 @@ class BlueskyConn(val context: Context) {
     suspend fun listPublications(did: Did): Result<List<PublicationRecord>> {
         return listRecordsFromRepo(did, "site.standard.publication").map { records ->
             records.mapNotNull { record ->
-                runCatching {
+                suspendRunCatching {
                     val obj = record.value.value as kotlinx.serialization.json.JsonObject
                     PublicationRecord(
                         uri = record.uri,
@@ -1483,7 +1501,7 @@ class BlueskyConn(val context: Context) {
     suspend fun listDocuments(did: Did): Result<List<DocumentRecord>> {
         return listRecordsFromRepo(did, "site.standard.document").map { records ->
             records.mapNotNull { record ->
-                runCatching {
+                suspendRunCatching {
                     val obj = record.value.value as kotlinx.serialization.json.JsonObject
                     val tagsArray = obj["tags"] as? kotlinx.serialization.json.JsonArray
                     val contentBlocks = parseContentBlocks(obj["content"], did)
@@ -1546,7 +1564,7 @@ class BlueskyConn(val context: Context) {
     private suspend fun uploadImages(images: List<Uri>): Result<List<MediaBlob>> {
         val maxImageSize = MAX_IMAGE_SIZE_BYTES
 
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1584,7 +1602,7 @@ class BlueskyConn(val context: Context) {
     }
 
     private suspend fun uploadVideo(video: Uri, onStatus: (VideoUploadStatus, Long?) -> Unit): Result<MediaBlob> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1776,7 +1794,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun orderedFeedUris(): Result<List<String>> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1808,7 +1826,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun feeds(): Result<List<GeneratorView>> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1829,7 +1847,7 @@ class BlueskyConn(val context: Context) {
                 return Result.success(emptyList())
             }
 
-            val batch = runCatching {
+            val batch = suspendRunCatching {
                 client!!.getFeedGenerators(
                     GetFeedGeneratorsQueryParams(feedUris)
                 )
@@ -1845,7 +1863,7 @@ class BlueskyConn(val context: Context) {
             val resolved = coroutineScope {
                 feedUris.map { uri ->
                     async {
-                        runCatching {
+                        suspendRunCatching {
                             client!!.getFeedGenerator(
                                 GetFeedGeneratorQueryParams(uri)
                             )
@@ -1864,7 +1882,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun reorderFeeds(newOrder: List<String>): Result<Unit> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1898,7 +1916,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun subscribedLabelers(): Result<Map<Did?, GetServicesResponseViewUnion.LabelerViewDetailed?>> {
-        return runCatching {
+        return suspendRunCatching {
             val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val labelersPref = prefs.preferences.firstOrNull {
                 it is PreferencesUnion.LabelersPref
@@ -1935,7 +1953,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun getMutedWords(): Result<List<MutedWord>> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -1949,7 +1967,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun setMutedWords(words: List<MutedWord>): Result<Unit> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -2005,7 +2023,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun like(uri: AtUri, cid: Cid): Result<RKey> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -2034,7 +2052,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun repost(uri: AtUri, cid: Cid): Result<RKey> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -2098,7 +2116,7 @@ class BlueskyConn(val context: Context) {
     }
 
     suspend fun follow(did: Did): Result<RKey> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }
@@ -2160,7 +2178,7 @@ class BlueskyConn(val context: Context) {
         avatarUri: Uri? = null,
         bannerUri: Uri? = null,
     ): Result<Unit> {
-        return runCatching {
+        return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
             }

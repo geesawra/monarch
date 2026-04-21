@@ -108,6 +108,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         }
                     }
                 }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                // User cancelled the action (e.g. dismissed notification); ignore silently.
             } finally {
                 pendingResult.finish()
             }

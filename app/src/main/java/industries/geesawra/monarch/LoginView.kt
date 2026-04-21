@@ -80,7 +80,7 @@ fun LoginView(
             }.onFailure {
                 Toast.makeText(
                     ctx,
-                    it.message ?: "Can't look up PDS: ${it.toString()}",
+                    it.message ?: "Can't look up PDS",
                     Toast.LENGTH_LONG
                 ).show()
                 handleTextFieldError.value = true

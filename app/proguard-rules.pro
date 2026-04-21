@@ -28,8 +28,12 @@
 -keep public class sh.christian.ozone.api.response.StatusCode$* { *; }
 -keep class sh.christian.ozone.api.response.AtpException { *; }
 -keep class sh.christian.ozone.api.response.AtpErrorDescription { *; }
+-keep class sh.christian.ozone.api.response.AtpResponse { *; }
+-keep class sh.christian.ozone.api.response.AtpResponse$* { *; }
 -keepnames class sh.christian.ozone.api.response.AtpException
+-keep class sh.christian.ozone.api.response.** { *; }
 -keep class sh.christian.ozone.api.response.**$$serializer { *; }
+-keep class sh.christian.ozone.api.xrpc.** { *; }
 
 # OAuthToken is round-tripped through JSON in DataStore; field renames would
 # silently produce malformed persisted credentials.

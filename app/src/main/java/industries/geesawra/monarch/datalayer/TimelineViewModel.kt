@@ -391,6 +391,7 @@ class TimelineViewModel @AssistedInject constructor(
     }
 
     private fun handleError(error: Throwable) {
+        if (error is CancellationException) return
         when (error) {
             is LoginException -> updateSession { it.copy(loginError = error.message) }
             else -> updateSession { it.copy(error = error.message) }
@@ -559,6 +560,20 @@ class TimelineViewModel @AssistedInject constructor(
                 return@launch
             }
 
+            // Eagerly initialize the in-memory auth state and HTTP clients before marking
+            // the session as authenticated. Without this, any concurrent API call that
+            // triggers token refresh will find sharedAuthTokens == null and crash with
+            // "No DPoP tokens to refresh".
+            bskyConn.create().onFailure {
+                // If create() fails (e.g. corrupted token), surface it as a login error so
+                // the UI routes to the login screen instead of leaving the user in a broken
+                // authenticated state.
+                if (it is CancellationException) throw it
+                handleError(it)
+                updateSession { it.copy(sessionChecked = true) }
+                return@launch
+            }
+
             updateSession { it.copy(authenticated = true, sessionChecked = true) }
             refreshAccounts()
         }
@@ -608,7 +623,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun fetchTimeline(fresh: Boolean = false, replyFilterMode: ReplyFilterMode = ReplyFilterMode.OnlyFilterDeepThreads, then: () -> Unit = {}) {
         updateTimeline { it.copy(isFetchingMoreTimeline = true) }
-        runCatching {
+        suspendRunCatching {
             timelineFetchJob?.cancel()
         }
 
@@ -669,7 +684,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun fetchNotifications(fresh: Boolean = false, then: () -> Unit = {}) {
         updateNotifications { it.copy(isFetchingMoreNotifications = true) }
-        runCatching {
+        suspendRunCatching {
             notificationsFetchJob?.cancel()
         }
 
