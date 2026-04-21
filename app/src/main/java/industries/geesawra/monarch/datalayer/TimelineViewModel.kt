@@ -628,57 +628,49 @@ class TimelineViewModel @AssistedInject constructor(
         }
 
         timelineFetchJob = viewModelScope.launch {
+            val feedKey = selectedFeed
+            val cursor = if (fresh) null else timelineCursor
+
             bskyConn.refreshLabelCacheIfNeeded()
 
-            when (selectedFeed) {
-                "following" -> bskyConn.fetchTimeline(
-                    if (fresh) null else timelineCursor
-                )
+            val response = when (feedKey) {
+                "following" -> bskyConn.fetchTimeline(cursor)
+                else -> bskyConn.fetchFeed(feed = feedKey, cursor = cursor)
+            }.getOrNull()
 
-                else -> bskyConn.fetchFeed(
-                    feed = selectedFeed,
-                    cursor = if (fresh) null else timelineCursor
-                )
-            }.onSuccess { response ->
-                val feedKey = selectedFeed
-                val existingFeedSkeets: List<SkeetData> = feedSkeets[feedKey] ?: persistentListOf()
-                val currentMutedWords = mutedWords
-                val previousFirstCid = skeets.firstOrNull()?.cid
-                val newSkeets = if (fresh) {
-                    response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }.distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
-                } else {
-                    (skeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
-                }.withMuteFlags(currentMutedWords)
-                val newFeedSkeets = if (fresh) {
-                    newSkeets
-                } else {
-                    (existingFeedSkeets + response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
-                }.withMuteFlags(currentMutedWords)
-
-                updateTimeline { t ->
-                    t.copy(
-                        skeets = newSkeets,
-                        feedSkeets = (t.feedSkeets + (feedKey to newFeedSkeets)).toImmutableMap(),
-                        feedCursors = (t.feedCursors + (feedKey to response.cursor)).toImmutableMap(),
-                        timelineCursor = response.cursor,
-                        isFetchingMoreTimeline = false,
-                    )
-                }
-                if (fresh && previousFirstCid != null && newSkeets.firstOrNull()?.cid != previousFirstCid) {
-                    hasNewTimelinePosts = true
-                }
-                newSkeets.forEach { postInteractionStore.seed(it) }
+            if (response == null) {
                 then()
-            }.onFailure { err ->
-                if (err is CancellationException) {
-                    return@onFailure
-                }
-
-                then()
-
                 updateTimeline { it.copy(isFetchingMoreTimeline = false) }
-                updateSession { it.copy(error = "Failed to fetch timeline: ${err.message}") }
+                return@launch
             }
+
+            val existingFeedSkeets: List<SkeetData> = feedSkeets[feedKey] ?: persistentListOf()
+            val currentMutedWords = mutedWords
+            val previousFirstCid = skeets.firstOrNull()?.cid
+            val responseSkeets = response.feed.map { SkeetData.fromFeedViewPost(it, bskyConn.session?.did, replyFilterMode) }
+                .distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
+
+            val newFeedSkeets = if (fresh) {
+                responseSkeets
+            } else {
+                (existingFeedSkeets + responseSkeets).distinctBy { if (it.reason is FeedViewPostReasonUnion.ReasonRepost) "repost-${it.cid}" else it.cid.cid }
+            }.withMuteFlags(currentMutedWords)
+
+            updateTimeline { t ->
+                val isStillOnThisFeed = selectedFeed == feedKey
+                t.copy(
+                    skeets = if (isStillOnThisFeed) newFeedSkeets else t.skeets,
+                    feedSkeets = (t.feedSkeets + (feedKey to newFeedSkeets)).toImmutableMap(),
+                    feedCursors = (t.feedCursors + (feedKey to response.cursor)).toImmutableMap(),
+                    timelineCursor = if (isStillOnThisFeed) response.cursor else t.timelineCursor,
+                    isFetchingMoreTimeline = false,
+                )
+            }
+            if (fresh && previousFirstCid != null && newFeedSkeets.firstOrNull()?.cid != previousFirstCid) {
+                hasNewTimelinePosts = true
+            }
+            newFeedSkeets.forEach { postInteractionStore.seed(it) }
+            then()
         }
     }
 
