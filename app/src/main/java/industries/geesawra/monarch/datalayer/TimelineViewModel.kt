@@ -579,7 +579,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun fetchAllNewData(then: () -> Unit = {}) {
+    fun fetchAllNewData(fromNotificationsTab: Boolean = false, then: () -> Unit = {}) {
         fetchAllJob?.cancel()
         updateTimeline { it.copy(isFetchingMoreTimeline = true) }
         fetchAllJob = viewModelScope.launch {
@@ -601,7 +601,7 @@ class TimelineViewModel @AssistedInject constructor(
             }
 
             fetchTimeline(fresh = true)
-            fetchNotifications(fresh = true)
+            fetchNotifications(fresh = true, fromNotificationsTab = fromNotificationsTab)
             fetchMutedWords()
             val fJob = feeds()
 
@@ -674,7 +674,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun fetchNotifications(fresh: Boolean = false, then: () -> Unit = {}) {
+    fun fetchNotifications(fresh: Boolean = false, fromNotificationsTab: Boolean = false, then: () -> Unit = {}) {
         updateNotifications { it.copy(isFetchingMoreNotifications = true) }
         suspendRunCatching {
             notificationsFetchJob?.cancel()
@@ -699,19 +699,30 @@ class TimelineViewModel @AssistedInject constructor(
                 return@launch
             }
 
-            val unreadCount = rawNotifs.notifications.fold(0) { acc, notification ->
-                when (notification.isRead) {
-                    false -> acc + 1
-                    true -> acc
-                }
-            }
-            updateNotifications { it.copy(unreadNotificationsAmt = unreadCount) }
-            NotificationBadge.set(unreadCount)
+            val oldNotifications = if (fresh) notifications else null
 
             val posts = parseRawNotifications(rawNotifs)
             val (notifs, repeatable) = buildNotificationList(rawNotifs, posts)
             val grouped = groupRepeatableNotifications(repeatable)
             val processed = processGroupedNotifications(notifs, grouped)
+
+            val isSameData = fresh && fromNotificationsTab &&
+                oldNotifications != null && oldNotifications.isNotEmpty() && processed.isNotEmpty() &&
+                processed.size <= oldNotifications.size &&
+                processed.zip(oldNotifications).all { (a, b) -> a.uniqueKey() == b.uniqueKey() }
+
+            if (isSameData) {
+                updateSeenNotifications()
+            } else {
+                val unreadCount = rawNotifs.notifications.fold(0) { acc, notification ->
+                    when (notification.isRead) {
+                        false -> acc + 1
+                        true -> acc
+                    }
+                }
+                updateNotifications { it.copy(unreadNotificationsAmt = unreadCount) }
+                NotificationBadge.set(unreadCount)
+            }
 
             if (fresh) {
                 updateNotifications { it.copy(notifications = persistentListOf()) }

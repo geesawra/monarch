@@ -558,7 +558,8 @@ private fun InnerTimelineView(
             )
         },
         onRefresh = {
-            timelineViewModel.fetchAllNewData() {
+            val fromNotifTab = currentDestination == TabBarDestinations.NOTIFICATIONS
+            timelineViewModel.fetchAllNewData(fromNotificationsTab = fromNotifTab) {
                 coroutineScope.launch {
                     launch {
                         timelineState.scrollToItem(0)
