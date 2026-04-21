@@ -357,26 +357,23 @@ fun ComposeView(
         }
     }
 
-    // Outer Box: Handles IME padding and general content padding for the whole sheet content
-    Box(
+                                                                                                                                                                                                                    var showThreadgateSheet by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .nestedScroll(sheetScrollConnection)
             .windowInsetsPadding(WindowInsets.ime.add(WindowInsets.navigationBars))
-            .verticalScroll(scrollState)
-            .padding(16.dp)
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp)
     ) {
-        // Inner Box: Fills the space provided by Outer Box, used for layering scrollable content and fixed buttons
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Scrollable Content Column
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(),
-                horizontalAlignment = Alignment.End
-            ) {
-                var showThreadgateSheet by remember { mutableStateOf(false) }
-
+        // Scrollable Content Column
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .nestedScroll(sheetScrollConnection)
+                .verticalScroll(scrollState),
+            horizontalAlignment = Alignment.End
+        ) {
                 if (showThreadgateSheet) {
                     ThreadgateSettings(
                         currentRules = threadgateRules.value,
@@ -388,39 +385,29 @@ fun ComposeView(
                     )
                 }
 
-                ActionRow(
-                    context,
-                    uploadingPost,
-                    pickMedia,
-                    takePicture,
-                    cameraImageUri,
-                    textfieldState.text.toString(),
-                    mediaSelected,
-                    mediaSelectedIsVideo,
-                    mediaAltTexts,
-                    coroutineScope,
-                    maxChars,
-                    timelineViewModel,
+                PostButtonRow(
+                    context = context,
+                    uploadingPost = uploadingPost,
+                    postText = textfieldState.text.toString(),
+                    mediaSelected = mediaSelected,
+                    mediaSelectedIsVideo = mediaSelectedIsVideo,
+                    mediaAltTexts = mediaAltTexts,
+                    coroutineScope = coroutineScope,
+                    maxChars = maxChars,
+                    timelineViewModel = timelineViewModel,
                     autoLikeOnReply = settingsState.autoLikeOnReply,
                     requireAltText = settingsState.requireAltText,
                     autoThreadOnOverflow = settingsState.autoThreadOnOverflow,
-                    scaffoldState,
-                    inReplyTo.value,
-                    isQuotePost.value,
+                    scaffoldState = scaffoldState,
+                    inReplyToData = inReplyTo.value,
+                    isQuotePost = isQuotePost.value,
                     facets = facets,
                     linkPreview = if (!linkPreviewDismissed.value) linkPreview.value else null,
                     threadgateRules = threadgateRules,
                     wasEdited = wasEdited,
-                    onDraftsClick = onDraftsClick,
-                    onThreadgateClick = { showThreadgateSheet = true },
                     isThreadMode = isThreadMode,
                     threadPosts = threadPosts,
-                    threadPostIdCounter = threadPostIdCounter,
                     focusedThreadPostIndex = focusedThreadPostIndex.value,
-                    textfieldState = textfieldState,
-                    linkPreviewState = linkPreview,
-                    linkPreviewDismissedState = linkPreviewDismissed,
-                    mentionDids = mentionDids,
                     onThreadPost = {
                         coroutineScope.launch {
                             uploadingPost.value = true
@@ -456,6 +443,7 @@ fun ComposeView(
                             }
                         }
                     },
+                    mentionDids = mentionDids,
                 )
 
                 LaunchedEffect(Unit) {
@@ -762,8 +750,31 @@ fun ComposeView(
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
+
+            ComposeBottomBar(
+                context = context,
+                pickMedia = pickMedia,
+                takePicture = takePicture,
+                cameraImageUri = cameraImageUri,
+                mediaSelected = mediaSelected,
+                mediaSelectedIsVideo = mediaSelectedIsVideo,
+                mediaAltTexts = mediaAltTexts,
+                onDraftsClick = onDraftsClick,
+                onThreadgateClick = { showThreadgateSheet = true },
+                threadgateRules = threadgateRules,
+                isThreadMode = isThreadMode,
+                threadPosts = threadPosts,
+                threadPostIdCounter = threadPostIdCounter,
+                textfieldState = textfieldState,
+                linkPreviewState = linkPreview,
+                linkPreviewDismissedState = linkPreviewDismissed,
+                mentionDids = mentionDids,
+                inReplyToData = inReplyTo.value,
+                isQuotePost = isQuotePost.value,
+                coroutineScope = coroutineScope,
+                facets = facets,
+            )
         }
-    }
 
     altEditorUri.value?.let { uri ->
         AltTextEditorSheet(
@@ -781,12 +792,9 @@ fun ComposeView(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ActionRow(
+fun PostButtonRow(
     context: Context,
     uploadingPost: MutableState<Boolean>,
-    pickMedia: ManagedActivityResultLauncher<PickVisualMediaRequest, List<@JvmSuppressWildcards Uri>>,
-    takePicture: ManagedActivityResultLauncher<Uri, Boolean>,
-    cameraImageUri: MutableState<Uri?>,
     postText: String,
     mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
@@ -804,16 +812,10 @@ fun ActionRow(
     linkPreview: LinkPreviewData? = null,
     threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
     wasEdited: MutableState<Boolean> = mutableStateOf(false),
-    onDraftsClick: () -> Unit = {},
-    onThreadgateClick: () -> Unit = {},
     isThreadMode: MutableState<Boolean> = mutableStateOf(false),
     threadPosts: SnapshotStateList<ThreadPostState>? = null,
-    threadPostIdCounter: MutableState<Int>? = null,
     focusedThreadPostIndex: Int = 0,
     onThreadPost: (() -> Unit)? = null,
-    textfieldState: TextFieldState? = null,
-    linkPreviewState: MutableState<LinkPreviewData?>? = null,
-    linkPreviewDismissedState: MutableState<Boolean>? = null,
     mentionDids: MutableMap<String, Did>? = null,
 ) {
     val allMediaHasAlt = mediaSelected.value.isEmpty() ||
@@ -845,218 +847,238 @@ fun ActionRow(
         hasContent && (withinLimit || implicitOk) && altTextOk
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+    val haptic = LocalHapticFeedback.current
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        val haptic = LocalHapticFeedback.current
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (uploadingPost.value) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularWavyProgressIndicator()
-                    timelineViewModel.videoUploadStatus?.let { status ->
-                        val progress = timelineViewModel.videoUploadProgress
-                        val text = if (progress != null && progress > 0) {
-                            "${status.label} ${progress}%"
+        if (uploadingPost.value) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularWavyProgressIndicator()
+                timelineViewModel.videoUploadStatus?.let { status ->
+                    val progress = timelineViewModel.videoUploadProgress
+                    val text = if (progress != null && progress > 0) {
+                        "${status.label} ${progress}%"
+                    } else {
+                        status.label
+                    }
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        } else if (isThreadMode.value && onThreadPost != null) {
+            val focusedPostText = threadPosts?.getOrNull(focusedThreadPostIndex)?.textFieldState?.text?.length ?: 0
+            val charsRemaining = maxChars - focusedPostText
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                    onThreadPost()
+                },
+                modifier = Modifier.padding(end = 8.dp),
+                enabled = threadButtonEnabled && !uploadingPost.value,
+                colors = if (focusedPostText > maxChars) ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ) else ButtonDefaults.buttonColors(),
+            ) {
+                Icon(Icons.Filled.ArrowUpward, contentDescription = "Post thread")
+                if (focusedPostText > 0) {
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("$charsRemaining")
+                }
+            }
+        } else {
+            if (canImplicitSplit) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.FormatListNumbered,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        text = "Auto-thread",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                    coroutineScope.launch {
+                        uploadingPost.value = true
+                        val result = if (canImplicitSplit) {
+                            val posts = buildImplicitThreadPosts(
+                                text = postText,
+                                mentionDids = mentionDids.orEmpty(),
+                                maxChars = maxChars,
+                                images = if (!mediaSelectedIsVideo.value) mediaSelected.value.ifEmpty { null } else null,
+                                video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
+                                mediaAltTexts = mediaAltTexts.value,
+                                linkPreview = linkPreview,
+                            )
+                            timelineViewModel.postThread(
+                                posts = posts,
+                                threadgateRules = threadgateRules.value,
+                            ).map { Unit }
                         } else {
-                            status.label
+                            timelineViewModel.post(
+                                content = postText,
+                                facets = facets,
+                                images = if (!mediaSelectedIsVideo.value) mediaSelected.value.ifEmpty { null } else null,
+                                video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
+                                mediaAltTexts = mediaAltTexts.value,
+                                replyRef = if (!isQuotePost) inReplyToData?.replyRef() else null,
+                                quotePostRef = if (isQuotePost) {
+                                    val cid = inReplyToData?.cid
+                                    val uri = inReplyToData?.uri
+                                    if (cid == null || uri == null) null else StrongRef(uri, cid)
+                                } else null,
+                                linkPreview = linkPreview,
+                                threadgateRules = threadgateRules.value,
+                            ).map { Unit }
                         }
-                        Text(
-                            text = text,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
-                }
-            } else if (isThreadMode.value && onThreadPost != null) {
-                val focusedPostText = threadPosts?.getOrNull(focusedThreadPostIndex)?.textFieldState?.text?.length ?: 0
-                val charsRemaining = maxChars - focusedPostText
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                        onThreadPost()
-                    },
-                    modifier = Modifier.padding(end = 8.dp),
-                    enabled = threadButtonEnabled && !uploadingPost.value,
-                    colors = if (focusedPostText > maxChars) ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError,
-                    ) else ButtonDefaults.buttonColors(),
-                ) {
-                    Icon(Icons.Filled.ArrowUpward, contentDescription = "Post thread")
-                    if (focusedPostText > 0) {
-                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                        Text("$charsRemaining")
-                    }
-                }
-            } else {
-                if (canImplicitSplit) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 8.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.FormatListNumbered,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(Modifier.size(4.dp))
-                        Text(
-                            text = "Auto-thread",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                        coroutineScope.launch {
-                            uploadingPost.value = true
-                            val result = if (canImplicitSplit) {
-                                val posts = buildImplicitThreadPosts(
-                                    text = postText,
-                                    mentionDids = mentionDids.orEmpty(),
-                                    maxChars = maxChars,
-                                    images = if (!mediaSelectedIsVideo.value) mediaSelected.value.ifEmpty { null } else null,
-                                    video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
-                                    mediaAltTexts = mediaAltTexts.value,
-                                    linkPreview = linkPreview,
-                                )
-                                timelineViewModel.postThread(
-                                    posts = posts,
-                                    threadgateRules = threadgateRules.value,
-                                ).map { Unit }
-                            } else {
-                                timelineViewModel.post(
-                                    content = postText,
-                                    facets = facets,
-                                    images = if (!mediaSelectedIsVideo.value) mediaSelected.value.ifEmpty { null } else null,
-                                    video = if (mediaSelectedIsVideo.value) mediaSelected.value.firstOrNull() else null,
-                                    mediaAltTexts = mediaAltTexts.value,
-                                    replyRef = if (!isQuotePost) inReplyToData?.replyRef() else null,
-                                    quotePostRef = if (isQuotePost) {
-                                        val cid = inReplyToData?.cid
-                                        val uri = inReplyToData?.uri
-                                        if (cid == null || uri == null) null else StrongRef(uri, cid)
-                                    } else null,
-                                    linkPreview = linkPreview,
-                                    threadgateRules = threadgateRules.value,
-                                ).map { Unit }
+                        result.onSuccess {
+                            wasEdited.value = false
+                            timelineViewModel.draftsState.activeDraftId?.let { draftId ->
+                                timelineViewModel.deleteDraft(draftId)
+                                timelineViewModel.clearActiveDraft()
                             }
-                            result.onSuccess {
-                                wasEdited.value = false
-                                timelineViewModel.draftsState.activeDraftId?.let { draftId ->
-                                    timelineViewModel.deleteDraft(draftId)
-                                    timelineViewModel.clearActiveDraft()
-                                }
-                                if (!canImplicitSplit && autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
-                                    timelineViewModel.like(inReplyToData.uri, inReplyToData.cid)
-                                }
-                                coroutineScope.launch { scaffoldState.bottomSheetState.hide() }
-                            }.onFailure {
-                                Toast.makeText(context, "Could not post: ${it.message}", Toast.LENGTH_LONG).show()
-                            }.also {
-                                uploadingPost.value = false
+                            if (!canImplicitSplit && autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
+                                timelineViewModel.like(inReplyToData.uri, inReplyToData.cid)
                             }
+                            coroutineScope.launch { scaffoldState.bottomSheetState.hide() }
+                        }.onFailure {
+                            Toast.makeText(context, "Could not post: ${it.message}", Toast.LENGTH_LONG).show()
+                        }.also {
+                            uploadingPost.value = false
                         }
-                    },
-                    modifier = Modifier.padding(end = 8.dp),
-                    enabled = postButtonEnabled && !uploadingPost.value,
-                    colors = if (overflow && !canImplicitSplit) ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError,
-                    ) else ButtonDefaults.buttonColors(),
-                ) {
-                    Icon(Icons.Filled.ArrowUpward, contentDescription = "Post")
-                    if (postText.isNotEmpty()) {
-                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                        val label = when {
-                            canImplicitSplit -> "$implicitSplitCount"
-                            else -> "${maxChars - postText.length}"
-                        }
-                        Text(label)
                     }
+                },
+                modifier = Modifier.padding(end = 8.dp),
+                enabled = postButtonEnabled && !uploadingPost.value,
+                colors = if (overflow && !canImplicitSplit) ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ) else ButtonDefaults.buttonColors(),
+            ) {
+                Icon(Icons.Filled.ArrowUpward, contentDescription = "Post")
+                if (postText.isNotEmpty()) {
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    val label = when {
+                        canImplicitSplit -> "$implicitSplitCount"
+                        else -> "${maxChars - postText.length}"
+                    }
+                    Text(label)
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
+    }
+}
+
+@Composable
+fun ComposeBottomBar(
+    context: Context,
+    pickMedia: ManagedActivityResultLauncher<PickVisualMediaRequest, List<@JvmSuppressWildcards Uri>>,
+    takePicture: ManagedActivityResultLauncher<Uri, Boolean>,
+    cameraImageUri: MutableState<Uri?>,
+    mediaSelected: MutableState<List<Uri>>,
+    mediaSelectedIsVideo: MutableState<Boolean>,
+    mediaAltTexts: MutableState<Map<Uri, String>>,
+    onDraftsClick: () -> Unit = {},
+    onThreadgateClick: () -> Unit = {},
+    threadgateRules: MutableState<List<ThreadgateAllowUnion>?>,
+    isThreadMode: MutableState<Boolean> = mutableStateOf(false),
+    threadPosts: SnapshotStateList<ThreadPostState>? = null,
+    threadPostIdCounter: MutableState<Int>? = null,
+    textfieldState: TextFieldState? = null,
+    linkPreviewState: MutableState<LinkPreviewData?>? = null,
+    linkPreviewDismissedState: MutableState<Boolean>? = null,
+    mentionDids: MutableMap<String, Did>? = null,
+    inReplyToData: SkeetData? = null,
+    isQuotePost: Boolean = false,
+    coroutineScope: CoroutineScope,
+    facets: List<Facet> = listOf(),
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(
+            onClick = {
+                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+            }
         ) {
-            TextButton(
-                onClick = {
-                    pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                }
-            ) {
-                Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
+            Icon(Icons.Default.CameraRoll, contentDescription = "Attach media")
+        }
+        TextButton(
+            onClick = {
+                val cacheDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
+                val file = File.createTempFile("capture_", ".jpg", cacheDir)
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                cameraImageUri.value = uri
+                takePicture.launch(uri)
             }
-            TextButton(
-                onClick = {
-                    val cacheDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
-                    val file = File.createTempFile("capture_", ".jpg", cacheDir)
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    cameraImageUri.value = uri
-                    takePicture.launch(uri)
-                }
-            ) {
-                Icon(Icons.Default.CameraAlt, contentDescription = "Take photo")
-            }
-            TextButton(onClick = onDraftsClick) {
-                Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
-            }
-            TextButton(onClick = onThreadgateClick) {
-                Icon(
-                    Icons.Default.Shield,
-                    contentDescription = "Reply settings",
-                    tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                )
-            }
-            if (inReplyToData == null && !isQuotePost && (threadPosts == null || threadPosts.size < MAX_THREAD_POSTS)) {
-                TextButton(onClick = {
-                    if (!isThreadMode.value && threadPosts != null && textfieldState != null && threadPostIdCounter != null) {
-                        val firstPost = threadPosts[0]
-                        firstPost.textFieldState.edit {
-                            replace(0, length, textfieldState.text.toString())
-                            selection = TextRange(textfieldState.text.length)
-                        }
-                        firstPost.media.value = mediaSelected.value
-                        firstPost.mediaIsVideo.value = mediaSelectedIsVideo.value
-                        firstPost.mediaAltTexts.value = mediaAltTexts.value
-                        firstPost.facets.clear()
-                        firstPost.facets.addAll(facets)
-                        mentionDids?.let { dids ->
-                            firstPost.mentionDids.clear()
-                            firstPost.mentionDids.putAll(dids)
-                        }
-                        linkPreviewState?.let { firstPost.linkPreview.value = it.value }
-                        linkPreviewDismissedState?.let { firstPost.linkPreviewDismissed.value = it.value }
-                        textfieldState.clearText()
-                        mediaSelected.value = emptyList()
-                        mediaSelectedIsVideo.value = false
-                        mediaAltTexts.value = emptyMap()
-                        isThreadMode.value = true
-                        val newId = threadPostIdCounter.value++
-                        threadPosts.add(ThreadPostState(newId, TextFieldState()))
-                    } else if (isThreadMode.value && threadPosts != null && threadPostIdCounter != null) {
-                        val newId = threadPostIdCounter.value++
-                        threadPosts.add(ThreadPostState(newId, TextFieldState()))
+        ) {
+            Icon(Icons.Default.CameraAlt, contentDescription = "Take photo")
+        }
+        TextButton(onClick = onDraftsClick) {
+            Icon(Icons.AutoMirrored.Filled.Article, contentDescription = "Drafts")
+        }
+        TextButton(onClick = onThreadgateClick) {
+            Icon(
+                Icons.Default.Shield,
+                contentDescription = "Reply settings",
+                tint = if (threadgateRules.value != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
+            )
+        }
+        if (inReplyToData == null && !isQuotePost && (threadPosts == null || threadPosts.size < MAX_THREAD_POSTS)) {
+            TextButton(onClick = {
+                if (!isThreadMode.value && threadPosts != null && textfieldState != null && threadPostIdCounter != null) {
+                    val firstPost = threadPosts[0]
+                    firstPost.textFieldState.edit {
+                        replace(0, length, textfieldState.text.toString())
+                        selection = TextRange(textfieldState.text.length)
                     }
-                }) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Add thread post",
-                        tint = if (isThreadMode.value) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                    )
+                    firstPost.media.value = mediaSelected.value
+                    firstPost.mediaIsVideo.value = mediaSelectedIsVideo.value
+                    firstPost.mediaAltTexts.value = mediaAltTexts.value
+                    firstPost.facets.clear()
+                    firstPost.facets.addAll(facets)
+                    mentionDids?.let { dids ->
+                        firstPost.mentionDids.clear()
+                        firstPost.mentionDids.putAll(dids)
+                    }
+                    linkPreviewState?.let { firstPost.linkPreview.value = it.value }
+                    linkPreviewDismissedState?.let { firstPost.linkPreviewDismissed.value = it.value }
+                    textfieldState.clearText()
+                    mediaSelected.value = emptyList()
+                    mediaSelectedIsVideo.value = false
+                    mediaAltTexts.value = emptyMap()
+                    isThreadMode.value = true
+                    val newId = threadPostIdCounter.value++
+                    threadPosts.add(ThreadPostState(newId, TextFieldState()))
+                } else if (isThreadMode.value && threadPosts != null && threadPostIdCounter != null) {
+                    val newId = threadPostIdCounter.value++
+                    threadPosts.add(ThreadPostState(newId, TextFieldState()))
                 }
+            }) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add thread post",
+                    tint = if (isThreadMode.value) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
             }
         }
     }
