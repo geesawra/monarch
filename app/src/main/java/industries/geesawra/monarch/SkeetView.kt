@@ -756,7 +756,7 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels)
+    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = skeet.following)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -850,6 +850,7 @@ fun Embeds(
     avatarShape: Shape = CircleShape,
     isVisible: Boolean = true,
     showLabels: Boolean = true,
+    following: Boolean = false,
 ) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
@@ -889,6 +890,7 @@ fun Embeds(
                     postTextSize = postTextSize,
                     avatarShape = avatarShape,
                     showLabels = showLabels,
+                    following = following,
                 )
             }
         }
@@ -905,7 +907,7 @@ fun Embeds(
                 is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
             }
 
-            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels)
+            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = following)
 
             if (!nested) {
                 Column(
@@ -922,6 +924,7 @@ fun Embeds(
                         postTextSize = postTextSize,
                         avatarShape = avatarShape,
                         showLabels = showLabels,
+                        following = following,
                     )
                 }
             }
@@ -1214,13 +1217,38 @@ fun RecordView(
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
     showLabels: Boolean = true,
+    following: Boolean = false,
 ) {
     val rv = rv.record
     when (rv) {
-        is RecordViewRecordUnion.ViewBlocked -> SkeetData(blocked = true)
-        is RecordViewRecordUnion.ViewNotFound -> SkeetData(notFound = true)
+        is RecordViewRecordUnion.ViewBlocked -> SkeetView(
+            viewModel = viewModel,
+            skeet = SkeetData(blocked = true),
+            nested = true,
+            postTextSize = postTextSize,
+            avatarShape = avatarShape,
+            showLabels = showLabels,
+            onShowThread = onShowThread
+        )
+        is RecordViewRecordUnion.ViewNotFound -> SkeetView(
+            viewModel = viewModel,
+            skeet = SkeetData(notFound = true),
+            nested = true,
+            postTextSize = postTextSize,
+            avatarShape = avatarShape,
+            showLabels = showLabels,
+            onShowThread = onShowThread
+        )
         is RecordViewRecordUnion.ViewRecord -> {
-            val s = SkeetData.fromRecordView(rv.value)
+            val author = rv.value.author
+            val isBlockedEmbed = following && (
+                author.viewer?.blockedBy == true || author.viewer?.blocking != null
+            )
+            val s = if (isBlockedEmbed) {
+                SkeetData(blocked = true)
+            } else {
+                SkeetData.fromRecordView(rv.value)
+            }
             SkeetView(
                 viewModel = viewModel,
                 skeet = s,
@@ -1246,6 +1274,7 @@ private fun RecordWithMediaView(
     postTextSize: PostTextSize = PostTextSize.Medium,
     avatarShape: Shape = CircleShape,
     showLabels: Boolean = true,
+    following: Boolean = false,
 ) {
     val rv = rv.record.record
     val record = when (rv) {
@@ -1257,7 +1286,17 @@ private fun RecordWithMediaView(
         is RecordViewRecordUnion.ViewDetached -> null
         is RecordViewRecordUnion.ViewBlocked -> SkeetData(blocked = true)
         is RecordViewRecordUnion.ViewNotFound -> SkeetData(notFound = true)
-        is RecordViewRecordUnion.ViewRecord -> SkeetData.fromRecordView(rv.value)
+        is RecordViewRecordUnion.ViewRecord -> {
+            val author = rv.value.author
+            val isBlockedEmbed = following && (
+                author.viewer?.blockedBy == true || author.viewer?.blocking != null
+            )
+            if (isBlockedEmbed) {
+                SkeetData(blocked = true)
+            } else {
+                SkeetData.fromRecordView(rv.value)
+            }
+        }
     }
 
     record?.let {
