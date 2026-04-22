@@ -753,20 +753,64 @@ private fun InnerTimelineView(
                                         focusRequester.requestFocus()
                                     }
                                 } else {
-                                    Column {
-                                        Text(
-                                            text = timelineViewModel.user?.displayName
-                                                ?: timelineViewModel.user?.handle?.handle
-                                                ?: ""
-                                        )
-                                        val handle = timelineViewModel.user?.handle?.handle
-                                        val showHandle = timelineViewModel.user?.displayName != null && handle != null
-                                        if (showHandle) {
-                                            Text(
-                                                text = "@$handle",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    val user = timelineViewModel.user
+                                    var showAccountSwitcher by remember { mutableStateOf(false) }
+                                    val avatarClipShape = settingsState.avatarClipShape
+                                    Row(
+                                        verticalAlignment = Alignment.Bottom,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current)
+                                                    .data(user?.avatar?.uri)
+                                                    .crossfade(true)
+                                                    .build(),
+                                                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                                                contentDescription = "Profile avatar",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .clip(avatarClipShape)
+                                                    .combinedClickable(
+                                                        onClick = { user?.let { (if (isExpandedScreen) expandedOnProfileTap else onProfileTap)(it.did) } },
+                                                        onLongClick = { showAccountSwitcher = true }
+                                                    )
                                             )
+                                        if (showAccountSwitcher) {
+                                            AccountSwitcherSheet(
+                                                accounts = timelineViewModel.accounts,
+                                                activeDid = timelineViewModel.activeDid,
+                                                onSwitchAccount = { did ->
+                                                    timelineViewModel.switchAccount(did)
+                                                },
+                                                onAddAccount = onAddAccount,
+                                                onRemoveAccount = { did ->
+                                                    timelineViewModel.logout {
+                                                        if (timelineViewModel.accounts.isEmpty()) {
+                                                            loginError()
+                                                        }
+                                                    }
+                                                },
+                                                onDismiss = { showAccountSwitcher = false }
+                                            )
+                                        }
+                                        Column {
+                                            Text(
+                                                text = user?.displayName
+                                                    ?: user?.handle?.handle
+                                                    ?: ""
+                                            )
+                                            val handle = user?.handle?.handle
+                                            val showHandle = user?.displayName != null && handle != null
+                                            if (showHandle) {
+                                                Text(
+                                                    text = "@$handle",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(bottom = 2.dp),
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -823,48 +867,6 @@ private fun InnerTimelineView(
 
                                     IconButton(onClick = onSettingsTap) {
                                         Icon(Icons.Default.Settings, "Settings")
-                                    }
-
-                                    val user = timelineViewModel.user
-                                    var showAccountSwitcher by remember { mutableStateOf(false) }
-                                    val avatarClipShape = settingsState.avatarClipShape
-
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(user?.avatar?.uri)
-                                            .crossfade(true)
-                                            .build(),
-                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentDescription = "Profile avatar",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .padding(end = 8.dp)
-                                            .size(40.dp)
-                                            .clip(avatarClipShape)
-                                            .combinedClickable(
-                                                onClick = { user?.let { (if (isExpandedScreen) expandedOnProfileTap else onProfileTap)(it.did) } },
-                                                onLongClick = { showAccountSwitcher = true }
-                                            )
-                                    )
-
-                                    if (showAccountSwitcher) {
-                                        AccountSwitcherSheet(
-                                            accounts = timelineViewModel.accounts,
-                                            activeDid = timelineViewModel.activeDid,
-                                            onSwitchAccount = { did ->
-                                                timelineViewModel.switchAccount(did)
-                                            },
-                                            onAddAccount = onAddAccount,
-                                            onRemoveAccount = { did ->
-                                                timelineViewModel.logout {
-                                                    if (timelineViewModel.accounts.isEmpty()) {
-                                                        loginError()
-                                                    }
-                                                }
-                                            },
-                                            onDismiss = { showAccountSwitcher = false }
-                                        )
                                     }
                                 }
 
