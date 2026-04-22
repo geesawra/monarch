@@ -130,7 +130,7 @@ jobs:
           PY
           )
           mkdir -p "${{ github.workspace }}/whatsnew"
-          printf '%s\n' "$play_notes" > "${{ github.workspace }}/whatsnew/whatsnew-en-US"
+          printf '%s' "$play_notes" > "${{ github.workspace }}/whatsnew/whatsnew-en-US"
 
       - name: Create GitHub release
         env:
