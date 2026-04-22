@@ -61,6 +61,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                             appviewProxy = account.appviewProxy,
                             oauthToken = token,
                             handle = Handle(account.handle),
+                            authServerURL = account.authServerURL,
                         )
                     }
                 }

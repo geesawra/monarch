@@ -26,6 +26,7 @@ data class StoredAccount(
     val pdsHost: String,
     val appviewProxy: String,
     val oauthTokenJson: String,
+    val authServerURL: String? = null,
     val notificationsEnabled: Boolean = false,
 )
 
@@ -59,6 +60,20 @@ internal suspend fun Context.updateStoredAccountOAuthToken(did: String, oauthTok
     }.getOrNull() ?: return
     val updated = accounts.map {
         if (it.did == did) it.copy(oauthTokenJson = oauthTokenJson) else it
+    }
+    accountsDataStore.edit {
+        it[ACCOUNTS_LIST_KEY] = Json.encodeToString(updated)
+    }
+}
+
+internal suspend fun Context.updateStoredAccountAuthServerURL(did: String, authServerURL: String) {
+    val prefs = accountsDataStore.data.first()
+    val accountsJson = prefs[ACCOUNTS_LIST_KEY] ?: return
+    val accounts = runCatching {
+        Json.decodeFromString<List<StoredAccount>>(accountsJson)
+    }.getOrNull() ?: return
+    val updated = accounts.map {
+        if (it.did == did) it.copy(authServerURL = authServerURL) else it
     }
     accountsDataStore.edit {
         it[ACCOUNTS_LIST_KEY] = Json.encodeToString(updated)
@@ -135,6 +150,17 @@ class AccountManager @Inject constructor(
         val idx = accounts.indexOfFirst { it.did == did }
         if (idx >= 0) {
             accounts[idx] = accounts[idx].copy(oauthTokenJson = oauthTokenJson)
+            context.accountsDataStore.edit {
+                it[ACCOUNTS_LIST_KEY] = Json.encodeToString(accounts)
+            }
+        }
+    }
+
+    suspend fun updateAccountAuthServerURL(did: String, authServerURL: String) {
+        val accounts = getAccounts().toMutableList()
+        val idx = accounts.indexOfFirst { it.did == did }
+        if (idx >= 0) {
+            accounts[idx] = accounts[idx].copy(authServerURL = authServerURL)
             context.accountsDataStore.edit {
                 it[ACCOUNTS_LIST_KEY] = Json.encodeToString(accounts)
             }

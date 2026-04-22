@@ -1010,6 +1010,7 @@ fun ComposeBottomBar(
     coroutineScope: CoroutineScope,
     facets: List<Facet> = listOf(),
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -1069,9 +1070,11 @@ fun ComposeBottomBar(
                     isThreadMode.value = true
                     val newId = threadPostIdCounter.value++
                     threadPosts.add(ThreadPostState(newId, TextFieldState()))
+                    keyboardController?.show()
                 } else if (isThreadMode.value && threadPosts != null && threadPostIdCounter != null) {
                     val newId = threadPostIdCounter.value++
                     threadPosts.add(ThreadPostState(newId, TextFieldState()))
+                    keyboardController?.show()
                 }
             }) {
                 Icon(
@@ -1516,10 +1519,18 @@ fun ThreadComposeContent(
 ) {
     val urlColor = MaterialTheme.colorScheme.primary
 
+    val keyboardController = LocalSoftwareKeyboardController.current
     Column(modifier = Modifier.fillMaxWidth()) {
         threadPosts.forEachIndexed { index, postState ->
             val focusRequester = remember { FocusRequester() }
             val linkPreviewLoading = remember { mutableStateOf(false) }
+
+            LaunchedEffect(threadPosts.size) {
+                if (index == threadPosts.size - 1 && threadPosts.size > 1) {
+                    runCatching { focusRequester.requestFocus() }
+                    keyboardController?.show()
+                }
+            }
 
             LaunchedEffect(postState.textFieldState.text.toString()) {
                 val text = postState.textFieldState.text.toString()

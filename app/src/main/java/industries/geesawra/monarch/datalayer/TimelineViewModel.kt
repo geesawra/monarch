@@ -487,6 +487,7 @@ class TimelineViewModel @AssistedInject constructor(
             val pds = bskyConn.pdsURL ?: return@launch
             val appview = bskyConn.appviewProxy ?: return@launch
             val user = this@TimelineViewModel.user
+            val existing = accountManager.getAccount(session.did.did)
 
             accountManager.addAccount(
                 StoredAccount(
@@ -500,6 +501,7 @@ class TimelineViewModel @AssistedInject constructor(
                         sh.christian.ozone.oauth.OAuthToken.serializer(),
                         token,
                     ),
+                    authServerURL = existing?.authServerURL,
                 )
             )
             refreshAccounts()
@@ -524,6 +526,7 @@ class TimelineViewModel @AssistedInject constructor(
                 appviewProxy = account.appviewProxy,
                 oauthToken = token,
                 handle = sh.christian.ozone.api.Handle(account.handle),
+                authServerURL = account.authServerURL,
             )
             postInteractionStore.clear()
             resetAllState()
@@ -559,6 +562,7 @@ class TimelineViewModel @AssistedInject constructor(
                 appviewProxy = target.appviewProxy,
                 oauthToken = targetToken,
                 handle = sh.christian.ozone.api.Handle(target.handle),
+                authServerURL = target.authServerURL,
             )
             postInteractionStore.clear()
             resetAllState()

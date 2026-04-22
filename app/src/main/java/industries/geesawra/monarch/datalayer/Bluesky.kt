@@ -7,6 +7,7 @@ import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import industries.geesawra.monarch.BuildConfig
 import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.text.intl.Locale
@@ -256,7 +257,10 @@ private fun classifyAuthError(t: Throwable): AuthError {
             || msg.contains("DPoP", ignoreCase = true) -> AuthError.DpopNonce
         msg.contains("ExpiredToken", ignoreCase = true)
             || msg.contains("InvalidToken", ignoreCase = true)
-            || msg.contains("invalid_token", ignoreCase = true) -> AuthError.ExpiredToken
+            || msg.contains("invalid_token", ignoreCase = true)
+            || msg.contains("timestamp check failed", ignoreCase = true)
+            || msg.contains("exp claim", ignoreCase = true) -> AuthError.ExpiredToken
+        msg.contains("DPoP-Nonce header not found", ignoreCase = true) -> AuthError.DpopNonce
         else -> AuthError.Other
     }
 }
@@ -272,6 +276,22 @@ private fun summarizeAuthError(t: Throwable): String {
 
 private fun tokenTail(t: String?): String =
     if (t.isNullOrEmpty()) "<empty>" else "…" + t.takeLast(6)
+
+/**
+ * Parse the `exp` claim from a JWT access token. Returns `null` if the token is not a valid
+ * JWT or the claim is missing.
+ */
+private fun accessTokenExp(accessToken: String): Long? {
+    return runCatching {
+        val payload = accessToken.split(".")[1]
+        val decoded = java.util.Base64.getUrlDecoder().decode(payload)
+        val json = BlueskyJson.decodeFromString(
+            kotlinx.serialization.json.JsonObject.serializer(),
+            decoded.decodeToString()
+        )
+        (json["exp"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull()
+    }.getOrNull()
+}
 
 /**
  * In-memory "who am I" record for the active session. Credentials live separately in
@@ -347,6 +367,26 @@ class BlueskyConn(val context: Context) {
                 if (baseUrl != null) {
                     defaultRequest {
                         url(baseUrl)
+                    }
+                }
+                if (BuildConfig.DEBUG) {
+                    engine {
+                        addInterceptor { chain ->
+                            val req = chain.request()
+                            val res = chain.proceed(req)
+                            val code = res.code
+                            val xrpcLike = code == 404 || code in 100..199 || code in 300..399
+                            val path = req.url.encodedPath
+                            if (path.contains("/xrpc/")) {
+                                if (xrpcLike) {
+                                    Log.w("BlueskyXrpc", "XrpcNotSupported $code ${req.method} ${req.url}")
+                                } else if (code == 401) {
+                                    val body = runCatching { res.peekBody(4096).string() }.getOrElse { "<peek-failed: ${it.message}>" }
+                                    Log.w("BlueskyXrpc", "401 ${req.method} ${req.url} body=$body")
+                                }
+                            }
+                            res
+                        }
                     }
                 }
                 install(HttpTimeout) {
@@ -731,6 +771,7 @@ class BlueskyConn(val context: Context) {
         appviewProxy: String,
         oauthToken: OAuthToken,
         handle: Handle,
+        authServerURL: String? = null,
     ) {
         resetClients()
         this.pdsURL = pdsURL
@@ -741,6 +782,15 @@ class BlueskyConn(val context: Context) {
             did = oauthToken.subject,
             active = true,
         )
+
+        // The OAuthApi resolves authorization-server metadata via a relative GET to
+        // /.well-known/oauth-authorization-server. It MUST be pointed at the auth server,
+        // not the PDS, otherwise discovery fails and refreshes throw.
+        val resolvedAuthServerURL = if (!authServerURL.isNullOrBlank()) {
+            authServerURL
+        } else {
+            authServerForPds(pdsURL).getOrNull() ?: pdsURL
+        }
 
         // Seed the shared auth state. Both pdsClient and client will install a
         // BlueskyAuthPlugin that reads from this same flow, so a refresh from either side
@@ -754,7 +804,7 @@ class BlueskyConn(val context: Context) {
             nonce = oauthToken.nonce,
         )
         this.sharedAuthTokens = MutableStateFlow<BlueskyAuthPlugin.Tokens?>(initialTokens)
-        this.sharedOAuthHttpClient = createRetryHttpClient(baseUrl = pdsURL)
+        this.sharedOAuthHttpClient = createRetryHttpClient(baseUrl = resolvedAuthServerURL)
         this.sharedOAuthApi = OAuthApi(
             httpClient = this.sharedOAuthHttpClient!!,
             challengeSelector = { OAuthCodeChallengeMethod.S256 },
@@ -902,6 +952,7 @@ class BlueskyConn(val context: Context) {
                         pdsHost = pdsURL,
                         appviewProxy = appviewProxy,
                         oauthTokenJson = BlueskyJson.encodeToString(OAuthToken.serializer(), token),
+                        authServerURL = authServerURL,
                     )
                 )
             } finally {
@@ -1028,9 +1079,17 @@ class BlueskyConn(val context: Context) {
     suspend fun create(): Result<Unit> {
         createMutex.lock()
         try {
-            if (client != null && pdsClient != null && pdsURL != null) {
-                Log.d("BlueskyAuth", "create: session already active, skipping initialization")
-                return Result.success(Unit)
+            val currentToken = oauthToken
+            if (client != null && pdsClient != null && pdsURL != null && currentToken != null) {
+                val exp = accessTokenExp(currentToken.accessToken)
+                if (exp != null && Instant.fromEpochSeconds(exp) > Clock.System.now().plus(Duration.parse("60s"))) {
+                    Log.d("BlueskyAuth", "create: session already active and token valid, skipping initialization")
+                    return Result.success(Unit)
+                }
+                Log.d("BlueskyAuth", "create: session active but token expired or near expiry, re-initializing")
+                clearInMemorySession()
+                pdsURL = null
+                appviewProxy = null
             }
 
             Log.d("Bluesky", "create called without session or client")
@@ -1043,18 +1102,70 @@ class BlueskyConn(val context: Context) {
                 return Result.failure(LoginException("Failed to deserialize OAuth token: ${it.message}"))
             }
 
+            var authServerURL = account.authServerURL
+            if (authServerURL.isNullOrBlank()) {
+                authServerURL = authServerForPds(account.pdsHost).getOrElse {
+                    return Result.failure(LoginException("Failed to resolve auth server: ${it.message}"))
+                }
+                suspendRunCatching {
+                    context.updateStoredAccountAuthServerURL(account.did, authServerURL)
+                }.onFailure {
+                    Log.w("BlueskyAuth", "Failed to persist auth server URL: ${it.message}")
+                }
+            }
+
+            val exp = accessTokenExp(token.accessToken)
+            val needsRefresh = exp == null || Instant.fromEpochSeconds(exp) <= Clock.System.now().plus(Duration.parse("60s"))
+            val freshToken = if (needsRefresh) {
+                Log.d("BlueskyAuth", "create: token expired or near expiry, proactively refreshing")
+                val tempOAuthClient = createRetryHttpClient(baseUrl = authServerURL)
+                val tempOAuthApi = OAuthApi(
+                    httpClient = tempOAuthClient,
+                    challengeSelector = { OAuthCodeChallengeMethod.S256 },
+                )
+                try {
+                    val refreshed = tempOAuthApi.refreshToken(
+                        clientId = token.clientId,
+                        nonce = token.nonce,
+                        refreshToken = token.refreshToken,
+                        keyPair = token.keyPair,
+                    )
+                    val updated = token.copy(
+                        accessToken = refreshed.accessToken,
+                        refreshToken = refreshed.refreshToken,
+                        nonce = refreshed.nonce,
+                        keyPair = refreshed.keyPair,
+                    )
+                    val updatedJson = BlueskyJson.encodeToString(OAuthToken.serializer(), updated)
+                    context.updateStoredAccountOAuthToken(account.did, updatedJson)
+                    Log.d("BlueskyAuth", "create: proactive refresh succeeded token=${tokenTail(updated.accessToken)}")
+                    updated
+                } catch (e: Throwable) {
+                    Log.w("BlueskyAuth", "create: proactive refresh failed: ${e::class.simpleName}: ${e.message}")
+                    return Result.failure(LoginException("Session expired: ${e.message}"))
+                } finally {
+                    tempOAuthClient.close()
+                }
+            } else token
+
             initializeInMemory(
                 pdsURL = account.pdsHost,
                 appviewProxy = account.appviewProxy,
-                oauthToken = token,
+                oauthToken = freshToken,
                 handle = Handle(account.handle),
+                authServerURL = authServerURL,
             )
 
             // Hydrate the labeler cache and rebuild `client` with the labelers header so future
             // appview queries respect the user's subscribed labelers. The rebuilt client still
             // shares `sharedAuthTokens` with `pdsClient` because `mkClient` installs the plugin
             // with the connection-level shared state, so no watcher re-arming is needed.
-            val labelerMap = this.subscribedLabelers().getOrDefault(emptyMap())
+            val labelerMap = runCatching {
+                this.subscribedLabelers().getOrDefault(emptyMap())
+            }.getOrElse {
+                Log.w("BlueskyAuth", "create: labeler cache hydration failed: ${it.message}")
+                emptyMap()
+            }
             buildLabelCache(labelerMap)
             labelCacheFetchCount = 0
             val labelers = labelerMap.keys.mapNotNull { it?.did }
