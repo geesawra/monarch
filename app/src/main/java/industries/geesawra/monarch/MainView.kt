@@ -219,10 +219,16 @@ fun MainView(
     val composeLinkPreview = remember { mutableStateOf<LinkPreviewData?>(null) }
 
     LaunchedEffect(timelineViewModel.redraftText) {
-        if (timelineViewModel.redraftText != null) {
-            inReplyTo.value = null
+        val text = timelineViewModel.redraftText
+        if (text != null) {
+            inReplyTo.value = timelineViewModel.redraftReplyParent
             isQuotePost.value = false
+            composeTextFieldState.edit {
+                replace(0, length, text)
+                selection = androidx.compose.ui.text.TextRange(text.length)
+            }
             scaffoldState.bottomSheetState.expand()
+            timelineViewModel.setRedraft(null)
         }
     }
 
@@ -340,8 +346,6 @@ fun MainView(
         sheetSwipeEnabled = true,
         sheetShadowElevation = 16.dp,
         sheetContent = {
-            val redraftText = timelineViewModel.redraftText ?: ""
-            if (redraftText.isNotEmpty()) timelineViewModel.setRedraft(null)
             ComposeView(
                 context = LocalContext.current,
                 coroutineScope = coroutineScope,
@@ -352,7 +356,6 @@ fun MainView(
                 inReplyTo = inReplyTo,
                 isQuotePost = isQuotePost,
                 wasEdited = wasEdited,
-                initialText = redraftText,
                 textfieldState = composeTextFieldState,
                 mediaSelected = composeMediaSelected,
                 mediaSelectedIsVideo = composeMediaSelectedIsVideo,

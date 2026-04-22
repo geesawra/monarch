@@ -145,7 +145,7 @@ fun TimelinePostActionsView(
     modifier: Modifier = Modifier,
     timelineViewModel: TimelineViewModel?,
     onReplyTap: (SkeetData, Boolean) -> Unit = { _, _ -> },
-    onRedraft: (SkeetData) -> Unit = { s -> timelineViewModel?.setRedraft(s.content) },
+    onRedraft: (SkeetData) -> Unit = { s -> timelineViewModel?.setRedraftSource(s) },
     skeet: SkeetData,
     inThread: Boolean = false,
     translationEnabled: Boolean = true,
@@ -268,8 +268,8 @@ fun TimelinePostActionsView(
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = {
                     showRedraftDialog = false
-                    timelineViewModel?.deletePost(skeet.uri) {}
                     onRedraft(skeet)
+                    timelineViewModel?.deletePost(skeet.uri) {}
                 }) {
                     androidx.compose.material3.Text(
                         "Redraft",

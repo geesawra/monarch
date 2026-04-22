@@ -17,6 +17,9 @@ import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toPersistentList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import app.bsky.actor.MutedWordActorTarget
 import app.bsky.actor.MutedWord
 import app.bsky.actor.MutedWordTarget
@@ -234,8 +237,13 @@ class TimelineViewModel @AssistedInject constructor(
     var draftsState by mutableStateOf(DraftsState()); private set
     var bookmarksState by mutableStateOf(BookmarksState()); private set
     var redraftText by mutableStateOf<String?>(null); private set
+    var redraftReplyParent by mutableStateOf<SkeetData?>(null); private set
+    var redraftPending by mutableStateOf(false); private set
     var pendingNotificationsTab by mutableStateOf(false)
     var hasNewTimelinePosts by mutableStateOf(false); private set
+
+    private val _dismissCurrentThread = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val dismissCurrentThread: SharedFlow<Unit> = _dismissCurrentThread.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -266,7 +274,43 @@ class TimelineViewModel @AssistedInject constructor(
         hasNewTimelinePosts = false
     }
 
-    fun setRedraft(text: String?) { redraftText = text }
+    fun setRedraft(text: String?) {
+        redraftText = text
+        if (text == null) {
+            redraftReplyParent = null
+            redraftPending = false
+        }
+    }
+
+    fun setRedraftSource(source: SkeetData) {
+        val hydratedParent = if (source.reply != null) source.parent().first else null
+        val recordReply = source.recordReply
+        if (hydratedParent != null) {
+            redraftReplyParent = hydratedParent
+            redraftText = source.content
+            return
+        }
+        if (recordReply == null) {
+            redraftReplyParent = null
+            redraftText = source.content
+            return
+        }
+        redraftPending = true
+        viewModelScope.launch {
+            val fetched = bskyConn.getPosts(listOf(recordReply.parent.uri)).getOrNull()?.firstOrNull()
+            redraftReplyParent = if (fetched != null) {
+                SkeetData.fromPostView(fetched, fetched.author)
+            } else {
+                SkeetData(
+                    uri = recordReply.parent.uri,
+                    cid = recordReply.parent.cid,
+                    recordReply = recordReply,
+                )
+            }
+            redraftText = source.content
+            redraftPending = false
+        }
+    }
 
     // ── Flat read-only forwarding getters (compat with existing call sites) ─
     val user: ProfileViewDetailed? get() = sessionState.user
@@ -1219,13 +1263,45 @@ class TimelineViewModel @AssistedInject constructor(
     suspend fun getRepostedBy(uri: AtUri, cursor: String? = null) = bskyConn.getRepostedBy(uri, cursor)
     suspend fun getQuotes(uri: AtUri, cursor: String? = null) = bskyConn.getQuotes(uri, cursor)
 
+    private fun removePostsLocally(deleted: Set<AtUri>) {
+        if (deleted.isEmpty()) return
+        updateTimeline { t ->
+            t.copy(
+                skeets = t.skeets.filter { it.uri !in deleted }.toPersistentList(),
+                feedSkeets = t.feedSkeets.mapValues { (_, list) ->
+                    list.filter { it.uri !in deleted }.toPersistentList()
+                }.toImmutableMap(),
+            )
+        }
+        updateProfile { p ->
+            p.copy(profilePosts = p.profilePosts.filter { it.uri !in deleted }.toPersistentList())
+        }
+    }
+
+    private fun pruneCurrentThread(deleted: Set<AtUri>) {
+        if (deleted.isEmpty()) return
+        val stack = threadState.threadStack
+        val top = stack.lastOrNull() ?: return
+        if (top.post.uri in deleted) {
+            if (redraftText == null && !redraftPending) {
+                _dismissCurrentThread.tryEmit(Unit)
+            }
+            return
+        }
+        fun strip(node: ThreadPost): ThreadPost = node.copy(
+            replies = node.replies.filter { it.post.uri !in deleted }.map(::strip),
+        )
+        val pruned = strip(top)
+        updateThread { it.copy(threadStack = (stack.dropLast(1) + pruned).toPersistentList()) }
+    }
+
     fun deletePost(uri: AtUri, then: () -> Unit) {
+        removePostsLocally(setOf(uri))
+        pruneCurrentThread(setOf(uri))
         viewModelScope.launch {
             bskyConn.deletePost(uri.rkey()).onFailure {
                 handleError(it)
             }.onSuccess {
-                updateTimeline { t -> t.copy(skeets = t.skeets.filter { it.uri != uri }.toPersistentList()) }
-                updateProfile { p -> p.copy(profilePosts = p.profilePosts.filter { it.uri != uri }.toPersistentList()) }
                 then()
             }
         }
@@ -1233,6 +1309,9 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun deleteThreadPosts(uris: List<AtUri>, then: () -> Unit) {
         if (uris.isEmpty()) { then(); return }
+        val uriSet = uris.toSet()
+        removePostsLocally(uriSet)
+        pruneCurrentThread(uriSet)
         viewModelScope.launch {
             for (uri in uris) {
                 val result = bskyConn.deletePost(uri.rkey())
@@ -1241,9 +1320,6 @@ class TimelineViewModel @AssistedInject constructor(
                     return@launch
                 }
             }
-            val uriSet = uris.toSet()
-            updateTimeline { t -> t.copy(skeets = t.skeets.filter { it.uri !in uriSet }.toPersistentList()) }
-            updateProfile { p -> p.copy(profilePosts = p.profilePosts.filter { it.uri !in uriSet }.toPersistentList()) }
             then()
         }
     }

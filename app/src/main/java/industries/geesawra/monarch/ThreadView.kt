@@ -115,6 +115,10 @@ fun ThreadView(
                 }
             }
 
+            LaunchedEffect(Unit) {
+                timelineViewModel.dismissCurrentThread.collect { backButton() }
+            }
+
             val contentModifier = if (!settingsState.forceCompactLayout) {
                 Modifier.widthIn(max = 600.dp)
             } else {

@@ -27,6 +27,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.ui.text.TextRange
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -290,6 +291,20 @@ class MainActivity : ComponentActivity() {
                             val threadMediaAltTexts = remember { mutableStateOf(mapOf<android.net.Uri, String>()) }
                             val threadThreadgateRules = remember { mutableStateOf<List<app.bsky.feed.ThreadgateAllowUnion>?>(null) }
                             val threadLinkPreview = remember { mutableStateOf<industries.geesawra.monarch.datalayer.LinkPreviewData?>(null) }
+
+                            LaunchedEffect(timelineViewModel.redraftText) {
+                                val text = timelineViewModel.redraftText
+                                if (text != null) {
+                                    threadInReplyTo.value = timelineViewModel.redraftReplyParent
+                                    threadIsQuotePost.value = false
+                                    threadTextFieldState.edit {
+                                        replace(0, length, text)
+                                        selection = TextRange(text.length)
+                                    }
+                                    threadScaffoldState.bottomSheetState.expand()
+                                    timelineViewModel.setRedraft(null)
+                                }
+                            }
 
                             BottomSheetScaffold(
                                 modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
