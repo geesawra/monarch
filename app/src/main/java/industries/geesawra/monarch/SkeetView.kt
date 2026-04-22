@@ -477,10 +477,6 @@ fun FocusedSkeetView(
             onShowQuotes = onShowQuotes,
         )
 
-        if (hasEngagementStats) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        }
-
         TimelinePostActionsView(
             onReplyTap = onReplyTap,
             modifier = Modifier
