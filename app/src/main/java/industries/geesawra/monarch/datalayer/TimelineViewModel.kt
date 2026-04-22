@@ -98,10 +98,27 @@ data class TimelineState(
     val mutedWords: ImmutableList<MutedWord> = persistentListOf(),
 )
 
-data class NotificationsState(
+enum class NotificationTab {
+    All, Replies, Likes, Reposts;
+
+    fun reasons(): List<String>? = when (this) {
+        All -> null
+        Replies -> listOf("reply")
+        Likes -> listOf("like")
+        Reposts -> listOf("repost", "quote")
+    }
+}
+
+data class PerTabNotificationsState(
     val notifications: ImmutableList<Notification> = persistentListOf(),
-    val notificationsCursor: String? = null,
-    val isFetchingMoreNotifications: Boolean = false,
+    val cursor: String? = null,
+    val isFetching: Boolean = false,
+)
+
+data class NotificationsState(
+    val tabs: ImmutableMap<NotificationTab, PerTabNotificationsState> = NotificationTab.entries.associateWith {
+        PerTabNotificationsState()
+    }.toImmutableMap(),
     val unreadNotificationsAmt: Int = 0,
     val seenNotificationsAt: Instant? = null,
 )
@@ -271,11 +288,21 @@ class TimelineViewModel @AssistedInject constructor(
     val isFetchingMoreTimeline: Boolean get() = timelineState.isFetchingMoreTimeline
     val mutedWords: ImmutableList<MutedWord> get() = timelineState.mutedWords
 
-    val notifications: ImmutableList<Notification> get() = notificationsState.notifications
-    val notificationsCursor: String? get() = notificationsState.notificationsCursor
-    val isFetchingMoreNotifications: Boolean get() = notificationsState.isFetchingMoreNotifications
+    fun notificationsForTab(tab: NotificationTab): ImmutableList<Notification> =
+        notificationsState.tabs.getOrElse(tab) { PerTabNotificationsState() }.notifications
+
+    fun isFetchingNotificationsForTab(tab: NotificationTab): Boolean =
+        notificationsState.tabs.getOrElse(tab) { PerTabNotificationsState() }.isFetching
+
+    fun notificationsCursorForTab(tab: NotificationTab): String? =
+        notificationsState.tabs.getOrElse(tab) { PerTabNotificationsState() }.cursor
+
+    val notifications: ImmutableList<Notification> get() = notificationsForTab(NotificationTab.All)
+    val notificationsCursor: String? get() = notificationsCursorForTab(NotificationTab.All)
+    val isFetchingMoreNotifications: Boolean get() = NotificationTab.entries.any { isFetchingNotificationsForTab(it) }
     val unreadNotificationsAmt: Int get() = notificationsState.unreadNotificationsAmt
     private val seenNotificationsAt: Instant? get() = notificationsState.seenNotificationsAt
+    var activeNotificationTab by mutableStateOf(NotificationTab.All)
 
     val threadStack: ImmutableList<ThreadPost> get() = threadState.threadStack
     val currentlyShownThread: ThreadPost get() = threadState.currentlyShownThread
@@ -579,7 +606,7 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun fetchAllNewData(fromNotificationsTab: Boolean = false, then: () -> Unit = {}) {
+    fun fetchAllNewData(refreshNotifications: Boolean = true, then: () -> Unit = {}) {
         fetchAllJob?.cancel()
         updateTimeline { it.copy(isFetchingMoreTimeline = true) }
         fetchAllJob = viewModelScope.launch {
@@ -601,11 +628,17 @@ class TimelineViewModel @AssistedInject constructor(
             }
 
             fetchTimeline(fresh = true)
-            fetchNotifications(fresh = true, fromNotificationsTab = fromNotificationsTab)
+            val nJob = if (refreshNotifications) {
+                fetchNotifications(activeNotificationTab, fresh = true)
+            } else null
             fetchMutedWords()
             val fJob = feeds()
 
-            joinAll(timelineFetchJob!!, notificationsFetchJob!!, fJob)
+            val jobs = mutableListOf(timelineFetchJob!!, fJob)
+            if (nJob != null) {
+                jobs += nJob
+            }
+            joinAll(*jobs.toTypedArray())
             then()
         }
     }
@@ -674,72 +707,70 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun fetchNotifications(fresh: Boolean = false, fromNotificationsTab: Boolean = false, then: () -> Unit = {}) {
-        updateNotifications { it.copy(isFetchingMoreNotifications = true) }
-        suspendRunCatching {
-            notificationsFetchJob?.cancel()
+    fun fetchNotifications(tab: NotificationTab = NotificationTab.All, fresh: Boolean = false, then: () -> Unit = {}): Job {
+        val currentTabState = notificationsState.tabs.getOrElse(tab) { PerTabNotificationsState() }
+        if (currentTabState.isFetching) { then(); return Job().apply { complete() } }
+
+        updateNotifications { state ->
+            state.copy(tabs = state.tabs.toMutableMap().apply {
+                this[tab] = currentTabState.copy(isFetching = true)
+            }.toImmutableMap())
         }
 
-        notificationsFetchJob = viewModelScope.launch {
+        val job = viewModelScope.launch {
             val rawNotifs = bskyConn.notifications(
-                if (fresh) null else notificationsCursor
-            )
-                .onFailure { err ->
-                    if (err is CancellationException) {
-                        return@onFailure
-                    }
+                cursor = if (fresh) null else currentTabState.cursor,
+                reasons = tab.reasons(),
+            ).onFailure { err ->
+                if (err is CancellationException) {
+                    return@onFailure
+                }
 
-                    then()
+                then()
 
-                    updateNotifications { it.copy(isFetchingMoreNotifications = false) }
-                    updateSession { it.copy(error = "Failed to fetch notifications: ${err.message}") }
-                }.getOrNull()
+                updateNotifications { state ->
+                    state.copy(tabs = state.tabs.toMutableMap().apply {
+                        this[tab] = (state.tabs[tab] ?: PerTabNotificationsState()).copy(isFetching = false)
+                    }.toImmutableMap())
+                }
+                updateSession { it.copy(error = "Failed to fetch notifications: ${err.message}") }
+            }.getOrNull()
 
             if (rawNotifs == null) {
                 return@launch
             }
-
-            val oldNotifications = if (fresh) notifications else null
 
             val posts = parseRawNotifications(rawNotifs)
             val (notifs, repeatable) = buildNotificationList(rawNotifs, posts)
             val grouped = groupRepeatableNotifications(repeatable)
             val processed = processGroupedNotifications(notifs, grouped)
 
-            val isSameData = fresh && fromNotificationsTab &&
-                oldNotifications != null && oldNotifications.isNotEmpty() && processed.isNotEmpty() &&
-                processed.size <= oldNotifications.size &&
-                processed.zip(oldNotifications).all { (a, b) -> a.uniqueKey() == b.uniqueKey() }
+            val existing = if (fresh) persistentListOf() else notificationsForTab(tab)
+            val merged = (existing + processed).distinctBy { it.uniqueKey() }.toPersistentList()
 
-            if (isSameData) {
-                updateSeenNotifications()
-            } else {
-                val unreadCount = rawNotifs.notifications.fold(0) { acc, notification ->
-                    when (notification.isRead) {
-                        false -> acc + 1
-                        true -> acc
-                    }
-                }
-                updateNotifications { it.copy(unreadNotificationsAmt = unreadCount) }
-                NotificationBadge.set(unreadCount)
+            updateNotifications { state ->
+                state.copy(
+                    tabs = state.tabs.toMutableMap().apply {
+                        this[tab] = PerTabNotificationsState(
+                            notifications = merged,
+                            cursor = rawNotifs.cursor,
+                            isFetching = false,
+                        )
+                    }.toImmutableMap()
+                )
             }
 
             if (fresh) {
-                updateNotifications { it.copy(notifications = persistentListOf()) }
-            }
-
-            val merged = (notifications + processed).distinctBy { it.uniqueKey() }.toPersistentList()
-
-            updateNotifications {
-                it.copy(
-                    notifications = merged,
-                    notificationsCursor = rawNotifs.cursor,
-                    isFetchingMoreNotifications = false,
-                )
+                bskyConn.getUnreadCount().onSuccess { count ->
+                    updateNotifications { it.copy(unreadNotificationsAmt = count.toInt()) }
+                    NotificationBadge.set(count.toInt())
+                }
             }
 
             then()
         }
+        notificationsFetchJob = job
+        return job
     }
 
     private suspend fun parseRawNotifications(

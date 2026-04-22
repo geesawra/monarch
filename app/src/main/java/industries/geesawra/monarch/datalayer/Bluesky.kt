@@ -1987,10 +1987,17 @@ class BlueskyConn(val context: Context) {
 
     suspend fun notifications(
         cursor: String? = null,
+        reasons: List<String>? = null,
     ): Result<ListNotificationsResponse> = retryOnDpopHiccup {
         apiCall("Failed to fetch notifications") {
-            client!!.listNotifications(ListNotificationsQueryParams(cursor = cursor))
+            client!!.listNotifications(ListNotificationsQueryParams(cursor = cursor, reasons = reasons))
         }
+    }
+
+    suspend fun getUnreadCount(): Result<Long> = retryOnDpopHiccup {
+        apiCall("Failed to fetch unread count") {
+            client!!.getUnreadCount(app.bsky.notification.GetUnreadCountQueryParams())
+        }.map { it.count }
     }
 
     suspend fun updateSeenNotifications(seenAt: Instant = Clock.System.now()): Result<Unit> = retryOnDpopHiccup {

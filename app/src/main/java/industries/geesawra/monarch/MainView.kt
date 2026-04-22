@@ -460,7 +460,7 @@ private fun InnerTimelineView(
         )
     }
     val timelineState = rememberLazyListState()
-    val notificationsState = rememberLazyListState()
+    var notificationScrollToTop by rememberSaveable { mutableIntStateOf(0) }
     val bookmarksListState = rememberLazyListState()
     val searchPostsState = rememberLazyListState()
     val searchPeopleState = rememberLazyListState()
@@ -558,14 +558,14 @@ private fun InnerTimelineView(
             )
         },
         onRefresh = {
-            val fromNotifTab = currentDestination == TabBarDestinations.NOTIFICATIONS
-            timelineViewModel.fetchAllNewData(fromNotificationsTab = fromNotifTab) {
+            val refreshNotif = currentDestination == TabBarDestinations.NOTIFICATIONS
+            timelineViewModel.fetchAllNewData(refreshNotifications = refreshNotif) {
                 coroutineScope.launch {
                     launch {
                         timelineState.scrollToItem(0)
                     }
                     launch {
-                        notificationsState.scrollToItem(0)
+                        notificationScrollToTop++
                     }
                 }
             }
@@ -646,18 +646,22 @@ private fun InnerTimelineView(
             val navItemOnClick: (TabBarDestinations) -> Unit = { dest ->
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 if (dest == currentDestination) {
-                    val state = when (dest) {
-                        TabBarDestinations.TIMELINE -> pagerListStates[pagerState.settledPage] ?: timelineState
-                        TabBarDestinations.SEARCH -> searchPostsState
-                        TabBarDestinations.BOOKMARKS -> bookmarksListState
-                        TabBarDestinations.NOTIFICATIONS -> notificationsState
-                    }
                     coroutineScope.launch {
                         launch {
-                            if (state.firstVisibleItemIndex > 8) {
-                                state.scrollToItem(0)
+                            if (dest == TabBarDestinations.NOTIFICATIONS) {
+                                notificationScrollToTop++
                             } else {
-                                state.animateScrollToItem(0)
+                                val state = when (dest) {
+                                    TabBarDestinations.TIMELINE -> pagerListStates[pagerState.settledPage] ?: timelineState
+                                    TabBarDestinations.SEARCH -> searchPostsState
+                                    TabBarDestinations.BOOKMARKS -> bookmarksListState
+                                    TabBarDestinations.NOTIFICATIONS -> error("unreachable")
+                                }
+                                if (state.firstVisibleItemIndex > 8) {
+                                    state.scrollToItem(0)
+                                } else {
+                                    state.animateScrollToItem(0)
+                                }
                             }
                         }
                         launch {
@@ -1211,8 +1215,8 @@ private fun InnerTimelineView(
 
                             TabBarDestinations.NOTIFICATIONS -> NotificationsView(
                                 viewModel = timelineViewModel,
+                                scrollToTopSignal = notificationScrollToTop,
                                 settingsState = settingsState,
-                                state = notificationsState,
                                 modifier = Modifier,
                                 isScrollEnabled = isScrollEnabled,
                                 onReplyTap = onReplyTap,

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,32 +20,44 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
+import io.github.fornewid.placeholder.material3.fade
+import io.github.fornewid.placeholder.material3.placeholder
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.Notification
+import industries.geesawra.monarch.datalayer.NotificationTab
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.TimelineViewModel
-import androidx.compose.runtime.DisposableEffect
+import kotlinx.coroutines.launch
 import sh.christian.ozone.api.Did
 import kotlin.time.ExperimentalTime
 
@@ -51,7 +65,7 @@ import kotlin.time.ExperimentalTime
 @Composable
 fun NotificationsView(
     viewModel: TimelineViewModel,
-    state: LazyListState,
+    scrollToTopSignal: Int,
     modifier: Modifier = Modifier,
     isScrollEnabled: Boolean,
     settingsState: SettingsState = SettingsState(),
@@ -71,64 +85,180 @@ fun NotificationsView(
         }
     }
 
-    LazyColumn(
-        state = state,
-        modifier = modifier.testTag("notifications_list"),
-        userScrollEnabled = isScrollEnabled,
-        contentPadding = PaddingValues(
-            top = scaffoldPadding.calculateTopPadding(),
-            bottom = scaffoldPadding.calculateBottomPadding(),
-            start = 16.dp,
-            end = 16.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        items(
-            items = viewModel.notifications,
-            key = { it.uniqueKey() }
-        ) { notif ->
-            val isUnread = viewModel.isNotificationNew(notif)
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                ),
-                modifier = Modifier
-            ) {
-                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(4.dp)
-                            .background(
-                                if (isUnread) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerLow
-                            )
-                    )
-                    Box(modifier = Modifier.weight(1f)) {
-                        RenderNotification(
-                            viewModel = viewModel,
-                            notification = notif,
-                            settingsState = settingsState,
-                            onReplyTap = onReplyTap,
-                            onProfileTap = onProfileTap,
-                            onShowThread = { skeet ->
-                                if (onSeeMoreTap != null) {
-                                    viewModel.startThread(skeet)
-                                    onSeeMoreTap(skeet)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+    val tabs = NotificationTab.entries
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    val listStates = remember {
+        tabs.associateWith { LazyListState() }
+    }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(pagerState.currentPage) {
+        val tab = tabs[pagerState.currentPage]
+        viewModel.activeNotificationTab = tab
+        if (viewModel.notificationsForTab(tab).isEmpty() && !viewModel.isFetchingNotificationsForTab(tab)) {
+            viewModel.fetchNotifications(tab)
         }
     }
 
-    OnEndOfListReached(
-        listState = state,
-        items = viewModel.notifications,
-        onEndReached = { viewModel.fetchNotifications() },
-    )
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            val activeTab = tabs[pagerState.settledPage]
+            listStates[activeTab]?.scrollToItem(0)
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(scaffoldPadding),
+    ) {
+        SecondaryScrollableTabRow(
+            selectedTabIndex = pagerState.currentPage.coerceIn(0, tabs.lastIndex),
+            edgePadding = 8.dp,
+            divider = {},
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = {
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    },
+                    text = { Text(tab.name) }
+                )
+            }
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 0,
+        ) { page ->
+            val tab = tabs[page]
+            val data = viewModel.notificationsForTab(tab)
+            val listState = listStates.getValue(tab)
+            val isLoading = viewModel.isFetchingNotificationsForTab(tab)
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().testTag("notifications_list_${tab.name}"),
+                userScrollEnabled = isScrollEnabled,
+                contentPadding = PaddingValues(
+                    top = 0.dp,
+                    bottom = 0.dp,
+                    start = 16.dp,
+                    end = 16.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (isLoading && data.isEmpty()) {
+                    items(6, key = { "skeleton_${tab.name}_$it" }) {
+                        SkeletonNotification()
+                    }
+                } else {
+                    items(
+                        items = data,
+                        key = { it.uniqueKey() }
+                    ) { notif ->
+                        val isUnread = viewModel.isNotificationNew(notif)
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                            modifier = Modifier
+                        ) {
+                            Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .width(4.dp)
+                                        .background(
+                                            if (isUnread) MaterialTheme.colorScheme.primaryContainer
+                                            else MaterialTheme.colorScheme.surfaceContainerLow
+                                        )
+                                )
+                                Box(modifier = Modifier.weight(1f)) {
+                                    RenderNotification(
+                                        viewModel = viewModel,
+                                        notification = notif,
+                                        settingsState = settingsState,
+                                        onReplyTap = onReplyTap,
+                                        onProfileTap = onProfileTap,
+                                        onShowThread = { skeet ->
+                                            if (onSeeMoreTap != null) {
+                                                viewModel.startThread(skeet)
+                                                onSeeMoreTap(skeet)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            OnEndOfListReached(
+                listState = listState,
+                items = data,
+                onEndReached = {
+                    if (!viewModel.isFetchingNotificationsForTab(tab)) {
+                        viewModel.fetchNotifications(tab)
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SkeletonNotification() {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .height(IntrinsicSize.Min)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+                )
+            }
+        }
+    }
 }
 
 @ExperimentalTime
