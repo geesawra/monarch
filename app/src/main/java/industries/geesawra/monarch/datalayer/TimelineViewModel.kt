@@ -740,13 +740,23 @@ class TimelineViewModel @AssistedInject constructor(
                 return@launch
             }
 
+            val oldNotifications = notificationsForTab(tab)
+            val existing = if (fresh) persistentListOf() else oldNotifications
+
             val posts = parseRawNotifications(rawNotifs)
             val (notifs, repeatable) = buildNotificationList(rawNotifs, posts)
             val grouped = groupRepeatableNotifications(repeatable)
             val processed = processGroupedNotifications(notifs, grouped)
-
-            val existing = if (fresh) persistentListOf() else notificationsForTab(tab)
             val merged = (existing + processed).distinctBy { it.uniqueKey() }.toPersistentList()
+
+            if (tab == NotificationTab.All && fresh) {
+                val isSameData = oldNotifications.isNotEmpty() && processed.isNotEmpty() &&
+                    processed.size <= oldNotifications.size &&
+                    processed.zip(oldNotifications).all { (a, b) -> a.uniqueKey() == b.uniqueKey() }
+                if (isSameData) {
+                    updateSeenNotifications()
+                }
+            }
 
             updateNotifications { state ->
                 state.copy(
