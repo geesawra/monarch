@@ -1162,13 +1162,22 @@ class TimelineViewModel @AssistedInject constructor(
         )
         updateVideoUpload { VideoUploadState() }
         result.onSuccess { uri ->
-            if (selectedFeed == "following") {
+            val shouldAppendToTimeline = selectedFeed == "following"
+            val shouldAppendToThread = replyRef != null && threadStack.isNotEmpty()
+            if (shouldAppendToTimeline || shouldAppendToThread) {
                 kotlinx.coroutines.delay(500)
                 bskyConn.getPosts(listOf(uri)).onSuccess { posts ->
                     val newSkeet = posts.firstOrNull()?.let { SkeetData.fromPostView(it, it.author) }
                     if (newSkeet != null) {
-                        postInteractionStore.seed(newSkeet)
-                        updateTimeline { it.copy(skeets = it.skeets.toPersistentList().add(0, newSkeet)) }
+                        if (shouldAppendToTimeline) {
+                            updateTimeline { it.copy(skeets = it.skeets.toPersistentList().add(0, newSkeet)) }
+                        }
+                        if (shouldAppendToThread) {
+                            val parentUri = replyRef.parent.uri
+                            if (threadStack.any { threadContainsPost(it, parentUri) }) {
+                                appendReplyToThread(newSkeet, parentUri)
+                            }
+                        }
                     }
                 }
             }
@@ -1630,6 +1639,21 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
+    fun appendReplyToThread(newSkeet: SkeetData, parentUri: AtUri) {
+        postInteractionStore.seed(newSkeet)
+        updateThread { state ->
+            state.copy(
+                threadStack = state.threadStack.map { thread ->
+                    thread.appendReply(parentUri, newSkeet)
+                }.toPersistentList()
+            )
+        }
+    }
+
+    private fun threadContainsPost(thread: ThreadPost, uri: AtUri): Boolean {
+        return thread.post.uri == uri || thread.replies.any { threadContainsPost(it, uri) }
+    }
+
     private fun reapplyMuteFlags(words: List<MutedWord>) {
         updateTimeline { t ->
             t.copy(
@@ -1731,7 +1755,7 @@ class TimelineViewModel @AssistedInject constructor(
         if (threadUnion !is GetPostThreadResponseThreadUnion.ThreadViewPost) {
             return when (threadUnion) {
                 is GetPostThreadResponseThreadUnion.BlockedPost -> ThreadPost(
-                    post = SkeetData(blocked = true),
+                    post = SkeetData(hidden = true),
                     level = level
                 )
 

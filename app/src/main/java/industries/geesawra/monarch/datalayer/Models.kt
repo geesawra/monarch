@@ -132,6 +132,7 @@ data class SkeetData(
     val replyDisabled: Boolean = false,
     val blocked: Boolean = false,
     val notFound: Boolean = false,
+    val hidden: Boolean = false,
     val following: Boolean = false,
     val follower: Boolean = false,
     val replyToNotFollowing: Boolean = false,
@@ -871,6 +872,8 @@ data class ThreadPost(
                 post.did == parentDid
         val myIsInChain = parentDid == null || isContinuation
 
+        if (post.hidden) return
+
         val myLevel = if (isContinuation) effectiveLevel else effectiveLevel.coerceAtMost(MAX_NESTING)
 
         val connectors = if (myLevel > 0 && !isContinuation) {
@@ -926,6 +929,17 @@ data class ThreadPost(
             if (!willBeContinuation) {
                 activeConnectors.removeAt(activeConnectors.lastIndex)
             }
+        }
+    }
+
+    fun appendReply(parentUri: sh.christian.ozone.api.AtUri, newReply: SkeetData): ThreadPost {
+        return if (this.post.uri == parentUri) {
+            this.copy(
+                replies = this.replies + ThreadPost(post = newReply, level = this.level + 1),
+                post = this.post.copy(replies = (this.post.replies ?: 0) + 1),
+            )
+        } else {
+            this.copy(replies = this.replies.map { it.appendReply(parentUri, newReply) })
         }
     }
 }
