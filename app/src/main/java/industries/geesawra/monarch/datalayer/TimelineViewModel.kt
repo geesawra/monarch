@@ -61,7 +61,9 @@ import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.RKey
+import sh.christian.ozone.api.response.StatusCode
 import com.atproto.label.Label
+
 import sh.christian.ozone.api.model.JsonContent
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import kotlin.coroutines.cancellation.CancellationException
@@ -467,6 +469,14 @@ class TimelineViewModel @AssistedInject constructor(
             is LoginException -> updateSession { it.copy(loginError = error.message) }
             else -> updateSession { it.copy(error = error.message) }
         }
+    }
+
+    private fun Throwable.isProfileNotFound(): Boolean = when (this) {
+        is ApiCallFailure ->
+            atp.statusCode is StatusCode.InvalidRequest &&
+                atp.error?.message?.contains("Could not find actor", ignoreCase = true) == true
+        is HandleNotFoundException -> true
+        else -> false
     }
 
     fun labelDisplayName(label: Label): String = bskyConn.labelDisplayName(label)
@@ -1810,7 +1820,7 @@ class TimelineViewModel @AssistedInject constructor(
 
         viewModelScope.launch {
             bskyConn.fetchActor(did).onFailure {
-                handleError(it)
+                if (!it.isProfileNotFound()) handleError(it)
                 updateProfile { it.copy(isFetchingProfile = false, profileNotFound = true) }
             }.onSuccess { fetched ->
                 updateProfile { it.copy(profileUser = fetched, isFetchingProfile = false) }
@@ -1831,7 +1841,7 @@ class TimelineViewModel @AssistedInject constructor(
 
         viewModelScope.launch {
             BlueskyConn.resolveHandleToDid(handle).onFailure { err ->
-                handleError(err)
+                if (!err.isProfileNotFound()) handleError(err)
                 updateProfile { it.copy(isFetchingProfile = false, profileNotFound = true) }
             }.onSuccess { did ->
                 openProfile(did, key = handle)
@@ -1910,7 +1920,7 @@ class TimelineViewModel @AssistedInject constructor(
                 filter = profileFeedFilter,
             ).onFailure { err ->
                 if (err is CancellationException) return@onFailure
-                handleError(err)
+                if (!profileNotFound && !err.isProfileNotFound()) handleError(err)
                 updateProfile { it.copy(isFetchingProfileFeed = false) }
             }.onSuccess { timeline ->
                 val currentMutedWords = mutedWords

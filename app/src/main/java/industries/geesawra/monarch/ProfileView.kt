@@ -463,14 +463,9 @@ fun ProfileView(
         ) { padding ->
             if (profile == null) {
                 if (localProfileNotFound) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Profile not found")
-                    }
+                    ProfileNotFound(
+                        modifier = Modifier.padding(padding),
+                    )
                 }
                 return@Scaffold
             }

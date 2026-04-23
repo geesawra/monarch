@@ -1352,15 +1352,17 @@ private fun DetailProfilePane(
         },
     ) { padding ->
         if (profile == null) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (isLoading) {
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) {
                     CircularWavyProgressIndicator()
-                } else if (localProfileNotFound) {
-                    Text("Profile not found")
                 }
+            } else if (localProfileNotFound) {
+                ProfileNotFound(
+                    modifier = Modifier.padding(padding),
+                )
             }
         } else {
             PullToRefreshBox(

@@ -208,6 +208,8 @@ inline fun <T> suspendRunCatching(block: () -> T): Result<T> {
 
 class LoginException(message: String?) : Exception(message)
 
+class HandleNotFoundException(message: String?) : Exception(message)
+
 /**
  * Wraps an [AtpException] from a failed `AtpResponse.Failure` with the surrounding call-site
  * context. Throwing this (instead of a plain `Exception` with a concatenated message) lets the
@@ -425,6 +427,9 @@ class BlueskyConn(val context: Context) {
                 )
                 when (rawId) {
                     is AtpResponse.Failure<*> -> {
+                        if (rawId.error?.error == "HandleNotFound") {
+                            throw HandleNotFoundException(rawId.error?.message)
+                        }
                         throw Exception("Failed to resolve handle: ${rawId.error?.message}")
                     }
                     is AtpResponse.Success<ResolveHandleResponse> -> Did(rawId.response.did.did)
