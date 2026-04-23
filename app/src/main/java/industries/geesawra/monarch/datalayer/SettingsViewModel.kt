@@ -70,6 +70,7 @@ data class SettingsState(
     val translationEnabled: Boolean = true,
     val targetTranslationLanguage: String = "en",
     val openLinksInBrowser: Boolean = false,
+    val carouselImageGallery: Boolean = false,
     val pushNotificationsEnabled: Boolean = false,
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
     val loaded: Boolean = false,
@@ -110,6 +111,7 @@ class SettingsViewModel @Inject constructor(
         private val TARGET_TRANSLATION_LANGUAGE = stringPreferencesKey("target_translation_language")
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
         private val OPEN_LINKS_IN_BROWSER = stringPreferencesKey("open_links_in_browser")
+        private val CAROUSEL_IMAGE_GALLERY = stringPreferencesKey("carousel_image_gallery")
         internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
     }
 
@@ -140,6 +142,7 @@ class SettingsViewModel @Inject constructor(
                     translationEnabled = prefs[TRANSLATION_ENABLED]?.toBooleanStrictOrNull() ?: true,
                     targetTranslationLanguage = prefs[TARGET_TRANSLATION_LANGUAGE] ?: "en",
                     openLinksInBrowser = prefs[OPEN_LINKS_IN_BROWSER]?.toBooleanStrictOrNull() ?: false,
+                    carouselImageGallery = prefs[CAROUSEL_IMAGE_GALLERY]?.toBooleanStrictOrNull() ?: false,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
                     loaded = true,
@@ -261,6 +264,12 @@ class SettingsViewModel @Inject constructor(
     fun setOpenLinksInBrowser(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[OPEN_LINKS_IN_BROWSER] = enabled.toString() }
+        }
+    }
+
+    fun setCarouselImageGallery(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[CAROUSEL_IMAGE_GALLERY] = enabled.toString() }
         }
     }
 

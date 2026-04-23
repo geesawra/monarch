@@ -331,6 +331,7 @@ private fun RenderNotification(
                         },
                         translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                         targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                        carouselImageGallery = settingsState.carouselImageGallery,
                     )
                 }
             }
@@ -360,6 +361,7 @@ private fun RenderNotification(
             onAvatarTap = onProfileTap,
             translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
             targetTranslationLanguage = settingsState.targetTranslationLanguage,
+            carouselImageGallery = settingsState.carouselImageGallery,
         )
 
         is Notification.Quote -> SkeetView(
@@ -379,6 +381,7 @@ private fun RenderNotification(
             onAvatarTap = onProfileTap,
             translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
             targetTranslationLanguage = settingsState.targetTranslationLanguage,
+            carouselImageGallery = settingsState.carouselImageGallery,
         )
 
         is Notification.Reply -> SkeetView(
@@ -398,6 +401,7 @@ private fun RenderNotification(
             onAvatarTap = onProfileTap,
             translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
             targetTranslationLanguage = settingsState.targetTranslationLanguage,
+            carouselImageGallery = settingsState.carouselImageGallery,
         )
 
         is Notification.Repost -> LikeRepostRowView(

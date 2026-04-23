@@ -1,6 +1,9 @@
 package industries.geesawra.monarch
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -23,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -31,6 +38,7 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import kotlin.math.abs
 
 private const val MAX_DISPLAY_IMAGES = 4
 
@@ -274,4 +282,96 @@ fun DeletableMediaView(
             }
         }
     }
+}
+
+@Composable
+fun PostImageCarousel(
+    modifier: Modifier = Modifier,
+    images: List<Image>,
+    onCrossClick: ((Int) -> Unit)? = null,
+    onImageClick: ((Int) -> Unit)? = null,
+) {
+    if (images.isEmpty()) return
+
+    val baselineMode = LocalBaselineProfileMode.current
+    val galleryVisible = remember { mutableStateOf<Int?>(null) }
+
+    if (!baselineMode && onImageClick == null) galleryVisible.value?.let {
+        if (it < images.size) {
+            GalleryViewer(
+                imageUrls = images,
+                initialPage = it,
+            ) {
+                galleryVisible.value = null
+            }
+        }
+    }
+
+    val onClick: (Int) -> Unit = onImageClick ?: { galleryVisible.value = it }
+    val pagerState = rememberPagerState { images.size }
+
+    Column(modifier = modifier) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 360.dp),
+            contentPadding = PaddingValues(horizontal = 40.dp),
+            pageSpacing = 8.dp,
+        ) { page ->
+            val img = images[page]
+            val aspectRatio = if (img.width != null && img.height != null) {
+                img.width.toFloat() / img.height.toFloat()
+            } else {
+                null
+            }
+
+            val pageOffset = calculatePageOffset(pagerState, page)
+            val scale = 1f - 0.08f * pageOffset.coerceAtMost(1f)
+            val alpha = 1f - 0.3f * pageOffset.coerceAtMost(1f)
+
+            DeletableImageView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    },
+                image = img,
+                originalIndex = page,
+                onCrossClick = onCrossClick,
+                onMediaClick = onClick,
+                aspectRatio = aspectRatio,
+            )
+        }
+
+        if (images.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                repeat(images.size) { index ->
+                    val selected = pagerState.currentPage == index
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(if (selected) 8.dp else 6.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun calculatePageOffset(pagerState: PagerState, page: Int): Float {
+    return abs(pagerState.currentPage - page + pagerState.currentPageOffsetFraction)
 }

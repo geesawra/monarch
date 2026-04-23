@@ -133,6 +133,7 @@ fun SkeetView(
     overrideAvatarSize: Dp? = null,
     translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
+    carouselImageGallery: Boolean = false,
 ) {
     if (skeet.blocked) {
         SkeetBlockedPost(nested)
@@ -190,6 +191,7 @@ fun SkeetView(
                 showLabels = showLabels,
                 translationEnabled = translationEnabled,
                 targetTranslationLanguage = targetTranslationLanguage,
+                carouselImageGallery = carouselImageGallery,
             )
         }
     } else {
@@ -252,6 +254,7 @@ fun SkeetView(
                     showLabels = showLabels,
                     translationEnabled = translationEnabled,
                     targetTranslationLanguage = targetTranslationLanguage,
+                    carouselImageGallery = carouselImageGallery,
                 )
             }
         }
@@ -321,6 +324,7 @@ fun FocusedSkeetView(
     isVisible: Boolean = true,
     translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
+    carouselImageGallery: Boolean = false,
     onShowLikes: () -> Unit = {},
     onShowReposts: () -> Unit = {},
     onShowQuotes: () -> Unit = {},
@@ -440,6 +444,7 @@ fun FocusedSkeetView(
             showLabels = showLabels,
             translationEnabled = translationEnabled,
             targetTranslationLanguage = targetTranslationLanguage,
+            carouselImageGallery = carouselImageGallery,
         )
 
         skeet.createdAt?.let { instant ->
@@ -613,6 +618,7 @@ private fun SkeetContentSection(
     showLabels: Boolean,
     translationEnabled: Boolean = true,
     targetTranslationLanguage: String = "en",
+    carouselImageGallery: Boolean = false,
 ) {
     if (warningLabel != null) {
         ContentWarningCard(
@@ -623,7 +629,7 @@ private fun SkeetContentSection(
         )
     }
     if (contentRevealed) {
-        SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onMentionClick, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels, targetTranslationLanguage = targetTranslationLanguage)
+        SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onMentionClick, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels, targetTranslationLanguage = targetTranslationLanguage, carouselImageGallery = carouselImageGallery)
 
         if (showActions) {
             TimelinePostActionsView(
@@ -654,6 +660,7 @@ private fun SkeetContent(
     isVisible: Boolean = true,
     showLabels: Boolean = true,
     targetTranslationLanguage: String = "en",
+    carouselImageGallery: Boolean = false,
 ) {
     val context = LocalContext.current
     val translation = viewModel?.postTranslationStore?.states?.get(skeet.cid)
@@ -756,7 +763,7 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = skeet.following)
+    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = skeet.following, carouselImageGallery = carouselImageGallery)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -851,10 +858,11 @@ fun Embeds(
     isVisible: Boolean = true,
     showLabels: Boolean = true,
     following: Boolean = false,
+    carouselImageGallery: Boolean = false,
 ) {
     when (embed) {
         is PostViewEmbedUnion.ImagesView -> {
-            ImageView(embed.value.images)
+            ImageView(embed.value.images, carouselImageGallery = carouselImageGallery)
         }
 
         is PostViewEmbedUnion.VideoView -> {
@@ -907,7 +915,7 @@ fun Embeds(
                 is RecordWithMediaViewMediaUnion.VideoView -> PostViewEmbedUnion.VideoView(media.value)
             }
 
-            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = following)
+            Embeds(context, false, mediaValue, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = following, carouselImageGallery = carouselImageGallery)
 
             if (!nested) {
                 Column(
@@ -935,26 +943,35 @@ fun Embeds(
 }
 
 @Composable
-private fun ImageView(img: List<ImagesViewImage>) {
-    Column(
-        modifier = Modifier
-            .padding(top = 8.dp, bottom = 8.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
-    ) {
-        PostImageGallery(
-            modifier = Modifier
-                .fillMaxWidth(),
-            images = img.map {
-                Image(
-                    url = it.thumb.uri,
-                    alt = it.alt,
-                    fullSize = it.fullsize.uri,
-                    width = it.aspectRatio?.width,
-                    height = it.aspectRatio?.height
-                )
-            },
+private fun ImageView(img: List<ImagesViewImage>, carouselImageGallery: Boolean = false) {
+    val images = img.map {
+        Image(
+            url = it.thumb.uri,
+            alt = it.alt,
+            fullSize = it.fullsize.uri,
+            width = it.aspectRatio?.width,
+            height = it.aspectRatio?.height
         )
+    }
+    if (carouselImageGallery) {
+        PostImageCarousel(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 8.dp),
+            images = images,
+        )
+    } else {
+        Column(
+            modifier = Modifier
+                .padding(top = 8.dp, bottom = 8.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
+        ) {
+            PostImageGallery(
+                modifier = Modifier.fillMaxWidth(),
+                images = images,
+            )
+        }
     }
 }
 

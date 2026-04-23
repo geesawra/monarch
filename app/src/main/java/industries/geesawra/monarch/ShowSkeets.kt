@@ -401,6 +401,7 @@ fun ShowSkeets(
                                 isVisible = isVisible,
                                 translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                                 targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                                carouselImageGallery = settingsState.carouselImageGallery,
                                 onShowLikes = { onShowLikes?.invoke(skeet.uri) },
                                 onShowReposts = { onShowReposts?.invoke(skeet.uri) },
                                 onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
@@ -422,6 +423,7 @@ fun ShowSkeets(
                                 overrideAvatarSize = replyAvatarSize(),
                                 translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                                 targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                                carouselImageGallery = settingsState.carouselImageGallery,
                             )
                         }
                     }
@@ -468,6 +470,7 @@ fun ShowSkeets(
                                     isVisible = isVisible,
                                     translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                                     targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                                    carouselImageGallery = settingsState.carouselImageGallery,
                                 )
                             }
 
@@ -527,6 +530,7 @@ fun ShowSkeets(
                                     isVisible = isVisible,
                                     translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                                     targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                                    carouselImageGallery = settingsState.carouselImageGallery,
                                 )
                             }
                         }
@@ -546,6 +550,7 @@ fun ShowSkeets(
                             isVisible = isVisible,
                             translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                             targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                            carouselImageGallery = settingsState.carouselImageGallery,
                             onShowLikes = { onShowLikes?.invoke(skeet.uri) },
                             onShowReposts = { onShowReposts?.invoke(skeet.uri) },
                             onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
@@ -572,6 +577,7 @@ fun ShowSkeets(
                             overrideAvatarSize = if (isShowingThread && !skeet.isFocused) replyAvatarSize() else null,
                             translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                             targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                            carouselImageGallery = settingsState.carouselImageGallery,
                         )
                     }
                 }

@@ -677,6 +677,7 @@ internal fun ProfileContent(
                         },
                         translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                         targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                        carouselImageGallery = settingsState.carouselImageGallery,
                     )
                 }
             }

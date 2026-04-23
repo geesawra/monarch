@@ -249,6 +249,17 @@ fun SettingsView(
             )
 
             ListItem(
+                headlineContent = { Text("Image carousel") },
+                supportingContent = { Text("Show images in a horizontal carousel instead of a grid") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.carouselImageGallery,
+                        onCheckedChange = { settingsViewModel.setCarouselImageGallery(it) }
+                    )
+                },
+            )
+
+            ListItem(
                 headlineContent = { Text("Avatar shape") },
                 supportingContent = {
                     SingleChoiceSegmentedButtonRow(
