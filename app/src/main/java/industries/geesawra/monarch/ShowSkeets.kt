@@ -626,6 +626,7 @@ fun ShowSkeets(
                 if (skeet.didLike) return@collectLatest
                 if (skeet.cid in autoLikedCids) return@collectLatest
                 if (skeet.root() != null || skeet.parent().first != null) return@collectLatest
+                if (skeet.did == viewModel.user?.did) return@collectLatest
                 autoLikedCids.add(skeet.cid)
                 viewModel.like(skeet.uri, skeet.cid)
             }

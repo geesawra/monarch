@@ -954,7 +954,7 @@ fun PostButtonRow(
                                 timelineViewModel.deleteDraft(draftId)
                                 timelineViewModel.clearActiveDraft()
                             }
-                            if (!canImplicitSplit && autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike) {
+                            if (!canImplicitSplit && autoLikeOnReply && !isQuotePost && inReplyToData != null && !inReplyToData.didLike && !timelineViewModel.isOwnPost(inReplyToData)) {
                                 timelineViewModel.like(inReplyToData.uri, inReplyToData.cid)
                             }
                             coroutineScope.launch { scaffoldState.bottomSheetState.hide() }

@@ -104,7 +104,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
                         val prefs = context.settingsDataStore.data.first()
                         val autoLike = prefs[stringPreferencesKey("auto_like_on_reply")]?.toBooleanStrictOrNull() ?: false
-                        if (autoLike && post.viewer?.like == null) {
+                        if (autoLike && post.viewer?.like == null && post.author.did != conn.session?.did) {
                             conn.like(post.uri, post.cid)
                         }
                     }
