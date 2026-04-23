@@ -125,39 +125,45 @@ fun ThreadView(
                 Modifier
             }
 
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Column(modifier = contentModifier) {
-                    ShowSkeets(
-                        viewModel = timelineViewModel,
-                        isScrollEnabled = true,
-                        state = listState,
-                        data = threadData,
-                        shouldFetchMoreData = false,
-                        isShowingThread = true,
-                        isLoading = isRefreshing.value,
-                        settingsState = settingsState,
-                        onProfileTap = onProfileTap,
-                        onReplyTap = onReplyTap,
-                        onSeeMoreTap = { tapped ->
-                            timelineViewModel.setThread(tapped)
-                            onThreadTap()
-                        },
-                        onShowLikes = { uri ->
-                            engagementUri = uri
-                            engagementType = EngagementType.Likes
-                        },
-                        onShowReposts = { uri ->
-                            engagementUri = uri
-                            engagementType = EngagementType.Reposts
-                        },
-                        onShowQuotes = { uri ->
-                            engagementUri = uri
-                            engagementType = EngagementType.Quotes
-                        },
-                    )
+            if (timelineViewModel.threadNotFound) {
+                PostNotFound(
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Column(modifier = contentModifier) {
+                        ShowSkeets(
+                            viewModel = timelineViewModel,
+                            isScrollEnabled = true,
+                            state = listState,
+                            data = threadData,
+                            shouldFetchMoreData = false,
+                            isShowingThread = true,
+                            isLoading = isRefreshing.value,
+                            settingsState = settingsState,
+                            onProfileTap = onProfileTap,
+                            onReplyTap = onReplyTap,
+                            onSeeMoreTap = { tapped ->
+                                timelineViewModel.setThread(tapped)
+                                onThreadTap()
+                            },
+                            onShowLikes = { uri ->
+                                engagementUri = uri
+                                engagementType = EngagementType.Likes
+                            },
+                            onShowReposts = { uri ->
+                                engagementUri = uri
+                                engagementType = EngagementType.Reposts
+                            },
+                            onShowQuotes = { uri ->
+                                engagementUri = uri
+                                engagementType = EngagementType.Quotes
+                            },
+                        )
+                    }
                 }
             }
         }

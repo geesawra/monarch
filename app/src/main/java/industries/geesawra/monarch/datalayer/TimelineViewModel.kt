@@ -130,6 +130,7 @@ data class NotificationsState(
 
 data class ThreadState(
     val threadStack: ImmutableList<ThreadPost> = persistentListOf(),
+    val threadNotFound: Boolean = false,
 ) {
     val currentlyShownThread: ThreadPost get() = threadStack.lastOrNull() ?: ThreadPost()
 }
@@ -352,6 +353,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     val threadStack: ImmutableList<ThreadPost> get() = threadState.threadStack
     val currentlyShownThread: ThreadPost get() = threadState.currentlyShownThread
+    val threadNotFound: Boolean get() = threadState.threadNotFound
 
     val profileUser: ProfileViewDetailed? get() = profileState.profileUser
     val profilePosts: ImmutableList<SkeetData> get() = profileState.profilePosts
@@ -476,6 +478,13 @@ class TimelineViewModel @AssistedInject constructor(
             atp.statusCode is StatusCode.InvalidRequest &&
                 atp.error?.message?.contains("Could not find actor", ignoreCase = true) == true
         is HandleNotFoundException -> true
+        else -> false
+    }
+
+    private fun Throwable.isThreadNotFound(): Boolean = when (this) {
+        is ApiCallFailure ->
+            atp.statusCode is StatusCode.InvalidRequest &&
+                atp.error?.error == "NotFound"
         else -> false
     }
 
@@ -1797,12 +1806,21 @@ class TimelineViewModel @AssistedInject constructor(
     fun getThread(parentHeight: Long = 80, then: () -> Unit) {
         viewModelScope.launch {
             bskyConn.getThread(currentlyShownThread.post.uri, parentHeight).onFailure {
-                handleError(it)
+                if (!it.isThreadNotFound()) handleError(it)
+                updateThread { it.copy(threadNotFound = true) }
             }.onSuccess {
                 val asd = readThread(it.thread)
-                updateThread { t -> t.copy(threadStack = (t.threadStack.dropLast(1) + asd).toPersistentList()) }
-                asd.flatten().forEach { postInteractionStore.seed(it) }
-                then()
+                val rootNotFound = asd.post.notFound
+                updateThread { t ->
+                    t.copy(
+                        threadStack = (t.threadStack.dropLast(1) + asd).toPersistentList(),
+                        threadNotFound = rootNotFound,
+                    )
+                }
+                if (!rootNotFound) {
+                    asd.flatten().forEach { postInteractionStore.seed(it) }
+                    then()
+                }
             }
         }
     }
