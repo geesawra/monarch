@@ -25,6 +25,7 @@ import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
@@ -220,6 +221,9 @@ fun ComposeView(
             SheetValue.Hidden -> {
                 keyboardController?.hide()
                 focusManager.clearFocus()
+                if (timelineViewModel.uploadingPost) {
+                    timelineViewModel.cancelPost()
+                }
                 if (!wasEdited.value) {
                     textfieldState.clearText()
                     inReplyTo.value = null
@@ -345,7 +349,6 @@ fun ComposeView(
             }
         }
 
-    val uploadingPost = remember { mutableStateOf(false) }
     val altEditorUri = remember { mutableStateOf<Uri?>(null) }
 
     val sheetScrollConnection = remember(scrollState) {
@@ -387,7 +390,7 @@ fun ComposeView(
 
                 PostButtonRow(
                     context = context,
-                    uploadingPost = uploadingPost,
+                    uploadingPost = timelineViewModel.uploadingPost,
                     postText = textfieldState.text.toString(),
                     mediaSelected = mediaSelected,
                     mediaSelectedIsVideo = mediaSelectedIsVideo,
@@ -409,8 +412,8 @@ fun ComposeView(
                     threadPosts = threadPosts,
                     focusedThreadPostIndex = focusedThreadPostIndex.value,
                     onThreadPost = {
-                        coroutineScope.launch {
-                            uploadingPost.value = true
+                        val job = coroutineScope.launch {
+                            timelineViewModel.uploadingPost = true
                             val posts = threadPosts.map { post ->
                                 ThreadPostData(
                                     text = post.textFieldState.text.toString(),
@@ -439,7 +442,8 @@ fun ComposeView(
                                     Toast.LENGTH_LONG
                                 ).show()
                             }.also {
-                                uploadingPost.value = false
+                                timelineViewModel.uploadingPost = false
+                                timelineViewModel.setPostJob(null)
                             }
                         }
                     },
@@ -794,7 +798,7 @@ fun ComposeView(
 @Composable
 fun PostButtonRow(
     context: Context,
-    uploadingPost: MutableState<Boolean>,
+    uploadingPost: Boolean,
     postText: String,
     mediaSelected: MutableState<List<Uri>>,
     mediaSelectedIsVideo: MutableState<Boolean>,
@@ -853,22 +857,24 @@ fun PostButtonRow(
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (uploadingPost.value) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularWavyProgressIndicator()
+        if (uploadingPost) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 timelineViewModel.videoUploadStatus?.let { status ->
-                    val progress = timelineViewModel.videoUploadProgress
-                    val text = if (progress != null && progress > 0) {
-                        "${status.label} ${progress}%"
-                    } else {
-                        status.label
-                    }
                     Text(
-                        text = text,
-                        style = MaterialTheme.typography.labelSmall,
+                        text = status.label,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.defaultMinSize(minWidth = 120.dp),
                     )
+                }
+                Spacer(Modifier.size(4.dp))
+                val progress = timelineViewModel.videoUploadProgress
+                if (progress != null && progress > 0) {
+                    CircularWavyProgressIndicator(
+                        progress = { progress.toFloat() / 100f },
+                    )
+                } else {
+                    CircularWavyProgressIndicator()
                 }
             }
         } else if (isThreadMode.value && onThreadPost != null) {
@@ -880,7 +886,7 @@ fun PostButtonRow(
                     onThreadPost()
                 },
                 modifier = Modifier.padding(end = 8.dp),
-                enabled = threadButtonEnabled && !uploadingPost.value,
+                enabled = threadButtonEnabled && !uploadingPost,
                 colors = if (focusedPostText > maxChars) ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
                     contentColor = MaterialTheme.colorScheme.onError,
@@ -915,8 +921,8 @@ fun PostButtonRow(
             Button(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                    coroutineScope.launch {
-                        uploadingPost.value = true
+                    val job = coroutineScope.launch {
+                        timelineViewModel.uploadingPost = true
                         val result = if (canImplicitSplit) {
                             val posts = buildImplicitThreadPosts(
                                 text = postText,
@@ -961,12 +967,13 @@ fun PostButtonRow(
                         }.onFailure {
                             Toast.makeText(context, "Could not post: ${it.message}", Toast.LENGTH_LONG).show()
                         }.also {
-                            uploadingPost.value = false
+                            timelineViewModel.uploadingPost = false
+                            timelineViewModel.setPostJob(null)
                         }
                     }
                 },
                 modifier = Modifier.padding(end = 8.dp),
-                enabled = postButtonEnabled && !uploadingPost.value,
+                enabled = postButtonEnabled && !uploadingPost,
                 colors = if (overflow && !canImplicitSplit) ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
                     contentColor = MaterialTheme.colorScheme.onError,

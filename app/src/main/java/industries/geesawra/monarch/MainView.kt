@@ -200,7 +200,7 @@ fun MainView(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
             confirmValueChange = { targetValue ->
-                if (targetValue == SheetValue.Hidden && wasEdited.value) {
+                if (targetValue == SheetValue.Hidden && (timelineViewModel.uploadingPost || wasEdited.value)) {
                     showSaveDraftDialog = true
                     false
                 } else {
@@ -240,7 +240,7 @@ fun MainView(
 
     val focusManager = LocalFocusManager.current
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
-        if (wasEdited.value) {
+        if (timelineViewModel.uploadingPost || wasEdited.value) {
             showSaveDraftDialog = true
         } else {
             focusManager.clearFocus()
@@ -254,6 +254,7 @@ fun MainView(
         SaveDraftDialog(
             onSaveDraft = {
                 showSaveDraftDialog = false
+                timelineViewModel.cancelPost()
                 timelineViewModel.saveDraft(
                     text = composeTextFieldState.text.toString(),
                     mediaUris = composeMediaSelected.value,
@@ -271,6 +272,7 @@ fun MainView(
             },
             onDiscard = {
                 showSaveDraftDialog = false
+                timelineViewModel.cancelPost()
                 wasEdited.value = false
                 timelineViewModel.clearActiveDraft()
                 focusManager.clearFocus()

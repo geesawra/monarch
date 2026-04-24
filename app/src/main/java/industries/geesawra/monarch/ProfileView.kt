@@ -204,9 +204,17 @@ fun ProfileView(
         bottomSheetState = rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
             confirmValueChange = { targetValue ->
-                if (targetValue == SheetValue.Hidden && wasEdited.value) {
-                    showDiscardDialog = true
-                    false
+                if (targetValue == SheetValue.Hidden) {
+                    if (timelineViewModel.uploadingPost) {
+                        timelineViewModel.cancelPost()
+                        wasEdited.value = false
+                        true
+                    } else if (wasEdited.value) {
+                        showDiscardDialog = true
+                        false
+                    } else {
+                        true
+                    }
                 } else {
                     true
                 }
@@ -224,7 +232,13 @@ fun ProfileView(
     val focusManager = LocalFocusManager.current
 
     BackHandler(enabled = scaffoldState.bottomSheetState.isVisible) {
-        if (wasEdited.value) {
+        if (timelineViewModel.uploadingPost) {
+            timelineViewModel.cancelPost()
+            focusManager.clearFocus()
+            coroutineScope.launch {
+                scaffoldState.bottomSheetState.hide()
+            }
+        } else if (wasEdited.value) {
             showDiscardDialog = true
         } else {
             focusManager.clearFocus()
@@ -238,6 +252,7 @@ fun ProfileView(
         DiscardChangesDialog(
             onDiscard = {
                 showDiscardDialog = false
+                timelineViewModel.cancelPost()
                 wasEdited.value = false
                 focusManager.clearFocus()
                 coroutineScope.launch {

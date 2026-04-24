@@ -244,6 +244,8 @@ class TimelineViewModel @AssistedInject constructor(
     var redraftPending by mutableStateOf(false); private set
     var pendingNotificationsTab by mutableStateOf(false)
     var hasNewTimelinePosts by mutableStateOf(false); private set
+    var uploadingPost by mutableStateOf(false); internal set
+    private var postJob: Job? = null
 
     private val _dismissCurrentThread = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val dismissCurrentThread: SharedFlow<Unit> = _dismissCurrentThread.asSharedFlow()
@@ -385,6 +387,17 @@ class TimelineViewModel @AssistedInject constructor(
 
     val videoUploadStatus: VideoUploadStatus? get() = videoUploadState.status
     val videoUploadProgress: Long? get() = videoUploadState.progress
+
+    fun setPostJob(job: Job?) {
+        postJob = job
+    }
+
+    fun cancelPost() {
+        postJob?.cancel()
+        postJob = null
+        uploadingPost = false
+        videoUploadState = VideoUploadState()
+    }
 
     // ── Update helpers ──────────────────────────────────────────────────────
     private inline fun updateSession(block: (SessionState) -> SessionState) {
