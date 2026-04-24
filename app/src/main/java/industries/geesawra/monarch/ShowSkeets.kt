@@ -57,9 +57,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.ReplyRefParentUnion
-import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
-import io.github.fornewid.placeholder.material3.fade
-import io.github.fornewid.placeholder.material3.placeholder
+
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
 import industries.geesawra.monarch.datalayer.ThreadConnectorType
@@ -655,10 +653,7 @@ private fun SkeletonPost(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .size(avatarSize())
                     .clip(CircleShape)
-                    .placeholder(
-                        visible = true,
-                        highlight = PlaceholderHighlight.fade(),
-                    )
+                    .themedPlaceholder()
             )
 
             Column(
@@ -672,10 +667,7 @@ private fun SkeletonPost(modifier: Modifier = Modifier) {
                         .fillMaxWidth(0.4f)
                         .height(14.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .placeholder(
-                            visible = true,
-                            highlight = PlaceholderHighlight.fade(),
-                        )
+                        .themedPlaceholder()
                 )
 
                 Box(
@@ -683,10 +675,7 @@ private fun SkeletonPost(modifier: Modifier = Modifier) {
                         .fillMaxWidth()
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .placeholder(
-                            visible = true,
-                            highlight = PlaceholderHighlight.fade(),
-                        )
+                        .themedPlaceholder()
                 )
 
                 Box(
@@ -694,10 +683,7 @@ private fun SkeletonPost(modifier: Modifier = Modifier) {
                         .fillMaxWidth()
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .placeholder(
-                            visible = true,
-                            highlight = PlaceholderHighlight.fade(),
-                        )
+                        .themedPlaceholder()
                 )
 
                 Box(
@@ -705,10 +691,7 @@ private fun SkeletonPost(modifier: Modifier = Modifier) {
                         .fillMaxWidth(0.7f)
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .placeholder(
-                            visible = true,
-                            highlight = PlaceholderHighlight.fade(),
-                        )
+                        .themedPlaceholder()
                 )
 
                 Row(
@@ -720,10 +703,7 @@ private fun SkeletonPost(modifier: Modifier = Modifier) {
                             modifier = Modifier
                                 .size(18.dp)
                                 .clip(CircleShape)
-                                .placeholder(
-                                    visible = true,
-                                    highlight = PlaceholderHighlight.fade(),
-                                )
+                                .themedPlaceholder()
                         )
                     }
                 }

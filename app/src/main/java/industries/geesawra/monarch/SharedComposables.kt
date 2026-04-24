@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -25,8 +26,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
+import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
+import io.github.fornewid.placeholder.foundation.fade
+import io.github.fornewid.placeholder.material3.placeholder
 import app.bsky.actor.VerificationStateVerifiedStatus
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.SettingsState
@@ -96,6 +102,22 @@ fun LoadingBox(modifier: Modifier = Modifier) {
         CircularWavyProgressIndicator()
     }
 }
+
+@Composable
+fun Modifier.themedPlaceholder(
+    visible: Boolean = true,
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+    shape: Shape? = null,
+): Modifier = this.then(
+    placeholder(
+        visible = visible,
+        color = contentColorFor(backgroundColor).copy(alpha = 0.1f).compositeOver(backgroundColor),
+        shape = shape,
+        highlight = PlaceholderHighlight.fade(
+            highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+        )
+    )
+)
 
 @Composable
 fun OnEndOfListReached(listState: LazyListState, items: List<Any>, onEndReached: () -> Unit) {

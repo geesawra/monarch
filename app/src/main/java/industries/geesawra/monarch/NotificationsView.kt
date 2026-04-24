@@ -47,9 +47,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.rememberCoroutineScope
-import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
-import io.github.fornewid.placeholder.material3.fade
-import io.github.fornewid.placeholder.material3.placeholder
+
 import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.Notification
 import industries.geesawra.monarch.datalayer.NotificationTab
@@ -228,7 +226,7 @@ private fun SkeletonNotification() {
                 modifier = Modifier
                     .size(20.dp)
                     .clip(CircleShape)
-                    .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+                    .themedPlaceholder()
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(
@@ -240,21 +238,21 @@ private fun SkeletonNotification() {
                         .fillMaxWidth(0.5f)
                         .height(14.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+                        .themedPlaceholder()
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.8f)
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+                        .themedPlaceholder()
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.6f)
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .placeholder(visible = true, highlight = PlaceholderHighlight.fade())
+                        .themedPlaceholder()
                 )
             }
         }
