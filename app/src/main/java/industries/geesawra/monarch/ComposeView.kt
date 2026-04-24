@@ -1395,17 +1395,14 @@ private fun MediaSelectionSection(
                 true -> DeletableMediaView(
                     originalIndex = 0,
                     onCrossClick = { onVideoRemove() },
-                    onMediaClick = { onEditAlt(0) }
+                    onMediaClick = { }
                 ) {
-                    AsyncImage(
-                        model = mediaSelected.first(),
-                        contentDescription = "Selected video",
+                    VideoPlayer(
+                        url = mediaSelected.first().toString(),
+                        mimeType = null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 300.dp),
-                        contentScale = ContentScale.Crop,
-                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     )
                 }
             }
@@ -1740,15 +1737,12 @@ fun ThreadComposeContent(
                                     },
                                     onMediaClick = { }
                                 ) {
-                                    AsyncImage(
-                                        model = postState.media.value.first(),
-                                        contentDescription = "Selected video",
+                                    VideoPlayer(
+                                        url = postState.media.value.first().toString(),
+                                        mimeType = null,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .heightIn(max = 200.dp),
-                                        contentScale = ContentScale.Crop,
-                                        placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                                     )
                                 }
                             }

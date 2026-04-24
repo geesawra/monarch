@@ -67,6 +67,7 @@ fun VideoPlayer(
     url: String,
     modifier: Modifier = Modifier,
     isVisible: Boolean = true,
+    mimeType: String? = MimeTypes.APPLICATION_M3U8,
 ) {
     val context = LocalContext.current
 
@@ -80,7 +81,11 @@ fun VideoPlayer(
                 true,
             )
             .build().apply {
-                setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).build())
+                val mediaItemBuilder = MediaItem.Builder().setUri(url)
+                if (mimeType != null) {
+                    mediaItemBuilder.setMimeType(mimeType)
+                }
+                setMediaItem(mediaItemBuilder.build())
                 volume = 0f
             }
     }
