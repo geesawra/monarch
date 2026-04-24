@@ -493,6 +493,17 @@ fun SettingsView(
             )
 
             ListItem(
+                headlineContent = { Text("Show only latest thread interaction") },
+                supportingContent = { Text("When multiple replies from the same thread appear in your feed, only show the most recent one") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.showOnlyLatestThreadInteraction,
+                        onCheckedChange = { settingsViewModel.setShowOnlyLatestThreadInteraction(it) }
+                    )
+                },
+            )
+
+            ListItem(
                 headlineContent = { Text("Show labels") },
                 supportingContent = { Text("Show content labels on posts") },
                 trailingContent = {

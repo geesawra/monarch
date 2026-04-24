@@ -65,6 +65,7 @@ import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.AtUri
 import sh.christian.ozone.api.Did
+import kotlin.time.Instant
 
 val LocalActiveVideoKey = compositionLocalOf<MutableState<String?>?> { null }
 
@@ -111,8 +112,31 @@ fun ShowSkeets(
         }
     }
 
-    val filteredData = remember(data, threadContextCids, searchFilter, isShowingThread) {
+    val filteredData = remember(data, threadContextCids, searchFilter, isShowingThread, settingsState.showOnlyLatestThreadInteraction) {
         val seenRootCids = mutableSetOf<Cid>()
+        val useLatestWins = settingsState.showOnlyLatestThreadInteraction
+
+        val latestPerRoot: Set<SkeetData> = if (useLatestWins) {
+            data
+                .filter {
+                    !it.replyToNotFollowing && it.cid !in threadContextCids &&
+                    (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.BlockedPost) &&
+                    (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.NotFoundPost) &&
+                    (isShowingThread || !it.isMuted)
+                }
+                .filter {
+                    val isRepost = it.reason is FeedViewPostReasonUnion.ReasonRepost
+                    if (isRepost) return@filter false
+                    it.reply != null && it.threadRootCid() != null
+                }
+                .groupBy { it.threadRootCid() }
+                .mapValues { it.value.maxByOrNull { it.createdAt ?: kotlin.time.Instant.fromEpochMilliseconds(0) } }
+                .mapNotNull { it.value }
+                .toSet()
+        } else {
+            emptySet()
+        }
+
         data.filter {
             !it.replyToNotFollowing && it.cid !in threadContextCids &&
             (isShowingThread || it.reply?.parent !is ReplyRefParentUnion.BlockedPost) &&
@@ -122,8 +146,14 @@ fun ShowSkeets(
             if (isShowingThread) return@filter true
             val isRepost = it.reason is FeedViewPostReasonUnion.ReasonRepost
             if (isRepost) return@filter true
-            val rootCid = it.root()?.cid ?: return@filter true
-            seenRootCids.add(rootCid)
+            if (useLatestWins) {
+                val isTopLevel = it.reply == null
+                if (isTopLevel) return@filter true
+                latestPerRoot.contains(it)
+            } else {
+                val rootCid = it.root()?.cid ?: return@filter true
+                seenRootCids.add(rootCid)
+            }
         }.filter {
             if (searchFilter.isBlank()) return@filter true
             it.content.contains(searchFilter, ignoreCase = true) ||

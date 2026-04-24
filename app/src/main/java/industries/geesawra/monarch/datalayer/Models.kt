@@ -663,6 +663,12 @@ data class SkeetData(
         return computeRoot(this.reply, this.parent())
     }
 
+    fun threadRootCid(): Cid? {
+        root()?.cid?.let { return it }
+        parent().first?.cid?.let { return it }
+        return null
+    }
+
     val rkey: String by lazy { this.uri.atUri.split("/").last() }
 
     fun key(): String = rkey

@@ -73,6 +73,7 @@ data class SettingsState(
     val carouselImageGallery: Boolean = false,
     val pushNotificationsEnabled: Boolean = false,
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
+    val showOnlyLatestThreadInteraction: Boolean = false,
     val loaded: Boolean = false,
 )
 
@@ -112,6 +113,7 @@ class SettingsViewModel @Inject constructor(
         private val PUSH_NOTIFICATIONS_ENABLED = stringPreferencesKey("push_notifications_enabled")
         private val OPEN_LINKS_IN_BROWSER = stringPreferencesKey("open_links_in_browser")
         private val CAROUSEL_IMAGE_GALLERY = stringPreferencesKey("carousel_image_gallery")
+        private val SHOW_ONLY_LATEST_THREAD_INTERACTION = stringPreferencesKey("show_only_latest_thread_interaction")
         internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
     }
 
@@ -145,6 +147,7 @@ class SettingsViewModel @Inject constructor(
                     carouselImageGallery = prefs[CAROUSEL_IMAGE_GALLERY]?.toBooleanStrictOrNull() ?: false,
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
+                    showOnlyLatestThreadInteraction = prefs[SHOW_ONLY_LATEST_THREAD_INTERACTION]?.toBooleanStrictOrNull() ?: false,
                     loaded = true,
                 )
             }.collect {
@@ -282,6 +285,12 @@ class SettingsViewModel @Inject constructor(
     fun setNotificationServerUrl(url: String) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[NOTIFICATION_SERVER_URL] = url }
+        }
+    }
+
+    fun setShowOnlyLatestThreadInteraction(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[SHOW_ONLY_LATEST_THREAD_INTERACTION] = enabled.toString() }
         }
     }
 }
