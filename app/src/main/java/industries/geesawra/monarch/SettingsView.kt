@@ -210,18 +210,16 @@ fun SettingsView(
                 },
             )
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                ListItem(
-                    headlineContent = { Text("Dynamic color") },
-                    supportingContent = { Text("Use colors from your wallpaper") },
-                    trailingContent = {
-                        Switch(
-                            checked = settings.dynamicColor,
-                            onCheckedChange = { settingsViewModel.setDynamicColor(it) }
-                        )
-                    },
-                )
-            }
+            ListItem(
+                headlineContent = { Text("Dynamic color") },
+                supportingContent = { Text("Use colors from your wallpaper") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.dynamicColor,
+                        onCheckedChange = { settingsViewModel.setDynamicColor(it) }
+                    )
+                },
+            )
 
             ListItem(
                 headlineContent = { Text("Post text size") },

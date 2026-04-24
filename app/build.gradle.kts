@@ -33,7 +33,7 @@ android {
 
     defaultConfig {
         applicationId = "industries.geesawra.monarch"
-        minSdk = 36
+        minSdk = 31
         targetSdk = 36
         versionCode = gitVersionCode
         versionName = gitVersionName
