@@ -66,6 +66,7 @@ class Compressor(
     companion object {
         const val VIDEO_SIZE_LIMIT_BYTES = 100 * 1024 * 1024L
         const val VIDEO_SCALE_FACTOR = 0.3f
+        const val MAX_IMAGE_DIMENSION = 4000
     }
 
     suspend fun compressImage(
@@ -84,15 +85,46 @@ class Compressor(
             ensureActive()
 
             withContext(Dispatchers.Default) {
-                val raw = BitmapFactory.decodeByteArray(inputBytes, 0, inputBytes.size)
-                val bitmap = applyExifOrientation(raw, inputBytes)
+                val ogSize = inputBytes.size
+
+                val bounds = BitmapFactory.decodeByteArray(inputBytes, 0, inputBytes.size, BitmapFactory.Options().apply { inJustDecodeBounds = true })
+
+                var outWidth = bounds?.width ?: 0
+                var outHeight = bounds?.height ?: 0
+
+                val inSampleSize = if (outWidth > MAX_IMAGE_DIMENSION || outHeight > MAX_IMAGE_DIMENSION) {
+                    val halfWidth = outWidth / 2
+                    val halfHeight = outHeight / 2
+                    var sampleSize = 1
+                    while (halfWidth / sampleSize > MAX_IMAGE_DIMENSION && halfHeight / sampleSize > MAX_IMAGE_DIMENSION) {
+                        sampleSize *= 2
+                    }
+                    sampleSize
+                } else {
+                    1
+                }
+
+                val options = BitmapFactory.Options().apply {
+                    this.inSampleSize = inSampleSize
+                }
+                var bitmap = BitmapFactory.decodeByteArray(inputBytes, 0, inputBytes.size, options)
+
+                bitmap = applyExifOrientation(bitmap, inputBytes)
 
                 ensureActive()
+
+                if (bitmap.width > MAX_IMAGE_DIMENSION || bitmap.height > MAX_IMAGE_DIMENSION) {
+                    val scale = MAX_IMAGE_DIMENSION.toFloat() / maxOf(bitmap.width.toFloat(), bitmap.height.toFloat())
+                    val newW = (bitmap.width * scale).toInt()
+                    val newH = (bitmap.height * scale).toInt()
+                    val scaled = Bitmap.createScaledBitmap(bitmap, newW, newH, true)
+                    if (scaled !== bitmap) bitmap.recycle()
+                    bitmap = scaled
+                }
 
                 val compressFormat = Bitmap.CompressFormat.JPEG
                 var outputBytes: ByteArray
                 var quality = 90
-                val ogSize = inputBytes.size
 
                 do {
                     ByteArrayOutputStream().use { outputStream ->
@@ -104,6 +136,8 @@ class Compressor(
                     outputBytes.size > compressionThreshold &&
                     quality > 5
                 )
+
+                bitmap.recycle()
 
                 val ob = BitmapFactory.decodeByteArray(outputBytes, 0, outputBytes.size)
 

@@ -327,7 +327,7 @@ data class ThreadPostData(
 @Stable
 class BlueskyConn(val context: Context) {
     companion object {
-        const val MAX_IMAGE_SIZE_BYTES = 950_000L
+        const val MAX_IMAGE_SIZE_BYTES = 1_950_000L
         const val VIDEO_UPLOAD_TIMEOUT_MS = 300_000L
         const val DEFAULT_TIMEOUT_MS = 30_000L
 
