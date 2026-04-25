@@ -315,7 +315,7 @@ fun PostImageCarousel(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 360.dp),
+                .height(280.dp),
             contentPadding = PaddingValues(horizontal = 40.dp),
             pageSpacing = 8.dp,
         ) { page ->
@@ -333,7 +333,7 @@ fun PostImageCarousel(
             DeletableImageView(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 360.dp)
+                    .height(280.dp)
                     .graphicsLayer {
                         scaleX = scale
                         scaleY = scale
