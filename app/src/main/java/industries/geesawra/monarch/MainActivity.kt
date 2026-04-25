@@ -2,6 +2,7 @@ package industries.geesawra.monarch
 
 import android.app.Application
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -130,7 +131,9 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            installSplashScreen()
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         currentIntent.value = intent
