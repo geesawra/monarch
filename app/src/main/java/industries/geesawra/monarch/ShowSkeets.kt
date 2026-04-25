@@ -60,7 +60,6 @@ import app.bsky.feed.ReplyRefParentUnion
 
 import industries.geesawra.monarch.datalayer.SettingsState
 import industries.geesawra.monarch.datalayer.SkeetData
-import industries.geesawra.monarch.datalayer.ThreadConnectorType
 import sh.christian.ozone.api.Cid
 import industries.geesawra.monarch.datalayer.TimelineViewModel
 import sh.christian.ozone.api.AtUri
@@ -68,13 +67,6 @@ import sh.christian.ozone.api.Did
 import kotlin.time.Instant
 
 val LocalActiveVideoKey = compositionLocalOf<MutableState<String?>?> { null }
-
-private const val DEEP_BRANCH_THRESHOLD = 3
-
-private sealed interface ThreadItem {
-    data class Post(val skeet: SkeetData, val originalIndex: Int) : ThreadItem
-    data class Collapsed(val key: String, val count: Int, val level: Int) : ThreadItem
-}
 
 @Composable
 fun ShowSkeets(
@@ -170,53 +162,10 @@ fun ShowSkeets(
 
     val activeVideoKey = remember { mutableStateOf<String?>(null) }
 
-    val expandedBranches = rememberSaveable(
-        saver = listSaver(
-            save = { it.toList() },
-            restore = { it.toMutableStateList() },
-        ),
-    ) { mutableStateListOf<String>() }
-
     val focusIdxLocal = remember(filteredData) { filteredData.indexOfFirst { it.isFocused } }
 
-    val isAncestorOrFocusAt: (Int) -> Boolean = lambda@{ idx ->
-        if (!isShowingThread) return@lambda false
-        if (idx < 0 || idx >= filteredData.size) return@lambda false
-        val s = filteredData[idx]
-        if (s.threadConnectors.isNotEmpty()) return@lambda false
-        s.isFocused || (focusIdxLocal >= 0 && idx < focusIdxLocal)
-    }
-
-    val visibleItems = remember(filteredData, expandedBranches.size, isShowingThread) {
-        if (!isShowingThread) {
-            filteredData.mapIndexed { i, s -> ThreadItem.Post(s, i) as ThreadItem }
-        } else {
-            buildList<ThreadItem> {
-                var i = 0
-                while (i < filteredData.size) {
-                    val skeet = filteredData[i]
-                    if (skeet.nestingLevel < DEEP_BRANCH_THRESHOLD) {
-                        add(ThreadItem.Post(skeet, i))
-                        i++
-                        continue
-                    }
-                    var end = i
-                    while (end < filteredData.size && filteredData[end].nestingLevel >= DEEP_BRANCH_THRESHOLD) end++
-                    val branchKey = filteredData[i].uri.atUri
-                    val containsFocus = (i until end).any { filteredData[it].isFocused }
-                    if (expandedBranches.contains(branchKey) || containsFocus) {
-                        for (j in i until end) add(ThreadItem.Post(filteredData[j], j))
-                    } else {
-                        add(ThreadItem.Collapsed(branchKey, end - i, filteredData[i].nestingLevel))
-                    }
-                    i = end
-                }
-            }
-        }
-    }
-
-    val focusedVisibleIdx = remember(visibleItems) {
-        visibleItems.indexOfFirst { it is ThreadItem.Post && it.skeet.isFocused }
+    val focusedVisibleIdx = remember(filteredData) {
+        filteredData.indexOfFirst { it.isFocused }
     }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -248,7 +197,7 @@ fun ShowSkeets(
         modifier = modifier
             .testTag("feed_list")
             .fillMaxSize()
-            .padding(horizontal = feedHorizontalPadding()),
+            .then(if (!isShowingThread) Modifier.padding(horizontal = feedHorizontalPadding()) else Modifier),
         contentPadding = PaddingValues(bottom = bottomScrollPadding),
         verticalArrangement = if (isShowingThread) Arrangement.spacedBy(0.dp) else Arrangement.spacedBy(feedItemSpacing()),
     ) {
@@ -264,191 +213,132 @@ fun ShowSkeets(
             return@LazyColumn
         }
         itemsIndexed(
-            items = visibleItems,
-            key = { _, item ->
-                when (item) {
-                    is ThreadItem.Post -> item.skeet.lazyListKey()
-                    is ThreadItem.Collapsed -> "collapsed_${item.key}"
-                }
-            },
-            contentType = { _, item ->
-                when (item) {
-                    is ThreadItem.Post -> if (item.skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0
-                    is ThreadItem.Collapsed -> 2
-                }
-            },
-        ) { _, item ->
-            if (item is ThreadItem.Collapsed) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Spacer(Modifier.width((item.level * nestingIndent()).dp))
-                    FilledTonalButton(onClick = { expandedBranches.add(item.key) }) {
-                        Text("Show ${item.count} more replies")
-                    }
-                }
-                return@itemsIndexed
-            }
-            item as ThreadItem.Post
-            val skeet = item.skeet
-            val originalIndex = item.originalIndex
+            items = filteredData,
+            key = { _, skeet -> skeet.lazyListKey() },
+            contentType = { _, skeet -> if (skeet.reason is FeedViewPostReasonUnion.ReasonRepost) 1 else 0 },
+        ) { index, skeet ->
             val skeetKey = skeet.lazyListKey()
             val isVisible = visibleKeys.contains(skeetKey)
 
-            val connectors = skeet.threadConnectors
-            val hasConnectors = isShowingThread && connectors.isNotEmpty()
-
-            val inAncestorGroup = isAncestorOrFocusAt(originalIndex)
-
-            val isGroupStart = if (isShowingThread && !hasConnectors) {
-                if (inAncestorGroup) {
-                    !isAncestorOrFocusAt(originalIndex - 1)
-                } else {
-                    val prev = filteredData.getOrNull(originalIndex - 1)
-                    prev == null || prev.threadConnectors.isNotEmpty() ||
-                        (prev.nestingLevel == 0 && !skeet.isSameAuthorContinuation && originalIndex > 0) ||
-                        skeet.isFocused || prev.isFocused
-                }
-            } else false
-
-            val isGroupEnd = if (isShowingThread && !hasConnectors) {
-                if (inAncestorGroup) {
-                    !isAncestorOrFocusAt(originalIndex + 1)
-                } else {
-                    val next = filteredData.getOrNull(originalIndex + 1)
-                    next == null || next.threadConnectors.isNotEmpty() ||
-                        (next.nestingLevel == 0 && !next.isSameAuthorContinuation) ||
-                        skeet.isFocused || next.isFocused
-                }
-            } else false
-
-            val threadCardShape = if (isShowingThread && !hasConnectors) {
-                val topRadius = if (isGroupStart) 12.dp else 0.dp
-                val bottomRadius = if (isGroupEnd) 12.dp else 0.dp
-                RoundedCornerShape(topStart = topRadius, topEnd = topRadius, bottomStart = bottomRadius, bottomEnd = bottomRadius)
-            } else MaterialTheme.shapes.medium
-
-            val connectorColors = listOf(
-                MaterialTheme.colorScheme.primary,
-                MaterialTheme.colorScheme.secondary,
-                MaterialTheme.colorScheme.tertiary,
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
-            )
-            val connectorWidth = nestingIndent()
-
-            if (hasConnectors) {
-                Row(
+            if (isShowingThread && index > 0 && filteredData[index - 1].chainBlockId != skeet.chainBlockId) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(IntrinsicSize.Min),
+                        .padding(horizontal = 80.dp, vertical = 12.dp)
                 ) {
-                    Box(
+                    SquigglyDivider(
                         modifier = Modifier
-                            .width((skeet.nestingLevel * connectorWidth).dp)
-                            .fillMaxHeight()
-                            .drawBehind {
-                                val slotWidth = connectorWidth.dp.toPx()
-                                val lineWidth = 2.dp.toPx()
-                                val branchLength = slotWidth * 0.5f
-
-                                connectors.forEach { connector ->
-                                    val color = connectorColors[connector.level % connectorColors.size]
-                                    val x = connector.level * slotWidth + slotWidth / 2f
-
-                                    when (connector.type) {
-                                        ThreadConnectorType.PASS_THROUGH -> {
-                                            drawLine(
-                                                color = color,
-                                                start = Offset(x, 0f),
-                                                end = Offset(x, size.height),
-                                                strokeWidth = lineWidth,
-                                                cap = StrokeCap.Round,
-                                            )
-                                        }
-
-                                        ThreadConnectorType.BRANCH -> {
-                                            drawLine(
-                                                color = color,
-                                                start = Offset(x, 0f),
-                                                end = Offset(x, size.height),
-                                                strokeWidth = lineWidth,
-                                                cap = StrokeCap.Round,
-                                            )
-                                            drawLine(
-                                                color = color,
-                                                start = Offset(x, size.height / 2f),
-                                                end = Offset(x + branchLength, size.height / 2f),
-                                                strokeWidth = lineWidth,
-                                                cap = StrokeCap.Round,
-                                            )
-                                        }
-
-                                        ThreadConnectorType.LAST_BRANCH -> {
-                                            drawLine(
-                                                color = color,
-                                                start = Offset(x, 0f),
-                                                end = Offset(x, size.height / 2f),
-                                                strokeWidth = lineWidth,
-                                                cap = StrokeCap.Round,
-                                            )
-                                            drawLine(
-                                                color = color,
-                                                start = Offset(x, size.height / 2f),
-                                                end = Offset(x + branchLength, size.height / 2f),
-                                                strokeWidth = lineWidth,
-                                                cap = StrokeCap.Round,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                            .fillMaxWidth()
+                            .height(4.dp)
                     )
+                }
+            }
 
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(top = 4.dp)
-                            .clip(MaterialTheme.shapes.medium)
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    ) {
-                        if (skeet.isFocused) {
-                            FocusedSkeetView(
-                                viewModel = viewModel,
-                                skeet = skeet,
-                                onReplyTap = onReplyTap,
-                                postTextSize = settingsState.postTextSize,
-                                avatarShape = avatarClipShape,
-                                showLabels = settingsState.showLabels,
-                                showPronouns = settingsState.showPronounsInPosts,
-                                onAvatarTap = onProfileTap,
-                                onShowThread = {},
-                                isVisible = isVisible,
-                                translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
-                                targetTranslationLanguage = settingsState.targetTranslationLanguage,
-                                carouselImageGallery = settingsState.carouselImageGallery,
-                                onShowLikes = { onShowLikes?.invoke(skeet.uri) },
-                                onShowReposts = { onShowReposts?.invoke(skeet.uri) },
-                                onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
-                            )
-                        } else {
+            val isGroupEnd = isShowingThread && skeet.isInChain &&
+                (index == filteredData.lastIndex || filteredData[index + 1].chainBlockId != skeet.chainBlockId)
+            val threadCardShape = MaterialTheme.shapes.medium
+
+            Column(
+                modifier = Modifier
+                    .then(
+                        if (isShowingThread)
+                            Modifier.padding(horizontal = feedHorizontalPadding())
+                        else
+                            Modifier
+                    )
+                    .clip(threadCardShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            ) {
+                val isRepost = when (skeet.reason) {
+                    is FeedViewPostReasonUnion.ReasonRepost -> true
+                    else -> false
+                }
+
+                val root = skeet.root()
+                val (parent, parentsParent) = skeet.parent()
+
+                if (!isShowingThread) {
+                    if (!isRepost) {
+                        root?.let {
                             SkeetView(
                                 viewModel = viewModel,
-                                skeet = skeet,
+                                skeet = it,
                                 onReplyTap = onReplyTap,
+                                inThread = true,
+                                showConnectorDown = true,
                                 postTextSize = settingsState.postTextSize,
                                 avatarShape = avatarClipShape,
                                 showLabels = settingsState.showLabels,
                                 showPronouns = settingsState.showPronounsInPosts,
                                 onAvatarTap = onProfileTap,
-                                onShowThread = { tapped ->
-                                    onSeeMoreTap?.invoke(tapped)
+                                onShowThread = { skeet ->
+                                    if (onSeeMoreTap != null) {
+                                        viewModel.startThread(skeet)
+                                        onSeeMoreTap(skeet)
+                                    }
                                 },
                                 isVisible = isVisible,
-                                overrideAvatarSize = replyAvatarSize(),
+                                translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
+                                targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                                carouselImageGallery = settingsState.carouselImageGallery,
+                            )
+                        }
+
+                        parent?.let {
+                            if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
+                                val threadLineWidth = avatarSize()
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(IntrinsicSize.Min)
+                                        .padding(start = postHorizontalPadding())
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(threadLineWidth)
+                                            .fillMaxHeight(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        VerticalDivider(
+                                            thickness = 3.dp,
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(12.dp)),
+                                            color = MaterialTheme.colorScheme.outlineVariant
+                                        )
+                                    }
+                                    FilledTonalButton(
+                                        modifier = Modifier.padding(start = 12.dp),
+                                        onClick = {
+                                            if (onSeeMoreTap != null) {
+                                                viewModel.startThread(root)
+                                                onSeeMoreTap(root)
+                                            }
+                                        }
+                                    ) {
+                                        Text("See full thread")
+                                    }
+                                }
+                            }
+
+                            SkeetView(
+                                viewModel = viewModel,
+                                skeet = it,
+                                onReplyTap = onReplyTap,
+                                inThread = true,
+                                showConnectorDown = true,
+                                postTextSize = settingsState.postTextSize,
+                                avatarShape = avatarClipShape,
+                                showLabels = settingsState.showLabels,
+                                showPronouns = settingsState.showPronounsInPosts,
+                                onAvatarTap = onProfileTap,
+                                onShowThread = { skeet ->
+                                    if (onSeeMoreTap != null) {
+                                        viewModel.startThread(skeet)
+                                        onSeeMoreTap(skeet)
+                                    }
+                                },
+                                isVisible = isVisible,
                                 translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
                                 targetTranslationLanguage = settingsState.targetTranslationLanguage,
                                 carouselImageGallery = settingsState.carouselImageGallery,
@@ -456,167 +346,64 @@ fun ShowSkeets(
                         }
                     }
                 }
-            } else {
-                if (isShowingThread && !isGroupStart && !inAncestorGroup) {
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant,
+
+                if (isShowingThread && skeet.isFocused) {
+                    FocusedSkeetView(
+                        viewModel = viewModel,
+                        skeet = skeet,
+                        onReplyTap = onReplyTap,
+                        postTextSize = settingsState.postTextSize,
+                        avatarShape = avatarClipShape,
+                        showLabels = settingsState.showLabels,
+                        showPronouns = settingsState.showPronounsInPosts,
+                        onAvatarTap = onProfileTap,
+                        onShowThread = {},
+                        isVisible = isVisible,
+                        translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
+                        targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                        carouselImageGallery = settingsState.carouselImageGallery,
+                        onShowLikes = { onShowLikes?.invoke(skeet.uri) },
+                        onShowReposts = { onShowReposts?.invoke(skeet.uri) },
+                        onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
                     )
-                }
-                Column(
-                    modifier = Modifier
-                        .clip(threadCardShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                ) {
-                    val isRepost = when (skeet.reason) {
-                        is FeedViewPostReasonUnion.ReasonRepost -> true
-                        else -> false
-                    }
-
-                    val root = skeet.root()
-                    val (parent, parentsParent) = skeet.parent()
-
-                    if (!isShowingThread) {
-                        if (!isRepost) {
-                            root?.let {
-                                SkeetView(
-                                    viewModel = viewModel,
-                                    skeet = it,
-                                    onReplyTap = onReplyTap,
-                                    inThread = true,
-                                    postTextSize = settingsState.postTextSize,
-                                    avatarShape = avatarClipShape,
-                                    showLabels = settingsState.showLabels,
-                            showPronouns = settingsState.showPronounsInPosts,
-                                    onAvatarTap = onProfileTap,
-                                    onShowThread = { skeet ->
-                                        if (onSeeMoreTap != null) {
-                                            viewModel.startThread(skeet)
-                                            onSeeMoreTap(skeet)
-                                        }
-                                    },
-                                    isVisible = isVisible,
-                                    translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
-                                    targetTranslationLanguage = settingsState.targetTranslationLanguage,
-                                    carouselImageGallery = settingsState.carouselImageGallery,
-                                )
+                } else {
+                    SkeetView(
+                        viewModel = viewModel,
+                        skeet = skeet,
+                        onReplyTap = onReplyTap,
+                        showInReplyTo = if (isShowingThread) false else (skeet.root() == null && skeet.parent().first == null),
+                        postTextSize = settingsState.postTextSize,
+                        avatarShape = avatarClipShape,
+                        showLabels = settingsState.showLabels,
+                        showPronouns = settingsState.showPronounsInPosts,
+                        onAvatarTap = onProfileTap,
+                        onShowThread = { tapped ->
+                            if (onSeeMoreTap != null) {
+                                if (!isShowingThread) viewModel.startThread(tapped)
+                                onSeeMoreTap(tapped)
                             }
-
-                            parent?.let {
-                                if ((parentsParent?.cid != root?.cid) && root?.cid != null) {
-                                    val threadLineWidth = avatarSize()
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(IntrinsicSize.Min)
-                                            .padding(start = postHorizontalPadding())
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(threadLineWidth)
-                                                .fillMaxHeight(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            VerticalDivider(
-                                                thickness = 3.dp,
-                                                modifier = Modifier
-                                                    .fillMaxHeight()
-                                                    .clip(RoundedCornerShape(12.dp)),
-                                                color = MaterialTheme.colorScheme.outlineVariant
-                                            )
-                                        }
-                                        FilledTonalButton(
-                                            modifier = Modifier.padding(start = 12.dp),
-                                            onClick = {
-                                                if (onSeeMoreTap != null) {
-                                                    viewModel.startThread(root)
-                                                    onSeeMoreTap(root)
-                                                }
-                                            }
-                                        ) {
-                                            Text("See full thread")
-                                        }
-                                    }
-                                }
-
-                                SkeetView(
-                                    viewModel = viewModel,
-                                    skeet = it,
-                                    onReplyTap = onReplyTap,
-                                    inThread = true,
-                                    postTextSize = settingsState.postTextSize,
-                                    avatarShape = avatarClipShape,
-                                    showLabels = settingsState.showLabels,
-                            showPronouns = settingsState.showPronounsInPosts,
-                                    onAvatarTap = onProfileTap,
-                                    onShowThread = { skeet ->
-                                        if (onSeeMoreTap != null) {
-                                            viewModel.startThread(skeet)
-                                            onSeeMoreTap(skeet)
-                                        }
-                                    },
-                                    isVisible = isVisible,
-                                    translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
-                                    targetTranslationLanguage = settingsState.targetTranslationLanguage,
-                                    carouselImageGallery = settingsState.carouselImageGallery,
-                                )
-                            }
-                        }
-                    }
-
-                    if (isShowingThread && skeet.isFocused) {
-                        FocusedSkeetView(
-                            viewModel = viewModel,
-                            skeet = skeet,
-                            onReplyTap = onReplyTap,
-                            postTextSize = settingsState.postTextSize,
-                            avatarShape = avatarClipShape,
-                            showLabels = settingsState.showLabels,
-                            showPronouns = settingsState.showPronounsInPosts,
-                            onAvatarTap = onProfileTap,
-                            onShowThread = {},
-                            isVisible = isVisible,
-                            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
-                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
-                            carouselImageGallery = settingsState.carouselImageGallery,
-                            onShowLikes = { onShowLikes?.invoke(skeet.uri) },
-                            onShowReposts = { onShowReposts?.invoke(skeet.uri) },
-                            onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
-                        )
-                    } else {
-                        SkeetView(
-                            viewModel = viewModel,
-                            skeet = skeet,
-                            onReplyTap = onReplyTap,
-                            showInReplyTo = if (isShowingThread) false else (skeet.root() == null && skeet.parent().first == null),
-                            postTextSize = settingsState.postTextSize,
-                            avatarShape = avatarClipShape,
-                            showLabels = settingsState.showLabels,
-                            showPronouns = settingsState.showPronounsInPosts,
-                            onAvatarTap = onProfileTap,
-                            onShowThread = { tapped ->
-                                if (onSeeMoreTap != null) {
-                                    if (!isShowingThread) viewModel.startThread(tapped)
-                                    onSeeMoreTap(tapped)
-                                }
-                            },
-                            isVisible = isVisible,
-                            inThread = isShowingThread && focusIdxLocal >= 0 && originalIndex < focusIdxLocal,
-                            overrideAvatarSize = if (isShowingThread && !skeet.isFocused) replyAvatarSize() else null,
-                            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
-                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
-                            carouselImageGallery = settingsState.carouselImageGallery,
-                        )
-                    }
+                        },
+                        isVisible = isVisible,
+                        inThread = isShowingThread && skeet.isInChain,
+                        showConnectorDown = isShowingThread && skeet.isInChain && !isGroupEnd,
+                        overrideAvatarSize = null,
+                        translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
+                        targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                        carouselImageGallery = settingsState.carouselImageGallery,
+                    )
                 }
             }
 
             if (isShowingThread && skeet.hasMoreReplies && onSeeMoreTap != null) {
-                val continueConnectorWidth = nestingIndent()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = (skeet.nestingLevel * continueConnectorWidth).dp),
+                        .then(
+                            if (skeet.chainBlockId > 0)
+                                Modifier.padding(horizontal = feedHorizontalPadding())
+                            else
+                                Modifier
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     FilledTonalButton(
@@ -626,10 +413,6 @@ fun ShowSkeets(
                         Text("Continue thread")
                     }
                 }
-            }
-
-            if (isShowingThread && isGroupEnd) {
-                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }

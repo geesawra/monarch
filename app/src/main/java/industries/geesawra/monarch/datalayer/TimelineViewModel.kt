@@ -1855,7 +1855,7 @@ class TimelineViewModel @AssistedInject constructor(
                     )
                 }
                 if (!rootNotFound) {
-                    asd.flatten().forEach { postInteractionStore.seed(it) }
+                    asd.allPosts().forEach { postInteractionStore.seed(it) }
                     then()
                 }
             }

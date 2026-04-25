@@ -30,6 +30,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import io.github.fornewid.placeholder.foundation.PlaceholderHighlight
 import io.github.fornewid.placeholder.foundation.fade
 import io.github.fornewid.placeholder.material3.placeholder
@@ -154,3 +159,38 @@ fun monarchTopAppBarColors(): TopAppBarColors =
 
 fun isVerificationStateVerifiedStatus(status: VerificationStateVerifiedStatus?): Boolean =
     status is VerificationStateVerifiedStatus.Valid
+
+@Composable
+fun SquigglyDivider(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.outlineVariant,
+    strokeWidth: androidx.compose.ui.unit.Dp = 2.dp,
+    amplitude: androidx.compose.ui.unit.Dp = 3.dp,
+    wavelength: androidx.compose.ui.unit.Dp = 14.dp,
+) {
+    val density = LocalDensity.current
+    Canvas(modifier = modifier) {
+        val path = Path()
+        val amp = with(density) { amplitude.toPx() }
+        val wave = with(density) { wavelength.toPx() }
+        val stroke = with(density) { strokeWidth.toPx() }
+        val y = size.height / 2f
+        val halfWave = wave / 2f
+
+        path.moveTo(-stroke, y)
+        val segments = ((size.width + stroke * 2) / halfWave).toInt() + 2
+        for (i in 0 until segments) {
+            val startX = -stroke + i * halfWave
+            val endX = startX + halfWave
+            val controlX = (startX + endX) / 2f
+            val controlY = if (i % 2 == 0) y - amp else y + amp
+            path.quadraticTo(controlX, controlY, endX, y)
+        }
+
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = stroke, cap = StrokeCap.Round)
+        )
+    }
+}

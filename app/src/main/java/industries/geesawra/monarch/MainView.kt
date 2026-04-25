@@ -1252,6 +1252,7 @@ private fun DetailThreadPane(
     onClose: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val tappedPostUri = remember { timelineViewModel.currentlyShownThread.post.uri }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -1282,7 +1283,7 @@ private fun DetailThreadPane(
             ShowSkeets(
                 viewModel = timelineViewModel,
                 isScrollEnabled = true,
-                data = timelineViewModel.currentlyShownThread.flatten(),
+                data = timelineViewModel.currentlyShownThread.flatten(focusedUri = tappedPostUri),
                 shouldFetchMoreData = false,
                 isShowingThread = true,
                 isLoading = isRefreshing,

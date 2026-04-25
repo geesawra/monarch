@@ -120,6 +120,7 @@ fun SkeetView(
     nested: Boolean = false,
     disableEmbeds: Boolean = false,
     inThread: Boolean = false,
+    showConnectorDown: Boolean = false,
     showInReplyTo: Boolean = true,
     showLabels: Boolean = true,
     showPronouns: Boolean = false,
@@ -207,6 +208,7 @@ fun SkeetView(
                 skeet = skeet,
                 avatarShape = avatarShape,
                 inThread = inThread,
+                showConnectorDown = showConnectorDown,
                 onAvatarTap = onAvatarTap,
                 overrideAvatarSize = overrideAvatarSize,
             )
@@ -574,6 +576,7 @@ private fun SkeetThreadLine(
     skeet: SkeetData,
     avatarShape: Shape,
     inThread: Boolean,
+    showConnectorDown: Boolean,
     onAvatarTap: ((Did) -> Unit)?,
     overrideAvatarSize: Dp? = null,
 ) {
@@ -585,7 +588,7 @@ private fun SkeetThreadLine(
             .fillMaxHeight()
     ) {
         AvatarImage(skeet.authorAvatarURL, minSize, avatarShape, skeet.did, onAvatarTap)
-        if (inThread) {
+        if (inThread && showConnectorDown) {
             VerticalDivider(
                 thickness = 3.dp,
                 modifier = Modifier

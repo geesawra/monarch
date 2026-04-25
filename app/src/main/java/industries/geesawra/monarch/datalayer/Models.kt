@@ -6,6 +6,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -90,19 +91,12 @@ private fun cdnVideoPlaylist(authorDid: Did, blob: Blob?): Uri? {
     return Uri("https://video.cdn.bsky.app/hls/${authorDid.did}/${id}/playlist.m3u8")
 }
 
-enum class ThreadConnectorType { PASS_THROUGH, BRANCH, LAST_BRANCH }
-
-@Immutable
-data class ThreadConnector(val level: Int, val type: ThreadConnectorType)
-
 @Immutable
 data class SkeetData(
-    val nestingLevel: Int = 0,
-    val isReplyToRoot: Boolean = false,
-    val isSameAuthorContinuation: Boolean = false,
-    val threadConnectors: List<ThreadConnector> = listOf(),
     val hasMoreReplies: Boolean = false,
     val isFocused: Boolean = false,
+    val isInChain: Boolean = false,
+    val chainBlockId: Int = -1,
     val likes: Long? = null,
     val reposts: Long? = null,
     val replies: Long? = null,
@@ -828,114 +822,64 @@ data class ThreadPost(
     val replies: List<ThreadPost> = listOf(),
     val hasMoreReplies: Boolean = false,
 ) {
-    companion object {
-        private const val MAX_NESTING = 5
-    }
-
     fun flatten(focusedUri: AtUri? = null): ImmutableList<SkeetData> {
+        val path = mutableListOf<ThreadPost>()
+        if (focusedUri != null) {
+            findPathTo(this, focusedUri, path)
+        }
+
         val out = mutableListOf<SkeetData>()
-        flattenInner(
-            out = out,
-            activeConnectors = mutableListOf(),
-            parentDid = null,
-            effectiveLevel = 0,
-            parentIsInChain = true,
-        )
-        val focusIdx = if (focusedUri != null) {
-            out.indexOfFirst { it.uri == focusedUri }
+
+        val visiblePath = path.filter { !it.post.hidden }
+        val focusNode = if (visiblePath.isNotEmpty()) {
+            visiblePath.last()
+        } else if (!post.hidden) {
+            this
         } else {
-            out.indexOfLast { it.nestingLevel == 0 && it.threadConnectors.isEmpty() }
+            return persistentListOf()
         }
-        if (focusIdx >= 0) {
-            out[focusIdx] = out[focusIdx].copy(isFocused = true)
+
+        val ancestors = if (focusedUri != null && visiblePath.isNotEmpty()) {
+            visiblePath
+        } else {
+            listOf(this).filter { !it.post.hidden }
         }
-        if (focusedUri != null && focusIdx > 0) {
-            val focusNesting = out[focusIdx].nestingLevel
-            for (i in out.indices) {
-                out[i] = if (i <= focusIdx) {
-                    out[i].copy(nestingLevel = 0, threadConnectors = emptyList())
-                } else {
-                    val newLevel = (out[i].nestingLevel - focusNesting).coerceAtLeast(0)
-                    val newConnectors = out[i].threadConnectors
-                        .filter { it.level >= focusNesting }
-                        .map { it.copy(level = it.level - focusNesting) }
-                    out[i].copy(nestingLevel = newLevel, threadConnectors = newConnectors)
-                }
+
+        for (node in ancestors) {
+            val isFocus = node.post.uri == focusNode.post.uri
+            out.add(
+                node.post.copy(
+                    isFocused = isFocus,
+                    isInChain = true,
+                    chainBlockId = 0,
+                    hasMoreReplies = node.hasMoreReplies,
+                )
+            )
+        }
+
+        var blockId = 1
+        for (reply in focusNode.replies) {
+            if (reply.post.hidden) continue
+            val subtree = reply.flattenSubtree()
+            for (node in subtree) {
+                out.add(
+                    node.post.copy(
+                        isInChain = true,
+                        chainBlockId = blockId,
+                        hasMoreReplies = node.hasMoreReplies,
+                    )
+                )
             }
+            blockId++
         }
+
         return out.toPersistentList()
     }
 
-    private fun flattenInner(
-        out: MutableList<SkeetData>,
-        activeConnectors: MutableList<Boolean>,
-        parentDid: Did?,
-        effectiveLevel: Int,
-        parentIsInChain: Boolean,
-    ) {
-        val isContinuation = parentIsInChain &&
-                parentDid != null &&
-                post.did == parentDid
-        val myIsInChain = parentDid == null || isContinuation
-
-        if (post.hidden) return
-
-        val myLevel = if (isContinuation) effectiveLevel else effectiveLevel.coerceAtMost(MAX_NESTING)
-
-        val connectors = if (myLevel > 0 && !isContinuation) {
-            activeConnectors.mapIndexed { idx, hasMoreSiblings ->
-                if (idx >= myLevel) return@mapIndexed null
-                if (idx == activeConnectors.lastIndex || idx == myLevel - 1) {
-                    ThreadConnector(
-                        idx,
-                        if (hasMoreSiblings) ThreadConnectorType.BRANCH else ThreadConnectorType.LAST_BRANCH
-                    )
-                } else {
-                    if (hasMoreSiblings) ThreadConnector(idx, ThreadConnectorType.PASS_THROUGH)
-                    else null
-                }
-            }.filterNotNull()
-        } else {
-            listOf()
-        }
-
-        out.add(
-            post.copy(
-                nestingLevel = myLevel,
-                isReplyToRoot = level == 1,
-                isSameAuthorContinuation = isContinuation,
-                threadConnectors = connectors,
-                hasMoreReplies = hasMoreReplies,
-            )
-        )
-
-        val sortedReplies = replies.sortedWith(compareByDescending { it.post.did == post.did })
-
-        sortedReplies.forEachIndexed { i, reply ->
-            val isLast = i == sortedReplies.lastIndex
-            val willBeContinuation = myIsInChain && reply.post.did == post.did
-            val childLevel = if (willBeContinuation) {
-                myLevel
-            } else {
-                (myLevel + 1).coerceAtMost(MAX_NESTING)
-            }
-
-            if (!willBeContinuation) {
-                activeConnectors.add(!isLast)
-            }
-
-            reply.flattenInner(
-                out = out,
-                activeConnectors = activeConnectors,
-                parentDid = post.did,
-                effectiveLevel = childLevel,
-                parentIsInChain = myIsInChain,
-            )
-
-            if (!willBeContinuation) {
-                activeConnectors.removeAt(activeConnectors.lastIndex)
-            }
-        }
+    fun allPosts(): List<SkeetData> {
+        val out = mutableListOf<SkeetData>()
+        collectAll(this, out)
+        return out
     }
 
     fun appendReply(parentUri: sh.christian.ozone.api.AtUri, newReply: SkeetData): ThreadPost {
@@ -948,6 +892,33 @@ data class ThreadPost(
             this.copy(replies = this.replies.map { it.appendReply(parentUri, newReply) })
         }
     }
+}
+
+private fun findPathTo(node: ThreadPost, target: AtUri, path: MutableList<ThreadPost>): Boolean {
+    path.add(node)
+    if (node.post.uri == target) return true
+    for (reply in node.replies) {
+        if (findPathTo(reply, target, path)) return true
+    }
+    path.removeAt(path.lastIndex)
+    return false
+}
+
+private fun ThreadPost.flattenSubtree(): List<ThreadPost> {
+    val result = mutableListOf<ThreadPost>()
+    fun dfs(node: ThreadPost) {
+        if (!node.post.hidden) {
+            result.add(node)
+            for (reply in node.replies) dfs(reply)
+        }
+    }
+    dfs(this)
+    return result
+}
+
+private fun collectAll(node: ThreadPost, out: MutableList<SkeetData>) {
+    if (!node.post.hidden) out.add(node.post)
+    for (reply in node.replies) collectAll(reply, out)
 }
 
 private fun String.containsWordBoundary(word: String): Boolean {
