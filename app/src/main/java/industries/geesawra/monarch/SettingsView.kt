@@ -12,6 +12,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -541,6 +547,33 @@ fun SettingsView(
                     Switch(
                         checked = settings.autoThreadOnOverflow,
                         onCheckedChange = { settingsViewModel.setAutoThreadOnOverflow(it) }
+                    )
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Also liked") },
+                supportingContent = {
+                    val uriHandler = LocalUriHandler.current
+                    val primaryColor = MaterialTheme.colorScheme.primary
+                    Text(
+                        buildAnnotatedString {
+                            append("Show posts other people also liked, powered by ")
+                            withLink(LinkAnnotation.Clickable(
+                                tag = "foryou",
+                                styles = TextLinkStyles(SpanStyle(color = primaryColor)),
+                                linkInteractionListener = { uriHandler.openUri("https://foryou.club/also-liked") },
+                            )) {
+                                append("foryou.club")
+                            }
+                            append(" (90-day window). Enable this, then tap \uD83D\uDC40 on any post in the thread view.")
+                        },
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = settings.alsoLikedEnabled,
+                        onCheckedChange = { settingsViewModel.setAlsoLikedEnabled(it) }
                     )
                 },
             )

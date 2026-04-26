@@ -2146,6 +2146,10 @@ class BlueskyConn(val context: Context) {
         }.map { it.posts }
     }
 
+    suspend fun fetchAlsoLiked(uri: AtUri, cursor: String? = null): Result<AlsoLikedResponse> {
+        return fetchAlsoLiked(uri.atUri, cursor)
+    }
+
     suspend fun like(uri: AtUri, cid: Cid): Result<RKey> {
         return suspendRunCatching {
             create().onFailure {

@@ -86,6 +86,7 @@ fun ShowSkeets(
     onShowLikes: ((AtUri) -> Unit)? = null,
     onShowReposts: ((AtUri) -> Unit)? = null,
     onShowQuotes: ((AtUri) -> Unit)? = null,
+    onShowAlsoLiked: ((AtUri) -> Unit)? = null,
 ) {
     val avatarClipShape = settingsState.avatarClipShape
     // Collect CIDs already shown as thread context (root/parent) to avoid duplicates
@@ -365,6 +366,8 @@ fun ShowSkeets(
                         onShowLikes = { onShowLikes?.invoke(skeet.uri) },
                         onShowReposts = { onShowReposts?.invoke(skeet.uri) },
                         onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
+                        alsoLikedEnabled = settingsState.alsoLikedEnabled,
+                        onShowAlsoLiked = { onShowAlsoLiked?.invoke(skeet.uri) },
                     )
                 } else {
                     SkeetView(

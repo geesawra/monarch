@@ -1307,6 +1307,29 @@ class TimelineViewModel @AssistedInject constructor(
     suspend fun getLikes(uri: AtUri, cursor: String? = null) = bskyConn.getLikes(uri, cursor)
     suspend fun getRepostedBy(uri: AtUri, cursor: String? = null) = bskyConn.getRepostedBy(uri, cursor)
     suspend fun getQuotes(uri: AtUri, cursor: String? = null) = bskyConn.getQuotes(uri, cursor)
+    suspend fun getAlsoLikedPosts(uri: AtUri, cursor: String? = null): Result<Pair<List<SkeetData>, String?>> {
+        return try {
+            val response = bskyConn.fetchAlsoLiked(uri, cursor).getOrThrow()
+            android.util.Log.d("AlsoLiked", "Got ${response.feed.size} URIs from foryou.club")
+            if (response.feed.isEmpty()) {
+                return Result.success(Pair(emptyList<SkeetData>(), response.cursor))
+            }
+            val allUris = response.feed.map { AtUri(it.post) }
+            val allPosts = mutableListOf<SkeetData>()
+            for (chunk in allUris.chunked(25)) {
+                android.util.Log.d("AlsoLiked", "Resolving chunk of ${chunk.size} URIs...")
+                val posts = bskyConn.getPosts(chunk).getOrThrow()
+                allPosts.addAll(posts.map { SkeetData.fromPostView(it, it.author) })
+            }
+            android.util.Log.d("AlsoLiked", "Resolved ${allPosts.size} posts total")
+            Result.success(Pair(allPosts, response.cursor))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            android.util.Log.e("AlsoLiked", "Failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 
     private fun removePostsLocally(deleted: Set<AtUri>) {
         if (deleted.isEmpty()) return

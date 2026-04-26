@@ -74,6 +74,7 @@ data class SettingsState(
     val pushNotificationsEnabled: Boolean = false,
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
     val showOnlyLatestThreadInteraction: Boolean = false,
+    val alsoLikedEnabled: Boolean = false,
     val loaded: Boolean = false,
 )
 
@@ -115,6 +116,7 @@ class SettingsViewModel @Inject constructor(
         private val CAROUSEL_IMAGE_GALLERY = stringPreferencesKey("carousel_image_gallery")
         private val SHOW_ONLY_LATEST_THREAD_INTERACTION = stringPreferencesKey("show_only_latest_thread_interaction")
         internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
+        private val ALSO_LIKED_ENABLED = stringPreferencesKey("also_liked_enabled")
     }
 
     var settingsState by mutableStateOf(SettingsState())
@@ -148,6 +150,7 @@ class SettingsViewModel @Inject constructor(
                     pushNotificationsEnabled = prefs[PUSH_NOTIFICATIONS_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
                     showOnlyLatestThreadInteraction = prefs[SHOW_ONLY_LATEST_THREAD_INTERACTION]?.toBooleanStrictOrNull() ?: false,
+                    alsoLikedEnabled = prefs[ALSO_LIKED_ENABLED]?.toBooleanStrictOrNull() ?: false,
                     loaded = true,
                 )
             }.collect {
@@ -291,6 +294,12 @@ class SettingsViewModel @Inject constructor(
     fun setShowOnlyLatestThreadInteraction(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[SHOW_ONLY_LATEST_THREAD_INTERACTION] = enabled.toString() }
+        }
+    }
+
+    fun setAlsoLikedEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[ALSO_LIKED_ENABLED] = enabled.toString() }
         }
     }
 }

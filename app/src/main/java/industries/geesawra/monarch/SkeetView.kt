@@ -330,6 +330,8 @@ fun FocusedSkeetView(
     onShowLikes: () -> Unit = {},
     onShowReposts: () -> Unit = {},
     onShowQuotes: () -> Unit = {},
+    alsoLikedEnabled: Boolean = false,
+    onShowAlsoLiked: () -> Unit = {},
 ) {
     val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
     var contentRevealed by remember { mutableStateOf(warningLabel == null) }
@@ -496,6 +498,8 @@ fun FocusedSkeetView(
             targetTranslationLanguage = targetTranslationLanguage,
             showCounts = !hasEngagementStats,
             detailMode = true,
+            alsoLikedEnabled = alsoLikedEnabled,
+            onAlsoLikedTap = onShowAlsoLiked,
         )
     }
 }

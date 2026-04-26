@@ -152,6 +152,8 @@ fun TimelinePostActionsView(
     targetTranslationLanguage: String = "en",
     showCounts: Boolean = true,
     detailMode: Boolean = false,
+    alsoLikedEnabled: Boolean = false,
+    onAlsoLikedTap: () -> Unit = {},
 ) {
     val effectiveIconSize: Dp? = if (detailMode) 24.dp else null
     val actionArrangement = if (detailMode) Arrangement.SpaceBetween else Arrangement.Start
@@ -503,6 +505,27 @@ fun TimelinePostActionsView(
                 contentDescription = "Bookmark",
                 tint = bookmarkColor,
             )
+        }
+
+        if (alsoLikedEnabled) {
+            Box(
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                            onAlsoLikedTap()
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "\uD83D\uDC40",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
         }
 
         var showMenu by remember { mutableStateOf(false) }
