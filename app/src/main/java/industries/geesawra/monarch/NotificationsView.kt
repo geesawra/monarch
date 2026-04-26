@@ -27,7 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SecondaryScrollableTabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,9 +110,8 @@ fun NotificationsView(
             .fillMaxSize()
             .padding(scaffoldPadding),
     ) {
-        SecondaryScrollableTabRow(
+        SecondaryTabRow(
             selectedTabIndex = pagerState.currentPage.coerceIn(0, tabs.lastIndex),
-            edgePadding = 8.dp,
             divider = {},
         ) {
             tabs.forEachIndexed { index, tab ->
