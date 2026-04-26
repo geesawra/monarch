@@ -50,6 +50,8 @@ import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -83,10 +85,14 @@ class Application : Application(), SingletonImageLoader.Factory {
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    override fun newImageLoader(context: PlatformContext): ImageLoader =
-        ImageLoader.Builder(context)
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+        return ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory())
+                add(OkHttpNetworkFetcherFactory(callFactory = okHttpClient))
                 add(coil3.gif.GifDecoder.Factory())
             }
             .memoryCache {
@@ -103,6 +109,7 @@ class Application : Application(), SingletonImageLoader.Factory {
             .fetcherCoroutineContext(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(8))
             .decoderCoroutineContext(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(4))
             .build()
+    }
 }
 
 enum class ViewList() {

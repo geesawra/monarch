@@ -9,7 +9,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.SSLException
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.EntryPointAccessors
@@ -25,12 +27,43 @@ import androidx.core.graphics.createBitmap
 
 class MessagingService : FirebaseMessagingService() {
 
+    private fun isRetryable(e: Exception): Boolean = when (e) {
+        is java.net.SocketTimeoutException,
+        is java.net.ConnectException,
+        is java.net.UnknownHostException,
+        is SSLException -> true
+        is java.io.IOException -> true
+        else -> false
+    }
+
     private fun downloadBitmap(url: String): Bitmap? {
-        return runCatching {
-            URL(url).openStream().use { BitmapFactory.decodeStream(it) }
-        }.onFailure {
-            Log.e(TAG, "Failed to download notification image: ${it.message}")
-        }.getOrNull()
+        val maxAttempts = 4
+        val baseDelayMs = 1000L
+        var attempt = 0
+        var lastException: Exception? = null
+
+        while (attempt < maxAttempts) {
+            attempt++
+            try {
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 15_000
+                conn.doInput = true
+                return conn.inputStream.use { BitmapFactory.decodeStream(it) }
+            } catch (e: Exception) {
+                lastException = e
+                if (attempt < maxAttempts && isRetryable(e)) {
+                    val delay = baseDelayMs shl (attempt - 1)
+                    Log.w(TAG, "Download attempt $attempt/$maxAttempts failed, retrying in ${delay}ms: ${e.message}")
+                    Thread.sleep(delay)
+                } else {
+                    Log.e(TAG, "Failed to download notification image " +
+                        "(attempt $attempt/$maxAttempts): ${e.message}")
+                    break
+                }
+            }
+        }
+        return null
     }
 
     private fun toCircularBitmap(source: Bitmap): Bitmap {
