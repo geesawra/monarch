@@ -117,7 +117,7 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
-    implementation(libs.play.services.basement)
+    
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.splashscreen)
     implementation(libs.ktor.client.core)
