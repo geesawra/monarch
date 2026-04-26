@@ -1374,7 +1374,7 @@ private fun MediaSelectionSection(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp)
+                .padding(8.dp)
         ) {
             when (mediaSelectedIsVideo) {
                 false -> PostImageGallery(
