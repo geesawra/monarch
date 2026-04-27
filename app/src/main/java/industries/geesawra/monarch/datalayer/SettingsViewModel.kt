@@ -75,6 +75,7 @@ data class SettingsState(
     val notificationServerUrl: String = BuildConfig.PUSH_SERVER_URL,
     val showOnlyLatestThreadInteraction: Boolean = false,
     val alsoLikedEnabled: Boolean = false,
+    val threadChainSelection: ThreadChainSelection = ThreadChainSelection.Random,
     val loaded: Boolean = false,
 )
 
@@ -117,6 +118,7 @@ class SettingsViewModel @Inject constructor(
         private val SHOW_ONLY_LATEST_THREAD_INTERACTION = stringPreferencesKey("show_only_latest_thread_interaction")
         internal val NOTIFICATION_SERVER_URL = stringPreferencesKey("notification_server_url")
         private val ALSO_LIKED_ENABLED = stringPreferencesKey("also_liked_enabled")
+        private val THREAD_CHAIN_SELECTION = stringPreferencesKey("thread_chain_selection")
     }
 
     var settingsState by mutableStateOf(SettingsState())
@@ -151,6 +153,7 @@ class SettingsViewModel @Inject constructor(
                     notificationServerUrl = prefs[NOTIFICATION_SERVER_URL] ?: BuildConfig.PUSH_SERVER_URL,
                     showOnlyLatestThreadInteraction = prefs[SHOW_ONLY_LATEST_THREAD_INTERACTION]?.toBooleanStrictOrNull() ?: false,
                     alsoLikedEnabled = prefs[ALSO_LIKED_ENABLED]?.toBooleanStrictOrNull() ?: false,
+                    threadChainSelection = prefs[THREAD_CHAIN_SELECTION]?.let { runCatching { ThreadChainSelection.valueOf(it) }.getOrNull() } ?: ThreadChainSelection.Random,
                     loaded = true,
                 )
             }.collect {
@@ -300,6 +303,12 @@ class SettingsViewModel @Inject constructor(
     fun setAlsoLikedEnabled(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { it[ALSO_LIKED_ENABLED] = enabled.toString() }
+        }
+    }
+
+    fun setThreadChainSelection(mode: ThreadChainSelection) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[THREAD_CHAIN_SELECTION] = mode.name }
         }
     }
 }

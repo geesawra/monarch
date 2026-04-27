@@ -85,6 +85,7 @@ import industries.geesawra.monarch.datalayer.AvatarShape
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.PushNotificationManager
 import industries.geesawra.monarch.datalayer.ReplyFilterMode
+import industries.geesawra.monarch.datalayer.ThreadChainSelection
 import industries.geesawra.monarch.datalayer.SettingsViewModel
 import industries.geesawra.monarch.datalayer.AppTheme
 import industries.geesawra.monarch.datalayer.ThemeMode
@@ -487,6 +488,43 @@ fun SettingsView(
                                             ReplyFilterMode.None -> "Off"
                                             ReplyFilterMode.OnlyFilterDeepThreads -> "Normal"
                                             ReplyFilterMode.Strict -> "Strict"
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+            )
+
+            ListItem(
+                headlineContent = { Text("Thread chain selection") },
+                supportingContent = {
+                    Column {
+                        Text(
+                            text = when (settings.threadChainSelection) {
+                                ThreadChainSelection.Random -> "Picks a reply branch at random at each level of the tree — a different path may be shown each time you open the thread"
+                                ThreadChainSelection.MostLikes -> "Follows the reply with the most likes at each level, highlighting the most popular conversation"
+                                ThreadChainSelection.Chronological -> "Follows the first reply at each level in server order, giving a consistent walk through the thread"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            val modes = ThreadChainSelection.entries
+                            modes.forEachIndexed { idx, mode ->
+                                SegmentedButton(
+                                    selected = settings.threadChainSelection == mode,
+                                    onClick = { settingsViewModel.setThreadChainSelection(mode) },
+                                    shape = SegmentedButtonDefaults.itemShape(idx, modes.size),
+                                ) {
+                                    Text(
+                                        when (mode) {
+                                            ThreadChainSelection.Random -> "Random"
+                                            ThreadChainSelection.MostLikes -> "Likes"
+                                            ThreadChainSelection.Chronological -> "Chrono"
                                         }
                                     )
                                 }

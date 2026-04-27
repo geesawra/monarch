@@ -1283,7 +1283,7 @@ private fun DetailThreadPane(
             ShowSkeets(
                 viewModel = timelineViewModel,
                 isScrollEnabled = true,
-                data = timelineViewModel.currentlyShownThread.flatten(focusedUri = tappedPostUri),
+                data = timelineViewModel.currentlyShownThread.flatten(focusedUri = tappedPostUri, selection = settingsState.threadChainSelection),
                 shouldFetchMoreData = false,
                 isShowingThread = true,
                 isLoading = isRefreshing,

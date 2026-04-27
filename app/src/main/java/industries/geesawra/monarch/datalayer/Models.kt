@@ -58,9 +58,51 @@ fun AspectRatio?.toFloat(): Float? {
 }
 
 enum class ReplyFilterMode {
+    /**
+     * All replies appear in the feed unfiltered — even from accounts you don't follow.
+     */
     None,
+
+    /**
+     * Hides long back-and-forth reply chains between people you don't follow
+     * while keeping direct replies to posts from people you follow visible.
+     */
     OnlyFilterDeepThreads,
+
+    /**
+     * Only shows replies where both the reply author *and* the person being
+     * replied to are accounts you follow. Everything else is hidden.
+     */
     Strict
+}
+
+/**
+ * Controls which reply branch to expand when viewing a post thread.
+ * For every node in a thread tree that has multiple reply children,
+ *
+ * only *one* child subtree is shown in full; the rest are silently skipped.
+ *
+ * (the user can tap any post to drill into its own thread view.)
+ */
+enum class ThreadChainSelection {
+    /**
+     * Picks one reply branch at random at each level of the tree —
+     * a different branch may be chosen each time you open the thread.
+     */
+    Random,
+
+    /**
+     * Always follows the reply with the highest like count.
+     * Ties are broken in API order (first one wins).
+     */
+    MostLikes,
+
+    /**
+     * Follows replies in the order they were returned by the server,
+     * which is roughly chronological. The first reply at each level
+     * wins, producing a consistent, predictable walk through the thread.
+     */
+    Chronological,
 }
 
 enum class CDNImageSize(
@@ -822,7 +864,7 @@ data class ThreadPost(
     val replies: List<ThreadPost> = listOf(),
     val hasMoreReplies: Boolean = false,
 ) {
-    fun flatten(focusedUri: AtUri? = null): ImmutableList<SkeetData> {
+    fun flatten(focusedUri: AtUri? = null, selection: ThreadChainSelection = ThreadChainSelection.Random, random: kotlin.random.Random = kotlin.random.Random): ImmutableList<SkeetData> {
         val path = mutableListOf<ThreadPost>()
         if (focusedUri != null) {
             findPathTo(this, focusedUri, path)
@@ -858,18 +900,9 @@ data class ThreadPost(
         }
 
         var blockId = 1
-        for (reply in focusNode.replies) {
+        for (reply in focusNode.replies.sortedByDescending { it.post.likes ?: 0 }) {
             if (reply.post.hidden) continue
-            val subtree = reply.flattenSubtree()
-            for (node in subtree) {
-                out.add(
-                    node.post.copy(
-                        isInChain = true,
-                        chainBlockId = blockId,
-                        hasMoreReplies = node.hasMoreReplies,
-                    )
-                )
-            }
+            flattenSingleBranch(reply, blockId, out, selection, random)
             blockId++
         }
 
@@ -914,6 +947,29 @@ private fun ThreadPost.flattenSubtree(): List<ThreadPost> {
     }
     dfs(this)
     return result
+}
+
+private fun flattenSingleBranch(node: ThreadPost, blockId: Int, out: MutableList<SkeetData>, selection: ThreadChainSelection, random: kotlin.random.Random) {
+    if (node.post.hidden) return
+    out.add(
+        node.post.copy(
+            isInChain = true,
+            chainBlockId = blockId,
+            hasMoreReplies = node.hasMoreReplies,
+        )
+    )
+    val visibleReplies = node.replies.filter { !it.post.hidden }
+    if (visibleReplies.isEmpty()) return
+    val picked = pickReply(visibleReplies, selection, random)
+    flattenSingleBranch(picked, blockId, out, selection, random)
+}
+
+private fun pickReply(replies: List<ThreadPost>, selection: ThreadChainSelection, random: kotlin.random.Random): ThreadPost {
+    return when (selection) {
+        ThreadChainSelection.Random -> replies[random.nextInt(replies.size)]
+        ThreadChainSelection.MostLikes -> replies.maxByOrNull { it.post.likes ?: 0 } ?: replies.first()
+        ThreadChainSelection.Chronological -> replies.first()
+    }
 }
 
 private fun collectAll(node: ThreadPost, out: MutableList<SkeetData>) {

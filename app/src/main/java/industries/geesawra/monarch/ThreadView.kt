@@ -92,7 +92,7 @@ fun ThreadView(
         ) { padding ->
             val thread = timelineViewModel.currentlyShownThread
             val tappedPostUri = remember { thread.post.uri }
-            val threadData = remember(thread) { thread.flatten(focusedUri = tappedPostUri) }
+            val threadData = remember(thread) { thread.flatten(focusedUri = tappedPostUri, selection = settingsState.threadChainSelection) }
             val focusIdx = remember(threadData) {
                 threadData.indexOfFirst { it.isFocused }.coerceAtLeast(0)
             }
