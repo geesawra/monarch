@@ -71,10 +71,10 @@ fun FollowersListView(
     val currentList = if (selectedTab == 0) followers else follows
 
     val knownList = remember(currentList) {
-        currentList.filter { it.viewer?.following != null }
+        currentList.filter { it.viewer?.following != null }.distinctBy { it.did.did }
     }
     val othersList = remember(currentList) {
-        currentList.filter { it.viewer?.following == null }
+        currentList.filter { it.viewer?.following == null }.distinctBy { it.did.did }
     }
 
     val displayKnown = knownList
