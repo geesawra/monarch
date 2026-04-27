@@ -257,6 +257,7 @@ fun DocumentReaderView(
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                     ) {
                                         SkeetView(
+                                            viewModel = timelineViewModel,
                                             skeet = block.embeddedPost,
                                             showLabels = false,
                                             onShowThread = {},

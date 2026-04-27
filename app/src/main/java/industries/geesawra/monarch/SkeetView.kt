@@ -4,6 +4,7 @@ package industries.geesawra.monarch
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +65,7 @@ import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -92,6 +95,10 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.atproto.label.Label
+import com.atproto.label.LabelValueDefinitionBlurs
+import com.atproto.label.LabelValueDefinitionDefaultSetting
+import com.atproto.label.LabelValueDefinitionSeverity
+import app.bsky.actor.ContentLabelPrefVisibility
 import industries.geesawra.monarch.datalayer.LinkPreviewFetcher
 import industries.geesawra.monarch.datalayer.PostTextSize
 import industries.geesawra.monarch.datalayer.SkeetData
@@ -146,8 +153,20 @@ fun SkeetView(
         return
     }
 
-    val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
-    var contentRevealed by remember { mutableStateOf(warningLabel == null) }
+    val moderationDecision = computeModerationDecision(
+        postLabels = skeet.postLabels,
+        authorLabels = skeet.authorLabels,
+        contentLabelPrefVisibility = { viewModel?.contentLabelPrefVisibility(it) },
+        labelDefaultSetting = { viewModel?.labelDefaultSetting(it) },
+        labelSeverity = { viewModel?.labelSeverity(it) },
+        labelBlurs = { viewModel?.labelBlurs(it) },
+        labelDisplayName = { viewModel?.labelDisplayName(it) },
+    )
+    val isWarn = moderationDecision is ModerationDecision.Warn
+    var contentRevealed by remember { mutableStateOf(!isWarn) }
+    LaunchedEffect(skeet.cid, isWarn) {
+        contentRevealed = !isWarn
+    }
 
     if (nested) {
         Column(
@@ -179,7 +198,7 @@ fun SkeetView(
                 skeet = skeet,
                 nested = nested,
                 disableEmbeds = disableEmbeds,
-                warningLabel = warningLabel,
+                moderationDecision = moderationDecision,
                 contentRevealed = contentRevealed,
                 onToggleContent = { contentRevealed = !contentRevealed },
                 showActions = false,
@@ -234,14 +253,16 @@ fun SkeetView(
                     showPronouns = showPronouns,
                     labelDisplayName = { viewModel?.labelDisplayName(it) },
                     labelDescription = { viewModel?.labelDescription(it) },
-                    labelerAvatar = { viewModel?.labelerAvatar(it) }
+                    labelerAvatar = { viewModel?.labelerAvatar(it) },
+                    contentLabelPrefVisibility = { viewModel?.contentLabelPrefVisibility(it) },
+                    labelSeverity = { viewModel?.labelSeverity(it) }
                 )
 
                 SkeetContentSection(
                     skeet = skeet,
                     nested = nested,
                     disableEmbeds = disableEmbeds,
-                    warningLabel = warningLabel,
+                moderationDecision = moderationDecision,
                     contentRevealed = contentRevealed,
                     onToggleContent = { contentRevealed = !contentRevealed },
                     showActions = !disableEmbeds,
@@ -333,8 +354,20 @@ fun FocusedSkeetView(
     alsoLikedEnabled: Boolean = false,
     onShowAlsoLiked: () -> Unit = {},
 ) {
-    val warningLabel = skeet.postLabels.firstOrNull { it.`val` in contentWarningLabels }
-    var contentRevealed by remember { mutableStateOf(warningLabel == null) }
+    val moderationDecision = computeModerationDecision(
+        postLabels = skeet.postLabels,
+        authorLabels = skeet.authorLabels,
+        contentLabelPrefVisibility = { viewModel?.contentLabelPrefVisibility(it) },
+        labelDefaultSetting = { viewModel?.labelDefaultSetting(it) },
+        labelSeverity = { viewModel?.labelSeverity(it) },
+        labelBlurs = { viewModel?.labelBlurs(it) },
+        labelDisplayName = { viewModel?.labelDisplayName(it) },
+    )
+    val isWarn = moderationDecision is ModerationDecision.Warn
+    var contentRevealed by remember { mutableStateOf(!isWarn) }
+    LaunchedEffect(skeet.cid, isWarn) {
+        contentRevealed = !isWarn
+    }
     var quoteCount by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(skeet.uri) {
@@ -429,13 +462,15 @@ fun FocusedSkeetView(
             labelDisplayName = { viewModel?.labelDisplayName(it) },
             labelDescription = { viewModel?.labelDescription(it) },
             labelerAvatar = { viewModel?.labelerAvatar(it) },
+            contentLabelPrefVisibility = { viewModel?.contentLabelPrefVisibility(it) },
+            labelSeverity = { viewModel?.labelSeverity(it) },
         )
 
         SkeetContentSection(
             skeet = skeet,
             nested = false,
             disableEmbeds = false,
-            warningLabel = warningLabel,
+            moderationDecision = moderationDecision,
             contentRevealed = contentRevealed,
             onToggleContent = { contentRevealed = !contentRevealed },
             showActions = false,
@@ -539,7 +574,9 @@ private fun SkeetHeaderSection(
             showPronouns = showPronouns,
             labelDisplayName = { viewModel?.labelDisplayName(it) },
             labelDescription = { viewModel?.labelDescription(it) },
-            labelerAvatar = { viewModel?.labelerAvatar(it) }
+            labelerAvatar = { viewModel?.labelerAvatar(it) },
+            contentLabelPrefVisibility = { viewModel?.contentLabelPrefVisibility(it) },
+            labelSeverity = { viewModel?.labelSeverity(it) }
         )
     }
 }
@@ -610,7 +647,7 @@ private fun SkeetContentSection(
     skeet: SkeetData,
     nested: Boolean,
     disableEmbeds: Boolean,
-    warningLabel: Label?,
+    moderationDecision: ModerationDecision,
     contentRevealed: Boolean,
     onToggleContent: () -> Unit,
     showActions: Boolean,
@@ -627,16 +664,32 @@ private fun SkeetContentSection(
     targetTranslationLanguage: String = "en",
     carouselImageGallery: Boolean = false,
 ) {
-    if (warningLabel != null) {
+    if (moderationDecision is ModerationDecision.Warn) {
+        val labeler = viewModel?.labelerName(moderationDecision.label) ?: moderationDecision.label.src.did
         ContentWarningCard(
-            label = labelDefinition(warningLabel.`val`).plaintext,
+            label = moderationDecision.displayName,
             revealed = contentRevealed,
             onToggle = onToggleContent,
             wrapWithCard = false,
+            subtitle = "Added by $labeler",
         )
     }
     if (contentRevealed) {
-        SkeetContent(skeet, nested, disableEmbeds, onShowThread, viewModel, onMentionClick = onMentionClick, postTextSize = postTextSize, avatarShape = avatarShape, isVisible = isVisible, showLabels = showLabels, targetTranslationLanguage = targetTranslationLanguage, carouselImageGallery = carouselImageGallery)
+        val blurMedia = moderationDecision is ModerationDecision.Warn &&
+            moderationDecision.blurs == LabelValueDefinitionBlurs.Media
+
+        SkeetContent(
+            skeet, nested, disableEmbeds, onShowThread, viewModel,
+            onMentionClick = onMentionClick,
+            postTextSize = postTextSize,
+            avatarShape = avatarShape,
+            isVisible = isVisible,
+            showLabels = showLabels,
+            targetTranslationLanguage = targetTranslationLanguage,
+            blurMedia = blurMedia,
+            moderationDecision = moderationDecision,
+            carouselImageGallery = carouselImageGallery,
+        )
 
         if (showActions) {
             TimelinePostActionsView(
@@ -668,6 +721,8 @@ private fun SkeetContent(
     showLabels: Boolean = true,
     targetTranslationLanguage: String = "en",
     carouselImageGallery: Boolean = false,
+    blurMedia: Boolean = false,
+    moderationDecision: ModerationDecision = ModerationDecision.None,
 ) {
     val context = LocalContext.current
     val translation = viewModel?.postTranslationStore?.states?.get(skeet.cid)
@@ -770,7 +825,57 @@ private fun SkeetContent(
         return
     }
 
-    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = skeet.following, carouselImageGallery = carouselImageGallery)
+    if (blurMedia) {
+        var mediaRevealed by remember { mutableStateOf(false) }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .blur(16.dp),
+                ) {
+                    Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = skeet.following, carouselImageGallery = carouselImageGallery)
+                }
+            }
+            if (!mediaRevealed) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Center)
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = "Hidden media",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Sensitive media",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FilledTonalButton(onClick = { mediaRevealed = true }) {
+                        Text("Show media")
+                    }
+                }
+            }
+        }
+    } else {
+        Embeds(context, nested, skeet.embed, onShowThread, viewModel, postTextSize, avatarShape, isVisible = isVisible, showLabels = showLabels, following = skeet.following, carouselImageGallery = carouselImageGallery)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1493,10 +1598,114 @@ private data class LabelDefinition(
     val icon: ImageVector,
 )
 
+sealed class ModerationDecision {
+    data object None : ModerationDecision()
+    data class Warn(val label: Label, val displayName: String, val blurs: LabelValueDefinitionBlurs) : ModerationDecision()
+    data object Hide : ModerationDecision()
+}
+
+/** Hardcoded fallback for content-warning labels when no labeler definition or user pref is found.
+ *  Covers the official Bluesky moderation service labels. */
 private val contentWarningLabels = setOf(
     "porn", "sexual", "nudity", "sexual-figurative",
     "graphic-media", "gore",
 )
+
+/**
+ * Compute the moderation decision for a post by inspecting both post-level and author-level
+ * labels, respecting user-configured [ContentLabelPref] overrides first, then labeler
+ * [LabelValueDefinition] metadata, falling back to the hardcoded [contentWarningLabels] set.
+ *
+ * Priority: user pref > labeler severity/blurs > labeler hide default > hardcoded fallback
+ */
+internal fun computeModerationDecision(
+    postLabels: List<Label>,
+    authorLabels: List<Label>,
+    contentLabelPrefVisibility: (Label) -> ContentLabelPrefVisibility?,
+    labelDefaultSetting: (Label) -> LabelValueDefinitionDefaultSetting?,
+    labelSeverity: (Label) -> LabelValueDefinitionSeverity?,
+    labelBlurs: (Label) -> LabelValueDefinitionBlurs?,
+    labelDisplayName: (Label) -> String?,
+): ModerationDecision {
+    val allLabels = postLabels + authorLabels
+    if (allLabels.isNotEmpty()) {
+        Log.d("Moderation", "=== POST postLabels=${postLabels.size} authorLabels=${authorLabels.size} ===")
+    }
+
+    for (label in allLabels) {
+        if (label.neg == true) continue
+        if (label.`val`.startsWith("!")) continue
+
+        val userPref = contentLabelPrefVisibility(label)
+        val defSetting = labelDefaultSetting(label)
+        val sev = labelSeverity(label)
+        val blurs = labelBlurs(label)
+        Log.d("Moderation", "  label=${label.`val`} src=${label.src.did} userPref=$userPref defSetting=$defSetting severity=$sev blurs=$blurs")
+
+        // 1. User preference takes complete priority
+        if (userPref != null) {
+            when (userPref) {
+                ContentLabelPrefVisibility.Hide -> {
+                    Log.d("Moderation", "  => HIDE (userPref)")
+                    return ModerationDecision.Hide
+                }
+                ContentLabelPrefVisibility.Warn -> {
+                    if (sev == LabelValueDefinitionSeverity.Inform || sev == LabelValueDefinitionSeverity.None) {
+                        Log.d("Moderation", "  => SHOW (userPref=warn but severity=inform/none)")
+                        continue
+                    }
+                    val name = labelDisplayName(label)
+                        ?: labelDefinition(label.`val`).plaintext
+                    Log.d("Moderation", "  => WARN (userPref) name=$name")
+                    return ModerationDecision.Warn(label, name, blurs ?: LabelValueDefinitionBlurs.Content)
+                }
+                ContentLabelPrefVisibility.Show,
+                ContentLabelPrefVisibility.Ignore -> {
+                    Log.d("Moderation", "  => SKIP (userPref=show/ignore)")
+                    continue
+                }
+                is ContentLabelPrefVisibility.Unknown -> {
+                    Log.d("Moderation", "  => UNKNOWN userPref")
+                }
+            }
+            continue
+        }
+
+        // 2. Labeler explicitly set defaultSetting to "hide"
+        if (defSetting == LabelValueDefinitionDefaultSetting.Hide) {
+            Log.d("Moderation", "  => HIDE (defSetting)")
+            return ModerationDecision.Hide
+        }
+
+        // 3. Labeler explicitly set defaultSetting to "ignore"
+        if (defSetting == LabelValueDefinitionDefaultSetting.Ignore) {
+            Log.d("Moderation", "  => SKIP (defSetting=ignore)")
+            continue
+        }
+
+        // 4. Labeler severity is "alert"
+        if (sev == LabelValueDefinitionSeverity.Alert) {
+            val name = labelDisplayName(label)
+                ?: labelDefinition(label.`val`).plaintext
+            Log.d("Moderation", "  => WARN (severity=alert) name=$name")
+            return ModerationDecision.Warn(label, name, blurs ?: LabelValueDefinitionBlurs.Content)
+        }
+
+        // 5. Fallback: hardcoded official Bluesky labels
+        if (label.`val` in contentWarningLabels) {
+            val name = labelDisplayName(label)
+                ?: labelDefinition(label.`val`).plaintext
+            Log.d("Moderation", "  => WARN (hardcoded) name=$name")
+            return ModerationDecision.Warn(label, name, blurs ?: LabelValueDefinitionBlurs.Content)
+        }
+
+        // 6. severity "inform" / "none"
+        Log.d("Moderation", "  => SHOW (inform/none)")
+    }
+
+    Log.d("Moderation", "  => NONE — no label triggered moderation")
+    return ModerationDecision.None
+}
 
 private val knownLabels: Map<String, LabelDefinition> = mapOf(
     "porn" to LabelDefinition("Adult Content", Icons.Filled.VisibilityOff),
@@ -1528,7 +1737,7 @@ private fun labelDefinition(rawValue: String): LabelDefinition {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, showPronouns: Boolean = false, labelDisplayName: (Label) -> String? = { null }, labelDescription: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }) {
+private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLabels: Boolean, showPronouns: Boolean = false, labelDisplayName: (Label) -> String? = { null }, labelDescription: (Label) -> String? = { null }, labelerAvatar: (Label) -> String? = { null }, contentLabelPrefVisibility: (Label) -> ContentLabelPrefVisibility? = { null }, labelSeverity: (Label) -> LabelValueDefinitionSeverity? = { null }) {
     val authorName = skeet.authorName?.ifEmpty { null } ?: (skeet.authorHandle?.handle ?: "")
 
     val isBot = skeet.authorLabels.any { it.`val` == "bot" }
@@ -1612,6 +1821,8 @@ private fun SkeetHeader(modifier: Modifier = Modifier, skeet: SkeetData, showLab
             labelDisplayName = labelDisplayName,
             labelDescription = labelDescription,
             labelerAvatar = labelerAvatar,
+            contentLabelPrefVisibility = contentLabelPrefVisibility,
+            labelSeverity = labelSeverity,
         )
 
     }
@@ -1625,21 +1836,39 @@ private fun SkeetLabelsRow(
     labelDisplayName: (Label) -> String? = { null },
     labelDescription: (Label) -> String? = { null },
     labelerAvatar: (Label) -> String? = { null },
+    contentLabelPrefVisibility: (Label) -> ContentLabelPrefVisibility? = { null },
+    labelSeverity: (Label) -> LabelValueDefinitionSeverity? = { null },
 ) {
     if (!showLabels) return
+    val allLabels = skeet.authorLabels + skeet.postLabels
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
         ) {
-            skeet.authorLabels.forEach {
+            allLabels.forEach {
                 it.neg?.let { neg ->
                     if (!neg) {
                         return@forEach
                     }
                 }
                 if (it.`val`.startsWith("!") || it.`val` == "bot") {
+                    return@forEach
+                }
+
+                val userPref = contentLabelPrefVisibility(it)
+                if (userPref == ContentLabelPrefVisibility.Ignore) {
+                    return@forEach
+                }
+
+                val sev = labelSeverity(it)
+                if (sev == LabelValueDefinitionSeverity.Alert || sev == LabelValueDefinitionSeverity.None) {
+                    return@forEach
+                }
+
+                // Skip labels from the official Bluesky moderation service (content labels)
+                if (it.src.did == "did:plc:ar7c4by46qjdydhdevvrndac") {
                     return@forEach
                 }
 
@@ -1744,32 +1973,42 @@ private fun ContentWarningCard(
     revealed: Boolean = false,
     onToggle: () -> Unit,
     wrapWithCard: Boolean = true,
+    subtitle: String? = null,
 ) {
     val content = @Composable {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (wrapWithCard) 16.dp else 0.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Warning,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.weight(1f),
-            )
-            val haptic = LocalHapticFeedback.current
-            TextButton(onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onToggle()
-            }) {
-                Text(if (revealed) "Hide" else "Show")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                val haptic = LocalHapticFeedback.current
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onToggle()
+                }) {
+                    Text(if (revealed) "Hide" else "Show")
+                }
+            }
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 28.dp),
+                )
             }
         }
     }

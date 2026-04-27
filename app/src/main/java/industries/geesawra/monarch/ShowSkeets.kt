@@ -152,6 +152,17 @@ fun ShowSkeets(
             it.content.contains(searchFilter, ignoreCase = true) ||
                 it.authorName?.contains(searchFilter, ignoreCase = true) == true ||
                 it.authorHandle?.handle?.contains(searchFilter, ignoreCase = true) == true
+        }.filter {
+            if (isShowingThread) return@filter true
+            computeModerationDecision(
+                postLabels = it.postLabels,
+                authorLabels = it.authorLabels,
+                contentLabelPrefVisibility = { l -> viewModel.contentLabelPrefVisibility(l) },
+                labelDefaultSetting = { l -> viewModel.labelDefaultSetting(l) },
+                labelSeverity = { l -> viewModel.labelSeverity(l) },
+                labelBlurs = { l -> viewModel.labelBlurs(l) },
+                labelDisplayName = { l -> viewModel.labelDisplayName(l) },
+            ) !is ModerationDecision.Hide
         }
     }
 

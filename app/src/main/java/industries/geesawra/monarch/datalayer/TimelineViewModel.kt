@@ -62,7 +62,11 @@ import sh.christian.ozone.api.Cid
 import sh.christian.ozone.api.Did
 import sh.christian.ozone.api.RKey
 import sh.christian.ozone.api.response.StatusCode
+import app.bsky.actor.ContentLabelPrefVisibility
 import com.atproto.label.Label
+import com.atproto.label.LabelValueDefinitionBlurs
+import com.atproto.label.LabelValueDefinitionDefaultSetting
+import com.atproto.label.LabelValueDefinitionSeverity
 
 import sh.christian.ozone.api.model.JsonContent
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
@@ -501,9 +505,14 @@ class TimelineViewModel @AssistedInject constructor(
         else -> false
     }
 
-    fun labelDisplayName(label: Label): String = bskyConn.labelDisplayName(label)
+    fun labelDisplayName(label: Label): String? = bskyConn.labelDisplayName(label)
     fun labelDescription(label: Label): String? = bskyConn.labelDescription(label)
     fun labelerAvatar(label: Label): String? = bskyConn.labelerAvatar(label)
+    fun labelSeverity(label: Label): LabelValueDefinitionSeverity? = bskyConn.labelSeverity(label)
+    fun labelBlurs(label: Label): LabelValueDefinitionBlurs? = bskyConn.labelBlurs(label)
+    fun labelDefaultSetting(label: Label): LabelValueDefinitionDefaultSetting? = bskyConn.labelDefaultSetting(label)
+    fun contentLabelPrefVisibility(label: Label): ContentLabelPrefVisibility? = bskyConn.contentLabelPrefVisibility(label)
+    fun labelerName(label: Label): String = bskyConn.labelerName(label)
 
     fun refreshAccounts() {
         viewModelScope.launch {

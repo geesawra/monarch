@@ -543,6 +543,7 @@ data class SkeetData(
                 authorHandle = post.author.handle,
                 authorPronouns = post.author.pronouns,
                 authorLabels = post.author.labels.orEmpty(),
+                postLabels = post.labels.orEmpty(),
                 verified = post.author.verification?.verifiedStatus == VerificationStateVerifiedStatus.Valid,
                 content = content.text,
                 embed = embed,

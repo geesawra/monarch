@@ -681,6 +681,7 @@ fun ComposeView(
                         modifier = Modifier.padding(8.dp)
                     ) {
                         SkeetView(
+                            viewModel = timelineViewModel,
                             modifier = Modifier
                                 .padding(8.dp)
                                 .background(Color.Transparent),

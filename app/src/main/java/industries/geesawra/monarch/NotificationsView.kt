@@ -311,6 +311,7 @@ private fun RenderNotification(
                     ),
                 ) {
                     SkeetView(
+                        viewModel = viewModel,
                         skeet = SkeetData(
                             authorName = (notification.follow.displayName
                                 ?: notification.follow.handle).toString(),

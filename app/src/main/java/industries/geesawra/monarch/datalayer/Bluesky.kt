@@ -22,6 +22,8 @@ import app.bsky.bookmark.DeleteBookmarkRequest
 import app.bsky.bookmark.GetBookmarksQueryParams
 import app.bsky.bookmark.GetBookmarksResponse
 import app.bsky.actor.GetProfileResponse
+import app.bsky.actor.ContentLabelPref
+import app.bsky.actor.ContentLabelPrefVisibility
 import app.bsky.actor.MutedWord
 import app.bsky.actor.MutedWordsPref
 import app.bsky.actor.PreferencesUnion
@@ -89,6 +91,10 @@ import app.bsky.labeler.GetServicesQueryParams
 import app.bsky.labeler.GetServicesResponse
 import app.bsky.labeler.GetServicesResponseViewUnion
 import com.atproto.label.Label
+import com.atproto.label.LabelValueDefinition
+import com.atproto.label.LabelValueDefinitionBlurs
+import com.atproto.label.LabelValueDefinitionDefaultSetting
+import com.atproto.label.LabelValueDefinitionSeverity
 import app.bsky.notification.ListNotificationsQueryParams
 import app.bsky.notification.ListNotificationsResponse
 import app.bsky.notification.UpdateSeenRequest
@@ -330,6 +336,9 @@ class BlueskyConn(val context: Context) {
         const val MAX_IMAGE_SIZE_BYTES = 1_950_000L
         const val VIDEO_UPLOAD_TIMEOUT_MS = 300_000L
         const val DEFAULT_TIMEOUT_MS = 30_000L
+
+        // Official Bluesky moderation labeler (always subscribed, applies porn/nsfw/nudity/etc.)
+        private const val BSKY_MOD_SERVICE = "did:plc:ar7c4by46qjdydhdevvrndac"
 
         // Transient OAuth-flow state lives here. The active session itself (credentials, handle,
         // PDS, appview) is stored in AccountManager — see datalayer/AccountManager.kt.
@@ -704,12 +713,20 @@ class BlueskyConn(val context: Context) {
     private var labelDisplayNames: Map<String, String> = emptyMap()
     private var labelDescriptions: Map<String, String> = emptyMap()
     private var labelerAvatars: Map<String, String> = emptyMap()
+    // Moderation metadata from label value definitions: "labelerDid:labelVal" -> moderation info
+    private var labelSeverities: Map<String, LabelValueDefinitionSeverity> = emptyMap()
+    private var labelBlurs: Map<String, LabelValueDefinitionBlurs> = emptyMap()
+    private var labelDefaultSettings: Map<String, LabelValueDefinitionDefaultSetting> = emptyMap()
+    // User-configured content label preferences (overrides labeler defaults)
+    private var contentLabelPrefs: Map<String, ContentLabelPrefVisibility> = emptyMap()
+    // Labeler display names: labelerDid -> display name
+    private var labelerNames: Map<String, String> = emptyMap()
     private var labelCacheFetchCount: Int = 0
     private val labelCacheRefreshInterval: Int = 12
 
-    fun labelDisplayName(label: Label): String {
+    fun labelDisplayName(label: Label): String? {
         val key = "${label.src.did}:${label.`val`}"
-        return labelDisplayNames[key] ?: label.`val`
+        return labelDisplayNames[key]
     }
 
     fun labelDescription(label: Label): String? {
@@ -721,11 +738,39 @@ class BlueskyConn(val context: Context) {
         return labelerAvatars[label.src.did]
     }
 
+    fun labelSeverity(label: Label): LabelValueDefinitionSeverity? {
+        val key = "${label.src.did}:${label.`val`}"
+        return labelSeverities[key]
+    }
+
+    fun labelBlurs(label: Label): LabelValueDefinitionBlurs? {
+        val key = "${label.src.did}:${label.`val`}"
+        return labelBlurs[key]
+    }
+
+    fun labelDefaultSetting(label: Label): LabelValueDefinitionDefaultSetting? {
+        val key = "${label.src.did}:${label.`val`}"
+        return labelDefaultSettings[key]
+    }
+
+    fun contentLabelPrefVisibility(label: Label): ContentLabelPrefVisibility? {
+        val specificKey = "${label.src.did}:${label.`val`}"
+        val globalKey = "_:${label.`val`}"
+        return contentLabelPrefs[specificKey] ?: contentLabelPrefs[globalKey]
+    }
+
+    fun labelerName(label: Label): String {
+        val did = label.src.did
+        if (did == BSKY_MOD_SERVICE) return "Bluesky Moderation Service"
+        return labelerNames[did] ?: did.run { substringAfter("did:web:").substringBefore("#") }
+    }
+
     suspend fun refreshLabelCacheIfNeeded() {
         labelCacheFetchCount++
         if (labelCacheFetchCount < labelCacheRefreshInterval) return
         labelCacheFetchCount = 0
         subscribedLabelers().onSuccess { buildLabelCache(it) }
+        getContentLabelPrefs().onSuccess { contentLabelPrefs = it }
     }
 
     private fun buildLabelCache(
@@ -734,19 +779,54 @@ class BlueskyConn(val context: Context) {
         val names = mutableMapOf<String, String>()
         val descriptions = mutableMapOf<String, String>()
         val avatars = mutableMapOf<String, String>()
+        val severities = mutableMapOf<String, LabelValueDefinitionSeverity>()
+        val blurs = mutableMapOf<String, LabelValueDefinitionBlurs>()
+        val defaultSettings = mutableMapOf<String, LabelValueDefinitionDefaultSetting>()
+        val lblrNames = mutableMapOf<String, String>()
         for ((did, detailed) in labelers) {
             if (did == null || detailed == null) continue
+            detailed.value.creator.displayName?.let { lblrNames[did.did] = it }
             detailed.value.creator.avatar?.let { avatars[did.did] = it.uri }
             for (defn in detailed.value.policies.labelValueDefinitions.orEmpty()) {
                 val locale = defn.locales.firstOrNull() ?: continue
                 val key = "${did.did}:${defn.identifier}"
                 names[key] = locale.name
                 if (locale.description.isNotEmpty()) descriptions[key] = locale.description
+                severities[key] = defn.severity
+                blurs[key] = defn.blurs
+                defn.defaultSetting?.let { defaultSettings[key] = it }
             }
         }
         labelDisplayNames = names
         labelDescriptions = descriptions
         labelerAvatars = avatars
+        labelSeverities = severities
+        labelBlurs = blurs
+        labelDefaultSettings = defaultSettings
+        labelerNames = lblrNames
+    }
+
+    /** Reads [ContentLabelPref] entries from the user's account preferences and returns
+     *  a lookup map keyed by "labelerDid:labelVal". Labels without a labeler DID use "_"
+     *  as the did component for global matching. */
+    suspend fun getContentLabelPrefs(): Result<Map<String, ContentLabelPrefVisibility>> {
+        return suspendRunCatching {
+            val client = pdsClient
+            if (client == null) {
+                return Result.success(emptyMap())
+            }
+            val prefs = client.getPreferencesForActor().requireResponse()
+            val result = mutableMapOf<String, ContentLabelPrefVisibility>()
+            for (pref in prefs.preferences) {
+                if (pref !is PreferencesUnion.ContentLabelPref) continue
+                val cp = pref.value
+                val didPart = cp.labelerDid?.did ?: "_"
+                val key = "$didPart:${cp.label}"
+                result[key] = cp.visibility
+            }
+            Log.d("Moderation", "Loaded ${result.size} ContentLabelPrefs: $result")
+            result
+        }
     }
 
     suspend fun logout() {
@@ -1004,7 +1084,9 @@ class BlueskyConn(val context: Context) {
         val hc = createRetryHttpClient {
             defaultRequest {
                 url(pds)
-                headers["atproto-accept-labelers"] = labelers.joinToString()
+                headers["atproto-accept-labelers"] = labelers.joinToString { did ->
+                    if (did == BSKY_MOD_SERVICE) "$did;redact" else did
+                }
                 if (appviewProxy != null) {
                     headers["atproto-proxy"] = appviewProxy
                 }
@@ -1161,6 +1243,9 @@ class BlueskyConn(val context: Context) {
                 authServerURL = authServerURL,
             )
 
+            // Create client first so `subscribedLabelers()` can use it for `getServices()`.
+            this.client = mkClient(account.pdsHost, listOf(), appviewProxy = account.appviewProxy)
+
             // Hydrate the labeler cache and rebuild `client` with the labelers header so future
             // appview queries respect the user's subscribed labelers. The rebuilt client still
             // shares `sharedAuthTokens` with `pdsClient` because `mkClient` installs the plugin
@@ -1172,8 +1257,12 @@ class BlueskyConn(val context: Context) {
                 emptyMap()
             }
             buildLabelCache(labelerMap)
+            getContentLabelPrefs().onSuccess { contentLabelPrefs = it }
             labelCacheFetchCount = 0
-            val labelers = labelerMap.keys.mapNotNull { it?.did }
+            val labelers = labelerMap.keys.mapNotNull { it?.did }.toMutableList()
+            if (BSKY_MOD_SERVICE !in labelers) {
+                labelers.add(0, BSKY_MOD_SERVICE)
+            }
             this.client = mkClient(account.pdsHost, labelers, appviewProxy = account.appviewProxy)
 
             Log.d("BlueskyAuth", "Clients initialized: pdsClient=${this.pdsClient != null}, client=${this.client != null}, handle=${account.handle}")
@@ -2039,17 +2128,15 @@ class BlueskyConn(val context: Context) {
                 it is PreferencesUnion.LabelersPref
             } as? PreferencesUnion.LabelersPref
 
-            if (labelersPref == null) {
-                return Result.success(emptyMap())
+            val labelers = (labelersPref?.value?.labelers?.map { it.did } ?: emptyList()).toMutableList()
+            // Always include the official Bluesky moderation labeler so we get its label
+            // definitions (display names, severities, etc.) for the label cache.
+            if (Did(BSKY_MOD_SERVICE) !in labelers) {
+                labelers.add(0, Did(BSKY_MOD_SERVICE))
             }
 
-            val labelers = labelersPref.value.labelers.map { it.did }.toMutableList()
-
             val res = client!!.getServices(
-                GetServicesQueryParams(
-                    detailed = true,
-                    dids = labelers
-                )
+                GetServicesQueryParams(detailed = true, dids = labelers)
             )
 
             val response = when (res) {
