@@ -351,8 +351,6 @@ fun FocusedSkeetView(
     onShowLikes: () -> Unit = {},
     onShowReposts: () -> Unit = {},
     onShowQuotes: () -> Unit = {},
-    alsoLikedEnabled: Boolean = false,
-    onShowAlsoLiked: () -> Unit = {},
 ) {
     val moderationDecision = computeModerationDecision(
         postLabels = skeet.postLabels,
@@ -533,8 +531,6 @@ fun FocusedSkeetView(
             targetTranslationLanguage = targetTranslationLanguage,
             showCounts = !hasEngagementStats,
             detailMode = true,
-            alsoLikedEnabled = alsoLikedEnabled,
-            onAlsoLikedTap = onShowAlsoLiked,
         )
     }
 }

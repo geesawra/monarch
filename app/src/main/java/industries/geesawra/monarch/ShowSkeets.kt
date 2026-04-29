@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -38,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
@@ -54,6 +56,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.bsky.feed.FeedViewPostReasonUnion
 import app.bsky.feed.ReplyRefParentUnion
@@ -86,7 +89,6 @@ fun ShowSkeets(
     onShowLikes: ((AtUri) -> Unit)? = null,
     onShowReposts: ((AtUri) -> Unit)? = null,
     onShowQuotes: ((AtUri) -> Unit)? = null,
-    onShowAlsoLiked: ((AtUri) -> Unit)? = null,
 ) {
     val avatarClipShape = settingsState.avatarClipShape
     // Collect CIDs already shown as thread context (root/parent) to avoid duplicates
@@ -173,6 +175,27 @@ fun ShowSkeets(
     }
 
     val activeVideoKey = remember { mutableStateOf<String?>(null) }
+
+    val focusedUri = remember(filteredData) { filteredData.firstOrNull { it.isFocused }?.uri }
+    var alsoLikedPosts by remember { mutableStateOf<List<SkeetData>>(emptyList()) }
+
+    LaunchedEffect(focusedUri, settingsState.alsoLikedEnabled) {
+        if (isShowingThread && settingsState.alsoLikedEnabled && focusedUri != null) {
+            val result = viewModel.getAlsoLikedPosts(focusedUri, null).getOrNull()
+            if (result != null && result.first.isNotEmpty()) {
+                alsoLikedPosts = result.first
+            } else {
+                alsoLikedPosts = emptyList()
+                if (result == null) {
+                    android.util.Log.e("ShowSkeets", "Also liked request failed for $focusedUri")
+                } else {
+                    android.util.Log.e("ShowSkeets", "Also liked returned empty for $focusedUri")
+                }
+            }
+        } else {
+            alsoLikedPosts = emptyList()
+        }
+    }
 
     val focusIdxLocal = remember(filteredData) { filteredData.indexOfFirst { it.isFocused } }
 
@@ -377,8 +400,6 @@ fun ShowSkeets(
                         onShowLikes = { onShowLikes?.invoke(skeet.uri) },
                         onShowReposts = { onShowReposts?.invoke(skeet.uri) },
                         onShowQuotes = { onShowQuotes?.invoke(skeet.uri) },
-                        alsoLikedEnabled = settingsState.alsoLikedEnabled,
-                        onShowAlsoLiked = { onShowAlsoLiked?.invoke(skeet.uri) },
                     )
                 } else {
                     SkeetView(
@@ -426,6 +447,55 @@ fun ShowSkeets(
                     ) {
                         Text("Continue thread")
                     }
+                }
+            }
+        }
+
+        if (isShowingThread && settingsState.alsoLikedEnabled && alsoLikedPosts.isNotEmpty()) {
+            item(key = "also_liked_header") {
+                Text(
+                    text = "People also liked",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(horizontal = feedHorizontalPadding(), vertical = 16.dp),
+                )
+            }
+            items(
+                items = alsoLikedPosts,
+                key = { "${it.cid.cid}_${it.uri.atUri}" },
+            ) { post ->
+                Column(
+                    modifier = Modifier
+                        .then(
+                            if (isShowingThread)
+                                Modifier.padding(horizontal = feedHorizontalPadding())
+                            else
+                                Modifier
+                        )
+                        .padding(bottom = feedItemSpacing())
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                ) {
+                    SkeetView(
+                        viewModel = viewModel,
+                        skeet = post,
+                        postTextSize = settingsState.postTextSize,
+                        avatarShape = avatarClipShape,
+                        showLabels = settingsState.showLabels,
+                        showPronouns = settingsState.showPronounsInPosts,
+                        onAvatarTap = onProfileTap,
+                        onShowThread = { tapped ->
+                            if (onSeeMoreTap != null) {
+                                if (!isShowingThread) viewModel.startThread(tapped)
+                                onSeeMoreTap(tapped)
+                            }
+                        },
+                        isVisible = visibleKeys.contains("${post.cid.cid}_${post.uri.atUri}"),
+                        translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
+                        targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                        carouselImageGallery = settingsState.carouselImageGallery,
+                    )
                 }
             }
         }

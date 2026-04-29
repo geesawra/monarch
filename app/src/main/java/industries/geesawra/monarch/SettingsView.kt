@@ -604,7 +604,7 @@ fun SettingsView(
                             )) {
                                 append("foryou.club")
                             }
-                            append(" (90-day window). Enable this, then tap \uD83D\uDC40 on any post in the thread view.")
+                            append(" (90-day window). When enabled, related posts appear at the bottom of the thread view.")
                         },
                     )
                 },

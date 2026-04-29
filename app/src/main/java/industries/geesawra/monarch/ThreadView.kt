@@ -37,7 +37,7 @@ import industries.geesawra.monarch.datalayer.TimelineViewModel
 import kotlinx.coroutines.CoroutineScope
 import sh.christian.ozone.api.Did
 
-enum class EngagementType { Likes, Reposts, Quotes, AlsoLiked }
+enum class EngagementType { Likes, Reposts, Quotes }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -162,10 +162,6 @@ fun ThreadView(
                         engagementUri = uri
                         engagementType = EngagementType.Quotes
                     },
-                    onShowAlsoLiked = { uri ->
-                        engagementUri = uri
-                        engagementType = EngagementType.AlsoLiked
-                    },
                         )
                     }
                 }
@@ -216,27 +212,6 @@ fun ThreadView(
                         }
                     },
                     timelineViewModel = timelineViewModel,
-                    onShowThread = { skeet ->
-                        engagementUri = null
-                        engagementType = null
-                        timelineViewModel.setThread(skeet)
-                        onThreadTap()
-                    },
-                    onProfileTap = { did ->
-                        engagementUri = null
-                        engagementType = null
-                        onProfileTap?.invoke(did)
-                    },
-                )
-            }
-            EngagementType.AlsoLiked -> {
-                AlsoLikedSheet(
-                    onDismiss = { engagementUri = null; engagementType = null },
-                    fetchAlsoLiked = { cursor ->
-                        timelineViewModel.getAlsoLikedPosts(uri, cursor).getOrNull()
-                    },
-                    timelineViewModel = timelineViewModel,
-                    settingsState = settingsState,
                     onShowThread = { skeet ->
                         engagementUri = null
                         engagementType = null
