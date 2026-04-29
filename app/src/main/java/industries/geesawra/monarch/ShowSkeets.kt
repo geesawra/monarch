@@ -29,6 +29,11 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -452,50 +457,74 @@ fun ShowSkeets(
         }
 
         if (isShowingThread && settingsState.alsoLikedEnabled && alsoLikedPosts.isNotEmpty()) {
-            item(key = "also_liked_header") {
-                Text(
-                    text = "People also liked",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+            item(key = "also_liked_divider") {
+                Box(
                     modifier = Modifier
-                        .padding(horizontal = feedHorizontalPadding(), vertical = 16.dp),
-                )
+                        .fillMaxWidth()
+                        .padding(horizontal = 80.dp, vertical = 12.dp)
+                ) {
+                    SquigglyDivider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                    )
+                }
+            }
+            item(key = "also_liked_header") {
+                AnimatedVisibility(
+                    visible = alsoLikedPosts.isNotEmpty(),
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    Text(
+                        text = "People also liked",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .padding(horizontal = feedHorizontalPadding(), vertical = 16.dp),
+                    )
+                }
             }
             items(
                 items = alsoLikedPosts,
                 key = { "${it.cid.cid}_${it.uri.atUri}" },
             ) { post ->
-                Column(
-                    modifier = Modifier
-                        .then(
-                            if (isShowingThread)
-                                Modifier.padding(horizontal = feedHorizontalPadding())
-                            else
-                                Modifier
-                        )
-                        .padding(bottom = feedItemSpacing())
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn() + expandVertically(),
                 ) {
-                    SkeetView(
-                        viewModel = viewModel,
-                        skeet = post,
-                        postTextSize = settingsState.postTextSize,
-                        avatarShape = avatarClipShape,
-                        showLabels = settingsState.showLabels,
-                        showPronouns = settingsState.showPronounsInPosts,
-                        onAvatarTap = onProfileTap,
-                        onShowThread = { tapped ->
-                            if (onSeeMoreTap != null) {
-                                if (!isShowingThread) viewModel.startThread(tapped)
-                                onSeeMoreTap(tapped)
-                            }
-                        },
-                        isVisible = visibleKeys.contains("${post.cid.cid}_${post.uri.atUri}"),
-                        translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
-                        targetTranslationLanguage = settingsState.targetTranslationLanguage,
-                        carouselImageGallery = settingsState.carouselImageGallery,
-                    )
+                    Column(
+                        modifier = Modifier
+                            .then(
+                                if (isShowingThread)
+                                    Modifier.padding(horizontal = feedHorizontalPadding())
+                                else
+                                    Modifier
+                            )
+                            .padding(bottom = feedItemSpacing())
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    ) {
+                        SkeetView(
+                            viewModel = viewModel,
+                            skeet = post,
+                            postTextSize = settingsState.postTextSize,
+                            avatarShape = avatarClipShape,
+                            showLabels = settingsState.showLabels,
+                            showPronouns = settingsState.showPronounsInPosts,
+                            onAvatarTap = onProfileTap,
+                            onShowThread = { tapped ->
+                                if (onSeeMoreTap != null) {
+                                    if (!isShowingThread) viewModel.startThread(tapped)
+                                    onSeeMoreTap(tapped)
+                                }
+                            },
+                            isVisible = visibleKeys.contains("${post.cid.cid}_${post.uri.atUri}"),
+                            translationEnabled = settingsState.aiEnabled && settingsState.translationEnabled,
+                            targetTranslationLanguage = settingsState.targetTranslationLanguage,
+                            carouselImageGallery = settingsState.carouselImageGallery,
+                        )
+                    }
                 }
             }
         }
