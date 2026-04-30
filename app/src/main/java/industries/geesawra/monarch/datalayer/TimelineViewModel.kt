@@ -2239,4 +2239,37 @@ class TimelineViewModel @AssistedInject constructor(
             }
         }
     }
+
+    fun isPinnedPost(skeet: SkeetData): Boolean {
+        val pinned = profileUser?.pinnedPost ?: user?.pinnedPost
+        return pinned != null && pinned.uri == skeet.uri && pinned.cid == skeet.cid
+    }
+
+    fun pinPost(uri: AtUri, cid: Cid) {
+        viewModelScope.launch {
+            bskyConn.pinPost(uri, cid).onFailure {
+                handleError(it)
+            }.onSuccess {
+                val did = profileUser?.did ?: bskyConn.session?.did ?: return@onSuccess
+                bskyConn.fetchActor(did).onSuccess { fetched ->
+                    updateProfile { it.copy(profileUser = fetched) }
+                }
+                fetchSelf()
+            }
+        }
+    }
+
+    fun unpinPost() {
+        viewModelScope.launch {
+            bskyConn.unpinPost().onFailure {
+                handleError(it)
+            }.onSuccess {
+                val did = profileUser?.did ?: bskyConn.session?.did ?: return@onSuccess
+                bskyConn.fetchActor(did).onSuccess { fetched ->
+                    updateProfile { it.copy(profileUser = fetched) }
+                }
+                fetchSelf()
+            }
+        }
+    }
 }

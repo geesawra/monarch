@@ -535,6 +535,18 @@ fun TimelinePostActionsView(
                     )
                 }
                 if (isOwnPost) {
+                    val isPinned = timelineViewModel.isPinnedPost(skeet)
+                    DropdownMenuItem(
+                        text = { Text(if (isPinned) "Unpin from profile" else "Pin to profile") },
+                        onClick = {
+                            showMenu = false
+                            if (isPinned) {
+                                timelineViewModel.unpinPost()
+                            } else {
+                                timelineViewModel.pinPost(skeet.uri, skeet.cid)
+                            }
+                        },
+                    )
                     DropdownMenuItem(
                         text = { Text("Delete") },
                         onClick = {

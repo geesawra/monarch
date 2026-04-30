@@ -2433,6 +2433,83 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    suspend fun pinPost(
+        uri: AtUri,
+        cid: Cid,
+    ): Result<Unit> {
+        return suspendRunCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+
+            val currentProfile = getProfileRecord().getOrThrow()
+
+            val updatedProfile = Profile(
+                displayName = currentProfile.displayName,
+                description = currentProfile.description,
+                pronouns = currentProfile.pronouns,
+                avatar = currentProfile.avatar,
+                banner = currentProfile.banner,
+                labels = currentProfile.labels,
+                pinnedPost = StrongRef(uri = uri, cid = cid),
+                createdAt = currentProfile.createdAt,
+            )
+
+            val record = BlueskyJson.encodeAsJsonContent(updatedProfile)
+
+            val ret = pdsClient!!.putRecord(
+                com.atproto.repo.PutRecordRequest(
+                    repo = session!!.did,
+                    collection = Nsid("app.bsky.actor.profile"),
+                    rkey = RKey("self"),
+                    record = record,
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed pinning post: ${ret.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
+    suspend fun unpinPost(): Result<Unit> {
+        return suspendRunCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+
+            val currentProfile = getProfileRecord().getOrThrow()
+
+            val updatedProfile = Profile(
+                displayName = currentProfile.displayName,
+                description = currentProfile.description,
+                pronouns = currentProfile.pronouns,
+                avatar = currentProfile.avatar,
+                banner = currentProfile.banner,
+                labels = currentProfile.labels,
+                pinnedPost = null,
+                createdAt = currentProfile.createdAt,
+            )
+
+            val record = BlueskyJson.encodeAsJsonContent(updatedProfile)
+
+            val ret = pdsClient!!.putRecord(
+                com.atproto.repo.PutRecordRequest(
+                    repo = session!!.did,
+                    collection = Nsid("app.bsky.actor.profile"),
+                    rkey = RKey("self"),
+                    record = record,
+                )
+            )
+
+            return when (ret) {
+                is AtpResponse.Failure<*> -> Result.failure(Exception("Failed unpinning post: ${ret.error?.message}"))
+                is AtpResponse.Success<*> -> Result.success(Unit)
+            }
+        }
+    }
+
     suspend fun searchPosts(
         query: String,
         sort: app.bsky.feed.SearchPostsSort? = app.bsky.feed.SearchPostsSort.Latest,
