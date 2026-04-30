@@ -649,6 +649,7 @@ internal fun ProfileContent(
     onPublicationTap: () -> Unit = {},
     onDocumentTap: () -> Unit = {},
     onLoadMore: () -> Unit = {},
+    onEditBlockNote: () -> Unit = {},
 ) {
     val vmKey = timelineViewModel.currentProfileKey
     val isOurData = vmKey == profileKey
@@ -665,6 +666,58 @@ internal fun ProfileContent(
 
     val posts = localPosts
     val avatarClipShape = settingsState.avatarClipShape
+    var showEditNoteDialog by remember { mutableStateOf(false) }
+    var editNoteText by remember { mutableStateOf("") }
+    var editingBlockNote by remember { mutableStateOf(false) }
+
+    if (showEditNoteDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showEditNoteDialog = false
+                editNoteText = ""
+            },
+            title = { Text(if (editingBlockNote) "Edit Block Note" else "Account Note") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editNoteText,
+                        onValueChange = { editNoteText = it },
+                        label = { Text(if (editingBlockNote) "Block note" else "Note") },
+                        maxLines = 3,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showEditNoteDialog = false
+                        if (editNoteText.isBlank()) {
+                            if (editingBlockNote) {
+                                timelineViewModel.deleteBlockNote(profile.did)
+                            } else {
+                                timelineViewModel.deleteAccountNote(profile.did)
+                            }
+                        } else {
+                            if (editingBlockNote) {
+                                timelineViewModel.saveBlockNote(profile.did, editNoteText)
+                            } else {
+                                timelineViewModel.saveAccountNote(profile.did, editNoteText)
+                            }
+                        }
+                        editNoteText = ""
+                    }
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showEditNoteDialog = false
+                        editNoteText = ""
+                    }
+                ) { Text("Cancel") }
+            }
+        )
+    }
 
     LazyColumn(
         state = listState,
@@ -687,6 +740,16 @@ internal fun ProfileContent(
                 },
                 onFollowingTap = {
                     onFollowersTap(false, profile.displayName ?: profile.handle.handle)
+                },
+                onEditAccountNote = {
+                    editingBlockNote = false
+                    editNoteText = timelineViewModel.getAccountNote(profile.did)?.note ?: ""
+                    showEditNoteDialog = true
+                },
+                onEditBlockNote = {
+                    editingBlockNote = true
+                    editNoteText = timelineViewModel.getBlockNote(profile.did)?.note ?: ""
+                    showEditNoteDialog = true
                 },
             )
         }
@@ -753,6 +816,16 @@ internal fun ProfileContent(
                                 )
                             }
                         }
+                        TextButton(
+                            onClick = {
+                                editingBlockNote = true
+                                editNoteText = blockNote.note
+                                showEditNoteDialog = true
+                            },
+                            modifier = Modifier.padding(top = 4.dp),
+                        ) {
+                            Text("Edit block note")
+                        }
                     }
                 }
             }
@@ -812,58 +885,18 @@ internal fun ProfileHeader(
     onHandleTap: (String) -> Unit = {},
     onFollowersTap: () -> Unit = {},
     onFollowingTap: () -> Unit = {},
+    onEditAccountNote: () -> Unit = {},
+    onEditBlockNote: () -> Unit = {},
 ) {
     var showImageViewer by remember { mutableStateOf<String?>(null) }
-    var showEditBlockNoteDialog by remember { mutableStateOf(false) }
-    var editBlockNoteText by remember { mutableStateOf("") }
     val isBlocked = profile.viewer?.blocking != null
     val blockNote = timelineViewModel.getBlockNote(profile.did)
+    val accountNote = timelineViewModel.getAccountNote(profile.did)
 
     if (showImageViewer != null) {
         GalleryViewer(
             imageUrls = listOf(Image(url = showImageViewer!!, fullSize = showImageViewer!!, alt = "")),
             onDismiss = { showImageViewer = null },
-        )
-    }
-
-    if (showEditBlockNoteDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showEditBlockNoteDialog = false
-                editBlockNoteText = ""
-            },
-            title = { Text("Edit Block Note") },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = editBlockNoteText,
-                        onValueChange = { editBlockNoteText = it },
-                        label = { Text("Block note") },
-                        maxLines = 3,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showEditBlockNoteDialog = false
-                        if (editBlockNoteText.isBlank()) {
-                            timelineViewModel.deleteBlockNote(profile.did)
-                        } else {
-                            timelineViewModel.saveBlockNote(profile.did, editBlockNoteText)
-                        }
-                        editBlockNoteText = ""
-                    }
-                ) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showEditBlockNoteDialog = false
-                        editBlockNoteText = ""
-                    }
-                ) { Text("Cancel") }
-            }
         )
     }
 
@@ -1057,6 +1090,31 @@ internal fun ProfileHeader(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
+            }
+
+            // Account note
+            if (accountNote != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = accountNote.note,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                }
+            }
+            TextButton(
+                onClick = onEditAccountNote,
+                modifier = Modifier.padding(top = 2.dp),
+            ) {
+                Text(if (accountNote != null) "Edit note" else "Add note")
             }
 
             // Stats row

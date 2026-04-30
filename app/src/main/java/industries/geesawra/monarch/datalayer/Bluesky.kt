@@ -336,20 +336,29 @@ data class ThreadPostData(
 
 @Stable
 @Serializable
-data class MonarchBlockNote(
+data class MonarchAccountNote(
     val did: String,
     val note: String,
-    val blockedAt: String,
+    val createdAt: String,
 )
 
 @Serializable
-data class MonarchBlockNotesData(
-    val notes: List<MonarchBlockNote> = emptyList(),
+data class MonarchAccountNotesData(
+    val notes: List<MonarchAccountNote> = emptyList(),
 )
 
 @Serializable
 data class MonarchBlockNotesPref(
-    val data: MonarchBlockNotesData,
+    @SerialName("\$type")
+    val type: String = "\$monarch.blockNotes",
+    val data: MonarchAccountNotesData,
+)
+
+@Serializable
+data class MonarchAccountNotesPref(
+    @SerialName("\$type")
+    val type: String = "\$monarch.accountNotes",
+    val data: MonarchAccountNotesData,
 )
 
 class BlueskyConn(val context: Context) {
@@ -2223,7 +2232,24 @@ class BlueskyConn(val context: Context) {
         }
     }
 
+    private fun prefType(pref: PreferencesUnion): String? {
+        return when (pref) {
+            is PreferencesUnion.Unknown -> {
+                val raw = pref.value.value
+                if (raw is kotlinx.serialization.json.JsonObject) {
+                    raw["\$type"]?.let { type ->
+                        if (type is kotlinx.serialization.json.JsonPrimitive) type.content else null
+                    }
+                } else null
+            }
+            else -> null
+        }
+    }
+
     private fun isMonarchBlockNotesPref(pref: PreferencesUnion): Boolean {
+        val type = prefType(pref)
+        if (type == "\$monarch.blockNotes") return true
+        // Fallback: old heuristic for migration
         return pref is PreferencesUnion.Unknown &&
             pref.value.value.let { v ->
                 v is kotlinx.serialization.json.JsonObject &&
@@ -2234,7 +2260,14 @@ class BlueskyConn(val context: Context) {
             }
     }
 
-    private fun extractBlockNotesPref(prefs: List<PreferencesUnion>): MonarchBlockNotesData? {
+    private fun isMonarchAccountNotesPref(pref: PreferencesUnion): Boolean {
+        return prefType(pref) == "\$monarch.accountNotes"
+    }
+
+    private fun extractNotesFromPref(
+        prefs: List<PreferencesUnion>,
+        matcher: (PreferencesUnion) -> Boolean,
+    ): MonarchAccountNotesData? {
         val allNotes = prefs.mapNotNull {
             when (it) {
                 is PreferencesUnion.Unknown -> {
@@ -2244,7 +2277,7 @@ class BlueskyConn(val context: Context) {
                         if (data is kotlinx.serialization.json.JsonObject &&
                             data["notes"] is kotlinx.serialization.json.JsonArray
                         ) {
-                            BlueskyJson.decodeFromJsonElement(MonarchBlockNotesData.serializer(), data)
+                            BlueskyJson.decodeFromJsonElement(MonarchAccountNotesData.serializer(), data)
                         } else null
                     } else null
                 }
@@ -2252,12 +2285,20 @@ class BlueskyConn(val context: Context) {
             }
         }
         if (allNotes.isEmpty()) return null
-        return MonarchBlockNotesData(
+        return MonarchAccountNotesData(
             notes = allNotes.flatMap { it.notes }.distinctBy { it.did },
         )
     }
 
-    suspend fun getBlockNotes(): Result<List<MonarchBlockNote>> {
+    private fun extractBlockNotesPref(prefs: List<PreferencesUnion>): MonarchAccountNotesData? {
+        return extractNotesFromPref(prefs, ::isMonarchBlockNotesPref)
+    }
+
+    private fun extractAccountNotesPref(prefs: List<PreferencesUnion>): MonarchAccountNotesData? {
+        return extractNotesFromPref(prefs, ::isMonarchAccountNotesPref)
+    }
+
+    suspend fun getBlockNotes(): Result<List<MonarchAccountNote>> {
         return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
@@ -2267,7 +2308,22 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun addBlockNote(did: Did, note: String): Result<Unit> {
+    suspend fun getAccountNotes(): Result<List<MonarchAccountNote>> {
+        return suspendRunCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
+            return Result.success(extractAccountNotesPref(prefs.preferences)?.notes ?: emptyList())
+        }
+    }
+
+    private suspend fun putNotes(
+        did: Did,
+        note: String,
+        matcher: (PreferencesUnion) -> Boolean,
+        prefFactory: (MonarchAccountNotesData) -> Any,
+    ): Result<Unit> {
         return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
@@ -2275,37 +2331,38 @@ class BlueskyConn(val context: Context) {
             val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val updatedPrefs = prefs.preferences.toMutableList()
 
-            // Collect notes from all matching entries, deduplicate by DID (last wins)
             val mergedNotes = updatedPrefs
-                .filter { isMonarchBlockNotesPref(it) }
+                .filter { matcher(it) }
                 .flatMap {
                     BlueskyJson.decodeFromJsonElement(
-                        MonarchBlockNotesData.serializer(),
+                        MonarchAccountNotesData.serializer(),
                         (it as PreferencesUnion.Unknown).value.value.jsonObject["data"]!!,
                     ).notes
                 }
                 .associateBy { it.did }
                 .toMutableMap()
 
-            // Remove all matching entries
-            updatedPrefs.removeAll { isMonarchBlockNotesPref(it) }
+            updatedPrefs.removeAll { matcher(it) }
 
-            // Update/add the note for this DID
-            mergedNotes[did.did] = MonarchBlockNote(
+            mergedNotes[did.did] = MonarchAccountNote(
                 did = did.did,
                 note = note,
-                blockedAt = Clock.System.now().toString(),
+                createdAt = Clock.System.now().toString(),
             )
 
             val newPrefJson = BlueskyJson.encodeAsJsonContent(
-                MonarchBlockNotesPref(data = MonarchBlockNotesData(notes = mergedNotes.values.toList()))
+                prefFactory(MonarchAccountNotesData(notes = mergedNotes.values.toList()))
             )
             updatedPrefs.add(PreferencesUnion.Unknown(newPrefJson))
             pdsClient!!.putPreferences(PutPreferencesRequest(preferences = updatedPrefs)).requireResponse()
         }
     }
 
-    suspend fun removeBlockNote(did: Did): Result<Unit> {
+    private suspend fun removeNotes(
+        did: Did,
+        matcher: (PreferencesUnion) -> Boolean,
+        prefFactory: (MonarchAccountNotesData) -> Any,
+    ): Result<Unit> {
         return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
@@ -2313,33 +2370,49 @@ class BlueskyConn(val context: Context) {
             val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val updatedPrefs = prefs.preferences.toMutableList()
 
-            // Collect notes from all matching entries
             val mergedNotes = updatedPrefs
-                .filter { isMonarchBlockNotesPref(it) }
+                .filter { matcher(it) }
                 .flatMap {
                     BlueskyJson.decodeFromJsonElement(
-                        MonarchBlockNotesData.serializer(),
+                        MonarchAccountNotesData.serializer(),
                         (it as PreferencesUnion.Unknown).value.value.jsonObject["data"]!!,
                     ).notes
                 }
                 .associateBy { it.did }
                 .toMutableMap()
 
-            // Remove all matching entries
-            updatedPrefs.removeAll { isMonarchBlockNotesPref(it) }
-
-            // Remove note for this DID
+            updatedPrefs.removeAll { matcher(it) }
             mergedNotes.remove(did.did)
 
             if (mergedNotes.isNotEmpty()) {
                 val newPrefJson = BlueskyJson.encodeAsJsonContent(
-                    MonarchBlockNotesPref(data = MonarchBlockNotesData(notes = mergedNotes.values.toList()))
+                    prefFactory(MonarchAccountNotesData(notes = mergedNotes.values.toList()))
                 )
                 updatedPrefs.add(PreferencesUnion.Unknown(newPrefJson))
             }
             pdsClient!!.putPreferences(PutPreferencesRequest(preferences = updatedPrefs)).requireResponse()
         }
     }
+
+    suspend fun addBlockNote(did: Did, note: String): Result<Unit> =
+        putNotes(did, note, ::isMonarchBlockNotesPref) { data ->
+            MonarchBlockNotesPref(data = data)
+        }
+
+    suspend fun removeBlockNote(did: Did): Result<Unit> =
+        removeNotes(did, ::isMonarchBlockNotesPref) { data ->
+            MonarchBlockNotesPref(data = data)
+        }
+
+    suspend fun addAccountNote(did: Did, note: String): Result<Unit> =
+        putNotes(did, note, ::isMonarchAccountNotesPref) { data ->
+            MonarchAccountNotesPref(data = data)
+        }
+
+    suspend fun removeAccountNote(did: Did): Result<Unit> =
+        removeNotes(did, ::isMonarchAccountNotesPref) { data ->
+            MonarchAccountNotesPref(data = data)
+        }
 
     suspend fun notifications(
         cursor: String? = null,
