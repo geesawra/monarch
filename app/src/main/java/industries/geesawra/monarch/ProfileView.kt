@@ -65,6 +65,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -199,6 +201,8 @@ fun ProfileView(
     }
     var isMediaFeedMode by remember { mutableStateOf(false) }
     var mediaFeedSnapshot by remember { mutableStateOf<ImmutableList<SkeetData>?>(null) }
+    var showBlockDialog by remember { mutableStateOf(false) }
+    var blockNoteText by remember { mutableStateOf("") }
     val isPublicationsTab = localIsPublicationsTab
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
@@ -260,6 +264,44 @@ fun ProfileView(
                 }
             },
             onKeepEditing = { showDiscardDialog = false },
+        )
+    }
+
+    if (showBlockDialog && profile != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showBlockDialog = false
+                blockNoteText = ""
+            },
+            title = { Text("Block ${profile.displayName ?: profile.handle.handle}?") },
+            text = {
+                Column {
+                    Text("Optionally add a note about why you're blocking this account.")
+                    OutlinedTextField(
+                        value = blockNoteText,
+                        onValueChange = { blockNoteText = it },
+                        label = { Text("Block note (optional)") },
+                        maxLines = 3,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showBlockDialog = false
+                        timelineViewModel.blockProfile(blockNoteText)
+                        blockNoteText = ""
+                    }
+                ) { Text("Block", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showBlockDialog = false
+                        blockNoteText = ""
+                    }
+                ) { Text("Cancel") }
+            }
         )
     }
 
@@ -409,7 +451,11 @@ fun ProfileView(
                     scrollBehavior = scrollBehavior,
                     actions = {
                         if (profile != null && !timelineViewModel.isOwnProfile()) {
-                            ProfileOverflowMenu(timelineViewModel, profile)
+                            ProfileOverflowMenu(
+                                timelineViewModel = timelineViewModel,
+                                profile = profile,
+                                onBlockRequest = { showBlockDialog = true },
+                            )
                         }
                     }
                 )
@@ -551,9 +597,11 @@ fun ProfileView(
 private fun ProfileOverflowMenu(
     timelineViewModel: TimelineViewModel,
     profile: ProfileViewDetailed,
+    onBlockRequest: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val isMuted = profile.viewer?.muted == true
+    val isBlocked = profile.viewer?.blocking != null
 
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Default.MoreVert, contentDescription = "More options")
@@ -566,6 +614,17 @@ private fun ProfileOverflowMenu(
                 expanded = false
                 if (isMuted) timelineViewModel.unmuteProfile()
                 else timelineViewModel.muteProfile()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text(if (isBlocked) "Unblock" else "Block") },
+            onClick = {
+                expanded = false
+                if (isBlocked) {
+                    timelineViewModel.unblockProfile()
+                } else {
+                    onBlockRequest()
+                }
             }
         )
     }
@@ -725,11 +784,56 @@ internal fun ProfileHeader(
     onFollowingTap: () -> Unit = {},
 ) {
     var showImageViewer by remember { mutableStateOf<String?>(null) }
+    var showEditBlockNoteDialog by remember { mutableStateOf(false) }
+    var editBlockNoteText by remember { mutableStateOf("") }
+    val isBlocked = profile.viewer?.blocking != null
+    val blockNote = timelineViewModel.getBlockNote(profile.did)
 
     if (showImageViewer != null) {
         GalleryViewer(
             imageUrls = listOf(Image(url = showImageViewer!!, fullSize = showImageViewer!!, alt = "")),
             onDismiss = { showImageViewer = null },
+        )
+    }
+
+    if (showEditBlockNoteDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showEditBlockNoteDialog = false
+                editBlockNoteText = ""
+            },
+            title = { Text("Edit Block Note") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editBlockNoteText,
+                        onValueChange = { editBlockNoteText = it },
+                        label = { Text("Block note") },
+                        maxLines = 3,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showEditBlockNoteDialog = false
+                        if (editBlockNoteText.isBlank()) {
+                            timelineViewModel.deleteBlockNote(profile.did)
+                        } else {
+                            timelineViewModel.saveBlockNote(profile.did, editBlockNoteText)
+                        }
+                        editBlockNoteText = ""
+                    }
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showEditBlockNoteDialog = false
+                        editBlockNoteText = ""
+                    }
+                ) { Text("Cancel") }
+            }
         )
     }
 
@@ -789,8 +893,51 @@ internal fun ProfileHeader(
 
             if (timelineViewModel.isOwnProfile()) {
                 EditProfileButton(profile, timelineViewModel)
+            } else if (isBlocked) {
+                SuggestionChip(
+                    onClick = { },
+                    label = { Text("Blocked") },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        labelColor = MaterialTheme.colorScheme.error,
+                    ),
+                )
+                TextButton(
+                    onClick = { timelineViewModel.unblockProfile() }
+                ) {
+                    Text("Unblock")
+                }
             } else {
                 FollowButton(profile, timelineViewModel)
+            }
+        }
+
+        if (isBlocked) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                if (blockNote != null) {
+                    Text(
+                        text = blockNote.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(
+                        onClick = {
+                            editBlockNoteText = blockNote.note
+                            showEditBlockNoteDialog = true
+                        },
+                        modifier = Modifier.padding(top = 2.dp),
+                    ) {
+                        Text("Edit note")
+                    }
+                } else {
+                    TextButton(
+                        onClick = { showEditBlockNoteDialog = true },
+                    ) {
+                        Text("Add note")
+                    }
+                }
             }
         }
 

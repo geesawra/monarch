@@ -72,6 +72,7 @@ import sh.christian.ozone.api.model.JsonContent
 import sh.christian.ozone.api.model.JsonContent.Companion.encodeAsJsonContent
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -148,6 +149,7 @@ data class ProfileState(
     val isFetchingProfileFeed: Boolean = false,
     val profileNotFound: Boolean = false,
     val profileKey: String? = null,
+    val blockNotes: ImmutableMap<String, MonarchBlockNote> = persistentMapOf(),
 )
 
 data class FollowersState(
@@ -250,6 +252,10 @@ class TimelineViewModel @AssistedInject constructor(
     var hasNewTimelinePosts by mutableStateOf(false); private set
     var uploadingPost by mutableStateOf(false); internal set
     private var postJob: Job? = null
+
+    // Track recent block/unblock mutations to avoid overwriting local state
+    // with stale server responses during propagation delay.
+    private val recentBlockMutations = mutableMapOf<String, Pair<Boolean, Instant>>()
 
     private val _dismissCurrentThread = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val dismissCurrentThread: SharedFlow<Unit> = _dismissCurrentThread.asSharedFlow()
@@ -367,6 +373,7 @@ class TimelineViewModel @AssistedInject constructor(
     val profileFeedFilter: GetAuthorFeedFilter? get() = profileState.profileFeedFilter
     val isFetchingProfile: Boolean get() = profileState.isFetchingProfile
     val isFetchingProfileFeed: Boolean get() = profileState.isFetchingProfileFeed
+    val blockNotes: ImmutableMap<String, MonarchBlockNote> get() = profileState.blockNotes
     val profileNotFound: Boolean get() = profileState.profileNotFound
     val currentProfileKey: String? get() = profileState.profileKey
 
@@ -721,6 +728,7 @@ class TimelineViewModel @AssistedInject constructor(
                 fetchNotifications(activeNotificationTab, fresh = true)
             } else null
             fetchMutedWords()
+            loadBlockNotes()
             val fJob = feeds()
 
             val jobs = mutableListOf(timelineFetchJob!!, fJob)
@@ -1897,7 +1905,7 @@ class TimelineViewModel @AssistedInject constructor(
     fun openProfile(did: Did, key: String? = null) {
         val cachedProfile = if (did == bskyConn.session?.did) user else null
         updateProfile {
-            ProfileState(
+            it.copy(
                 profileUser = cachedProfile,
                 isFetchingProfile = true,
                 isFetchingProfileFeed = true,
@@ -1910,16 +1918,43 @@ class TimelineViewModel @AssistedInject constructor(
                 if (!it.isProfileNotFound()) handleError(it)
                 updateProfile { it.copy(isFetchingProfile = false, profileNotFound = true) }
             }.onSuccess { fetched ->
-                updateProfile { it.copy(profileUser = fetched, isFetchingProfile = false) }
+                val localMutation = recentBlockMutations[fetched.did.did]
+                val isRecent = localMutation?.second?.let {
+                    Clock.System.now() - it < 10.seconds
+                } == true
+
+                val effectiveProfile = when {
+                    // We recently blocked but server hasn't caught up yet
+                    isRecent && localMutation!!.first && fetched.viewer?.blocking == null -> {
+                        fetched.copy(
+                            viewer = (fetched.viewer ?: ViewerState()).copy(
+                                blocking = AtUri("at://${bskyConn.session?.did?.did}/app.bsky.graph.block/local"),
+                            ),
+                        )
+                    }
+                    // We recently unblocked but server hasn't caught up yet
+                    isRecent && !localMutation!!.first && fetched.viewer?.blocking != null -> {
+                        fetched.copy(viewer = fetched.viewer!!.copy(blocking = null))
+                    }
+                    else -> fetched
+                }
+
+                updateProfile {
+                    val cleanNotes = if (effectiveProfile.viewer?.blocking == null) {
+                        it.blockNotes.toMutableMap().apply { remove(fetched.did.did) }.toImmutableMap()
+                    } else it.blockNotes
+                    it.copy(profileUser = effectiveProfile, isFetchingProfile = false, blockNotes = cleanNotes)
+                }
+                if (effectiveProfile.viewer?.blocking == null) {
+                    fetchProfileFeed(did, fresh = true)
+                }
             }
         }
-
-        fetchProfileFeed(did, fresh = true)
     }
 
     fun openProfileByHandle(handle: String) {
         updateProfile {
-            ProfileState(
+            it.copy(
                 isFetchingProfile = true,
                 isFetchingProfileFeed = true,
                 profileKey = handle,
@@ -1998,6 +2033,7 @@ class TimelineViewModel @AssistedInject constructor(
 
     fun fetchProfileFeed(did: Did? = null, fresh: Boolean = false) {
         val profileDid = did ?: profileUser?.did ?: return
+        if (profileUser?.viewer?.blocking != null) return
         updateProfile { it.copy(isFetchingProfileFeed = true) }
 
         viewModelScope.launch {
@@ -2105,6 +2141,112 @@ class TimelineViewModel @AssistedInject constructor(
             }
         }
     }
+
+    fun loadBlockNotes() {
+        viewModelScope.launch {
+            bskyConn.getBlockNotes().onSuccess { notes ->
+                updateProfile {
+                    it.copy(blockNotes = notes.associateBy { n -> n.did }.toImmutableMap())
+                }
+            }
+        }
+    }
+
+    fun blockProfile(note: String = "") {
+        val profile = profileUser ?: return
+        viewModelScope.launch {
+            bskyConn.blockActor(profile.did).onFailure {
+                handleError(it)
+            }.onSuccess { rkey ->
+                recentBlockMutations[profile.did.did] = true to Clock.System.now()
+                val updatedViewer = (profile.viewer ?: ViewerState()).copy(
+                    blocking = AtUri("at://${bskyConn.session?.did?.did}/app.bsky.graph.block/${rkey.rkey}"),
+                )
+                updateProfile {
+                    it.copy(profileUser = profile.copy(viewer = updatedViewer))
+                }
+                if (note.isNotBlank()) {
+                    bskyConn.addBlockNote(profile.did, note).onSuccess {
+                        updateProfile { p ->
+                            p.copy(
+                                blockNotes = p.blockNotes.toMutableMap().apply {
+                                    put(
+                                        profile.did.did,
+                                        MonarchBlockNote(
+                                            did = profile.did.did,
+                                            note = note,
+                                            blockedAt = Clock.System.now().toString(),
+                                        ),
+                                    )
+                                }.toImmutableMap(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun unblockProfile() {
+        val profile = profileUser ?: return
+        val blockUri = profile.viewer?.blocking ?: return
+        viewModelScope.launch {
+            bskyConn.unblockActor(blockUri).onFailure {
+                handleError(it)
+            }.onSuccess {
+                recentBlockMutations[profile.did.did] = false to Clock.System.now()
+                val updatedViewer = profile.viewer!!.copy(blocking = null)
+                updateProfile {
+                    it.copy(
+                        profileUser = profile.copy(viewer = updatedViewer),
+                        blockNotes = it.blockNotes.toMutableMap().apply {
+                            remove(profile.did.did)
+                        }.toImmutableMap(),
+                    )
+                }
+                bskyConn.removeBlockNote(profile.did).onFailure { err ->
+                    handleError(err)
+                }
+            }
+        }
+    }
+
+    fun saveBlockNote(did: Did, note: String) {
+        viewModelScope.launch {
+            bskyConn.addBlockNote(did, note).onSuccess {
+                updateProfile { p ->
+                    p.copy(
+                        blockNotes = p.blockNotes.toMutableMap().apply {
+                            put(
+                                did.did,
+                                MonarchBlockNote(
+                                    did = did.did,
+                                    note = note,
+                                    blockedAt = Clock.System.now().toString(),
+                                ),
+                            )
+                        }.toImmutableMap(),
+                    )
+                }
+            }.onFailure { handleError(it) }
+        }
+    }
+
+    fun deleteBlockNote(did: Did) {
+        viewModelScope.launch {
+            bskyConn.removeBlockNote(did).onSuccess {
+                updateProfile { p ->
+                    p.copy(
+                        blockNotes = p.blockNotes.toMutableMap().apply {
+                            remove(did.did)
+                        }.toImmutableMap(),
+                    )
+                }
+            }.onFailure { handleError(it) }
+        }
+    }
+
+    fun getBlockNote(did: Did): MonarchBlockNote? = blockNotes[did.did]
 
     fun search(query: String, fresh: Boolean = true) {
         if (query.isBlank()) {
