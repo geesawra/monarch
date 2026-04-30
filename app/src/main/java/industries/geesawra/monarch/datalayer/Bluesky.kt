@@ -549,6 +549,10 @@ class BlueskyConn(val context: Context) {
 
     var client: BlueskyApi? = null      // appview queries (has atproto-proxy)
     var pdsClient: BlueskyApi? = null   // PDS procedures (no atproto-proxy)
+    val publicClient: BlueskyApi by lazy {
+        val hc = createRetryHttpClient(baseUrl = "https://public.api.bsky.app")
+        XrpcBlueskyApi(hc)
+    }
     var session: SessionData? = null
     var oauthToken: OAuthToken? = null
     var createMutex: Mutex = Mutex()
@@ -1168,6 +1172,16 @@ class BlueskyConn(val context: Context) {
         crossinline block: suspend () -> AtpResponse<T>
     ): Result<T> = suspendRunCatching {
         create().getOrThrow()
+        when (val ret = block()) {
+            is AtpResponse.Failure<*> -> throw ApiCallFailure(errorMsg, ret.asException())
+            is AtpResponse.Success -> ret.response
+        }
+    }
+
+    private suspend inline fun <reified T : Any> publicApiCall(
+        errorMsg: String,
+        crossinline block: suspend () -> AtpResponse<T>
+    ): Result<T> = suspendRunCatching {
         when (val ret = block()) {
             is AtpResponse.Failure<*> -> throw ApiCallFailure(errorMsg, ret.asException())
             is AtpResponse.Success -> ret.response
@@ -2453,11 +2467,10 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> = retryOnDpopHiccup {
-        apiCall("Typeahead search failed") {
-            client!!.searchActorsTypeahead(SearchActorsTypeaheadQueryParams(q = query, limit = 5))
+    suspend fun searchActorsTypeahead(query: String): Result<List<ProfileViewBasic>> =
+        publicApiCall("Typeahead search failed") {
+            publicClient.searchActorsTypeahead(SearchActorsTypeaheadQueryParams(q = query, limit = 5))
         }.map { it.actors }
-    }
 
     suspend fun getAuthorFeed(
         did: Did,
@@ -2683,20 +2696,18 @@ class BlueskyConn(val context: Context) {
         sort: app.bsky.feed.SearchPostsSort? = app.bsky.feed.SearchPostsSort.Latest,
         cursor: String? = null,
         author: Did? = null,
-    ): Result<Pair<List<PostView>, String?>> = retryOnDpopHiccup {
-        apiCall("Search failed") {
-            client!!.searchPosts(app.bsky.feed.SearchPostsQueryParams(q = query, sort = sort, limit = 25, cursor = cursor, author = author))
+    ): Result<Pair<List<PostView>, String?>> =
+        publicApiCall("Search failed") {
+            publicClient.searchPosts(app.bsky.feed.SearchPostsQueryParams(q = query, sort = sort, limit = 25, cursor = cursor, author = author))
         }.map { it.posts to it.cursor }
-    }
 
     suspend fun searchActors(
         query: String,
         cursor: String? = null,
-    ): Result<Pair<List<app.bsky.actor.ProfileView>, String?>> = retryOnDpopHiccup {
-        apiCall("Search failed") {
-            client!!.searchActors(SearchActorsQueryParams(q = query, limit = 25, cursor = cursor))
+    ): Result<Pair<List<app.bsky.actor.ProfileView>, String?>> =
+        publicApiCall("Search failed") {
+            publicClient.searchActors(SearchActorsQueryParams(q = query, limit = 25, cursor = cursor))
         }.map { it.actors to it.cursor }
-    }
 
     suspend fun unmuteActor(did: Did): Result<Unit> = retryOnDpopHiccup {
         apiCall("Could not unmute") {

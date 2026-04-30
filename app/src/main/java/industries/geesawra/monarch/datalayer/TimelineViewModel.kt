@@ -1947,6 +1947,8 @@ class TimelineViewModel @AssistedInject constructor(
                 }
                 if (effectiveProfile.viewer?.blocking == null) {
                     fetchProfileFeed(did, fresh = true)
+                } else {
+                    updateProfile { it.copy(isFetchingProfileFeed = false) }
                 }
             }
         }
@@ -2163,7 +2165,11 @@ class TimelineViewModel @AssistedInject constructor(
                     blocking = AtUri("at://${bskyConn.session?.did?.did}/app.bsky.graph.block/${rkey.rkey}"),
                 )
                 updateProfile {
-                    it.copy(profileUser = profile.copy(viewer = updatedViewer))
+                    it.copy(
+                        profileUser = profile.copy(viewer = updatedViewer),
+                        profilePosts = persistentListOf(),
+                        profileFeedCursor = null,
+                    )
                 }
                 if (note.isNotBlank()) {
                     bskyConn.addBlockNote(profile.did, note).onSuccess {
@@ -2204,6 +2210,7 @@ class TimelineViewModel @AssistedInject constructor(
                         }.toImmutableMap(),
                     )
                 }
+                fetchProfileFeed(fresh = true)
                 bskyConn.removeBlockNote(profile.did).onFailure { err ->
                     handleError(err)
                 }

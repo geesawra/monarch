@@ -97,6 +97,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.ColorPainter
@@ -396,7 +397,7 @@ fun ProfileView(
         modifier = Modifier.padding(scaffoldPadding),
         isRefreshing = isLoading,
         onRefresh = {
-            profile?.did?.let { timelineViewModel.openProfile(it) }
+            profile?.did?.let { timelineViewModel.openProfile(it, profileKey) }
         },
     ) {
         Scaffold(
@@ -727,6 +728,35 @@ internal fun ProfileContent(
                 }
             }
         } else {
+            if (profile.viewer?.blocking != null) {
+                val blockNote = timelineViewModel.getBlockNote(profile.did)
+                item(key = "block_reason") {
+                    if (blockNote != null) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "Block reason",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = blockNote.note,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             itemsIndexed(
                 items = posts,
                 key = { _, skeet -> "post_${skeet.key()}" }
@@ -756,7 +786,7 @@ internal fun ProfileContent(
                 }
             }
 
-            if (localIsFetchingProfileFeed) {
+            if (localIsFetchingProfileFeed && profile.viewer?.blocking == null) {
                 item(key = "loading") {
                     LoadingBox()
                 }
@@ -853,6 +883,7 @@ internal fun ProfileHeader(
                     .fillMaxWidth()
                     .height(150.dp)
                     .clip(MaterialTheme.shapes.medium)
+                    .then(if (isBlocked) Modifier.blur(16.dp) else Modifier)
                     .clickable { showImageViewer = profile.banner?.uri }
             )
         } else {
@@ -884,8 +915,9 @@ internal fun ProfileHeader(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(avatarShape)
+                    .then(if (isBlocked) Modifier.blur(16.dp) else Modifier)
                     .then(
-                        if (profile.avatar != null)
+                        if (profile.avatar != null && !isBlocked)
                             Modifier.clickable { showImageViewer = profile.avatar?.uri }
                         else Modifier
                     )
@@ -909,35 +941,6 @@ internal fun ProfileHeader(
                 }
             } else {
                 FollowButton(profile, timelineViewModel)
-            }
-        }
-
-        if (isBlocked) {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            ) {
-                if (blockNote != null) {
-                    Text(
-                        text = blockNote.note,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(
-                        onClick = {
-                            editBlockNoteText = blockNote.note
-                            showEditBlockNoteDialog = true
-                        },
-                        modifier = Modifier.padding(top = 2.dp),
-                    ) {
-                        Text("Edit note")
-                    }
-                } else {
-                    TextButton(
-                        onClick = { showEditBlockNoteDialog = true },
-                    ) {
-                        Text("Add note")
-                    }
-                }
             }
         }
 
