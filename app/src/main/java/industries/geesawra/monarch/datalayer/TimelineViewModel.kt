@@ -149,7 +149,6 @@ data class ProfileState(
     val isFetchingProfileFeed: Boolean = false,
     val profileNotFound: Boolean = false,
     val profileKey: String? = null,
-    val blockNotes: ImmutableMap<String, MonarchAccountNote> = persistentMapOf(),
     val accountNotes: ImmutableMap<String, MonarchAccountNote> = persistentMapOf(),
 )
 
@@ -374,7 +373,6 @@ class TimelineViewModel @AssistedInject constructor(
     val profileFeedFilter: GetAuthorFeedFilter? get() = profileState.profileFeedFilter
     val isFetchingProfile: Boolean get() = profileState.isFetchingProfile
     val isFetchingProfileFeed: Boolean get() = profileState.isFetchingProfileFeed
-    val blockNotes: ImmutableMap<String, MonarchAccountNote> get() = profileState.blockNotes
     val accountNotes: ImmutableMap<String, MonarchAccountNote> get() = profileState.accountNotes
     val profileNotFound: Boolean get() = profileState.profileNotFound
     val currentProfileKey: String? get() = profileState.profileKey
@@ -730,7 +728,7 @@ class TimelineViewModel @AssistedInject constructor(
                 fetchNotifications(activeNotificationTab, fresh = true)
             } else null
             fetchMutedWords()
-            loadBlockNotes()
+            loadAccountNotes()
             val fJob = feeds()
 
             val jobs = mutableListOf(timelineFetchJob!!, fJob)
@@ -1942,10 +1940,7 @@ class TimelineViewModel @AssistedInject constructor(
                 }
 
                 updateProfile {
-                    val cleanNotes = if (effectiveProfile.viewer?.blocking == null) {
-                        it.blockNotes.toMutableMap().apply { remove(fetched.did.did) }.toImmutableMap()
-                    } else it.blockNotes
-                    it.copy(profileUser = effectiveProfile, isFetchingProfile = false, blockNotes = cleanNotes)
+                    it.copy(profileUser = effectiveProfile, isFetchingProfile = false)
                 }
                 if (effectiveProfile.viewer?.blocking == null) {
                     fetchProfileFeed(did, fresh = true)
@@ -2146,13 +2141,8 @@ class TimelineViewModel @AssistedInject constructor(
         }
     }
 
-    fun loadBlockNotes() {
+    fun loadAccountNotes() {
         viewModelScope.launch {
-            bskyConn.getBlockNotes().onSuccess { notes ->
-                updateProfile {
-                    it.copy(blockNotes = notes.associateBy { n -> n.did }.toImmutableMap())
-                }
-            }
             bskyConn.getAccountNotes().onSuccess { notes ->
                 updateProfile {
                     it.copy(accountNotes = notes.associateBy { n -> n.did }.toImmutableMap())
@@ -2179,10 +2169,10 @@ class TimelineViewModel @AssistedInject constructor(
                     )
                 }
                 if (note.isNotBlank()) {
-                    bskyConn.addBlockNote(profile.did, note).onSuccess {
+                    bskyConn.addAccountNote(profile.did, note).onSuccess {
                         updateProfile { p ->
                             p.copy(
-                                blockNotes = p.blockNotes.toMutableMap().apply {
+                                accountNotes = p.accountNotes.toMutableMap().apply {
                                     put(
                                         profile.did.did,
                                         MonarchAccountNote(
@@ -2212,56 +2202,20 @@ class TimelineViewModel @AssistedInject constructor(
                 updateProfile {
                     it.copy(
                         profileUser = profile.copy(viewer = updatedViewer),
-                        blockNotes = it.blockNotes.toMutableMap().apply {
-                            remove(profile.did.did)
-                        }.toImmutableMap(),
                     )
                 }
                 fetchProfileFeed(fresh = true)
-                bskyConn.removeBlockNote(profile.did).onFailure { err ->
+                bskyConn.removeAccountNote(profile.did).onFailure { err ->
                     handleError(err)
                 }
             }
         }
     }
 
-    fun saveBlockNote(did: Did, note: String) {
-        viewModelScope.launch {
-            bskyConn.addBlockNote(did, note).onSuccess {
-                updateProfile { p ->
-                    p.copy(
-                        blockNotes = p.blockNotes.toMutableMap().apply {
-                            put(
-                                did.did,
-                                MonarchAccountNote(
-                                    did = did.did,
-                                    note = note,
-                                    createdAt = Clock.System.now().toString(),
-                                ),
-                            )
-                        }.toImmutableMap(),
-                    )
-                }
-            }.onFailure { handleError(it) }
-        }
-    }
-
-    fun deleteBlockNote(did: Did) {
-        viewModelScope.launch {
-            bskyConn.removeBlockNote(did).onSuccess {
-                updateProfile { p ->
-                    p.copy(
-                        blockNotes = p.blockNotes.toMutableMap().apply {
-                            remove(did.did)
-                        }.toImmutableMap(),
-                    )
-                }
-            }.onFailure { handleError(it) }
-        }
-    }
-
-    fun getBlockNote(did: Did): MonarchAccountNote? = blockNotes[did.did]
+    fun getBlockNote(did: Did): MonarchAccountNote? = accountNotes[did.did]
     fun getAccountNote(did: Did): MonarchAccountNote? = accountNotes[did.did]
+    fun saveBlockNote(did: Did, note: String) = saveAccountNote(did, note)
+    fun deleteBlockNote(did: Did) = deleteAccountNote(did)
 
     fun saveAccountNote(did: Did, note: String) {
         viewModelScope.launch {
