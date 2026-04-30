@@ -2308,11 +2308,11 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    private suspend fun putNotes(
+    private suspend inline fun <reified T : Any> putNotes(
         did: Did,
         note: String,
-        matcher: (PreferencesUnion) -> Boolean,
-        prefFactory: (MonarchAccountNotesData) -> Any,
+        crossinline matcher: (PreferencesUnion) -> Boolean,
+        crossinline prefFactory: (MonarchAccountNotesData) -> T,
     ): Result<Unit> {
         return suspendRunCatching {
             create().onFailure {
@@ -2348,10 +2348,10 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    private suspend fun removeNotes(
+    private suspend inline fun <reified T : Any> removeNotes(
         did: Did,
-        matcher: (PreferencesUnion) -> Boolean,
-        prefFactory: (MonarchAccountNotesData) -> Any,
+        crossinline matcher: (PreferencesUnion) -> Boolean,
+        crossinline prefFactory: (MonarchAccountNotesData) -> T,
     ): Result<Unit> {
         return suspendRunCatching {
             create().onFailure {
