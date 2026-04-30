@@ -2247,17 +2247,7 @@ class BlueskyConn(val context: Context) {
     }
 
     private fun isMonarchBlockNotesPref(pref: PreferencesUnion): Boolean {
-        val type = prefType(pref)
-        if (type == "\$monarch.blockNotes") return true
-        // Fallback: old heuristic for migration
-        return pref is PreferencesUnion.Unknown &&
-            pref.value.value.let { v ->
-                v is kotlinx.serialization.json.JsonObject &&
-                v["data"]?.let { d ->
-                    d is kotlinx.serialization.json.JsonObject &&
-                    d["notes"] is kotlinx.serialization.json.JsonArray
-                } == true
-            }
+        return prefType(pref) == "\$monarch.blockNotes"
     }
 
     private fun isMonarchAccountNotesPref(pref: PreferencesUnion): Boolean {
@@ -2268,7 +2258,7 @@ class BlueskyConn(val context: Context) {
         prefs: List<PreferencesUnion>,
         matcher: (PreferencesUnion) -> Boolean,
     ): MonarchAccountNotesData? {
-        val allNotes = prefs.mapNotNull {
+        val allNotes = prefs.filter { matcher(it) }.mapNotNull {
             when (it) {
                 is PreferencesUnion.Unknown -> {
                     val raw = it.value.value
