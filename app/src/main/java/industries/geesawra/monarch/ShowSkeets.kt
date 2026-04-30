@@ -461,7 +461,7 @@ fun ShowSkeets(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 80.dp, vertical = 12.dp)
+                        .padding(start = 80.dp, top = 30.dp, end = 80.dp, bottom = 6.dp)
                 ) {
                     SquigglyDivider(
                         modifier = Modifier
@@ -508,6 +508,7 @@ fun ShowSkeets(
                         SkeetView(
                             viewModel = viewModel,
                             skeet = post,
+                            onReplyTap = onReplyTap,
                             postTextSize = settingsState.postTextSize,
                             avatarShape = avatarClipShape,
                             showLabels = settingsState.showLabels,
