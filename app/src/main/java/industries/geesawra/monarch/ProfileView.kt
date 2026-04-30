@@ -206,6 +206,7 @@ fun ProfileView(
     var blockNoteText by remember { mutableStateOf("") }
     var showNoteDialog by remember { mutableStateOf(false) }
     var editNoteText by remember { mutableStateOf("") }
+    var editingBlockNote by remember { mutableStateOf(false) }
     val isPublicationsTab = localIsPublicationsTab
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberModalBottomSheetState(
@@ -314,13 +315,13 @@ fun ProfileView(
                 showNoteDialog = false
                 editNoteText = ""
             },
-            title = { Text("Note") },
+            title = { Text(if (editingBlockNote) "Block note" else "Account note") },
             text = {
                 Column {
                     OutlinedTextField(
                         value = editNoteText,
                         onValueChange = { editNoteText = it },
-                        label = { Text("Note") },
+                        label = { Text(if (editingBlockNote) "Block note" else "Note") },
                         maxLines = 3,
                     )
                 }
@@ -330,9 +331,17 @@ fun ProfileView(
                     onClick = {
                         showNoteDialog = false
                         if (editNoteText.isBlank()) {
-                            timelineViewModel.deleteAccountNote(profile.did)
+                            if (editingBlockNote) {
+                                timelineViewModel.deleteBlockNote(profile.did)
+                            } else {
+                                timelineViewModel.deleteAccountNote(profile.did)
+                            }
                         } else {
-                            timelineViewModel.saveAccountNote(profile.did, editNoteText)
+                            if (editingBlockNote) {
+                                timelineViewModel.saveBlockNote(profile.did, editNoteText)
+                            } else {
+                                timelineViewModel.saveAccountNote(profile.did, editNoteText)
+                            }
                         }
                         editNoteText = ""
                     }
@@ -500,6 +509,7 @@ fun ProfileView(
                                 profile = profile,
                                 onBlockRequest = { showBlockDialog = true },
                                 onEditNoteRequest = {
+                                    editingBlockNote = false
                                     editNoteText = timelineViewModel.getAccountNote(profile.did)?.note ?: ""
                                     showNoteDialog = true
                                 },
@@ -632,6 +642,11 @@ fun ProfileView(
                             onPublicationTap = onPublicationTap,
                             onDocumentTap = onDocumentTap,
                             onLoadMore = { timelineViewModel.fetchProfileFeed(profile.did) },
+                            onEditBlockNote = {
+                                editingBlockNote = true
+                                editNoteText = timelineViewModel.getBlockNote(profile.did)?.note ?: ""
+                                showNoteDialog = true
+                            },
                         )
                     }
                 }
@@ -705,6 +720,7 @@ internal fun ProfileContent(
     onPublicationTap: () -> Unit = {},
     onDocumentTap: () -> Unit = {},
     onLoadMore: () -> Unit = {},
+    onEditBlockNote: () -> Unit = {},
 ) {
     val vmKey = timelineViewModel.currentProfileKey
     val isOurData = vmKey == profileKey
@@ -809,7 +825,12 @@ internal fun ProfileContent(
                                 )
                             }
                         }
-
+                        TextButton(
+                            onClick = onEditBlockNote,
+                            modifier = Modifier.padding(top = 4.dp),
+                        ) {
+                            Text("Edit block note")
+                        }
                     }
                 }
             }

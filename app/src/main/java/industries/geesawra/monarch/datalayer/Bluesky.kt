@@ -343,6 +343,11 @@ data class MonarchAccountNote(
 )
 
 @Serializable
+data class MonarchBlockNotesPref(
+    val blockNotes: List<MonarchAccountNote> = emptyList(),
+)
+
+@Serializable
 data class MonarchAccountNotesPref(
     val profileNotes: List<MonarchAccountNote> = emptyList(),
 )
@@ -2232,6 +2237,25 @@ class BlueskyConn(val context: Context) {
             }
     }
 
+    suspend fun getBlockNotes(): Result<List<MonarchAccountNote>> {
+        return suspendRunCatching {
+            create().onFailure {
+                return Result.failure(it)
+            }
+            val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
+            val notes = prefs.preferences
+                .filter { isMonarchBlockNotesPref(it) }
+                .flatMap {
+                    BlueskyJson.decodeFromJsonElement(
+                        MonarchBlockNotesPref.serializer(),
+                        (it as PreferencesUnion.Unknown).value.value,
+                    ).blockNotes
+                }
+                .distinctBy { it.did }
+            return Result.success(notes)
+        }
+    }
+
     suspend fun getAccountNotes(): Result<List<MonarchAccountNote>> {
         return suspendRunCatching {
             create().onFailure {
@@ -2251,7 +2275,11 @@ class BlueskyConn(val context: Context) {
         }
     }
 
-    suspend fun addAccountNote(did: Did, note: String): Result<Unit> {
+    private suspend fun addNote(
+        did: Did,
+        note: String,
+        isBlockNote: Boolean,
+    ): Result<Unit> {
         return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
@@ -2259,18 +2287,25 @@ class BlueskyConn(val context: Context) {
             val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val updatedPrefs = prefs.preferences.toMutableList()
 
+            val matcher = if (isBlockNote) ::isMonarchBlockNotesPref else ::isMonarchAccountNotesPref
+            val serializer = if (isBlockNote) MonarchBlockNotesPref.serializer() else MonarchAccountNotesPref.serializer()
+            val field = if (isBlockNote) "blockNotes" else "profileNotes"
+
             val mergedNotes = updatedPrefs
-                .filter { isMonarchAccountNotesPref(it) }
+                .filter { matcher(it) }
                 .flatMap {
                     BlueskyJson.decodeFromJsonElement(
-                        MonarchAccountNotesPref.serializer(),
+                        serializer,
                         (it as PreferencesUnion.Unknown).value.value,
-                    ).profileNotes
+                    ).let { pref ->
+                        if (isBlockNote) (pref as MonarchBlockNotesPref).blockNotes
+                        else (pref as MonarchAccountNotesPref).profileNotes
+                    }
                 }
                 .associateBy { it.did }
                 .toMutableMap()
 
-            updatedPrefs.removeAll { isMonarchAccountNotesPref(it) }
+            updatedPrefs.removeAll { matcher(it) }
 
             mergedNotes[did.did] = MonarchAccountNote(
                 did = did.did,
@@ -2278,15 +2313,24 @@ class BlueskyConn(val context: Context) {
                 createdAt = Clock.System.now().toString(),
             )
 
-            val newPrefJson = BlueskyJson.encodeAsJsonContent(
-                MonarchAccountNotesPref(profileNotes = mergedNotes.values.toList())
-            )
+            val newPrefJson = if (isBlockNote) {
+                BlueskyJson.encodeAsJsonContent(
+                    MonarchBlockNotesPref(blockNotes = mergedNotes.values.toList())
+                )
+            } else {
+                BlueskyJson.encodeAsJsonContent(
+                    MonarchAccountNotesPref(profileNotes = mergedNotes.values.toList())
+                )
+            }
             updatedPrefs.add(PreferencesUnion.Unknown(newPrefJson))
             pdsClient!!.putPreferences(PutPreferencesRequest(preferences = updatedPrefs)).requireResponse()
         }
     }
 
-    suspend fun removeAccountNote(did: Did): Result<Unit> {
+    private suspend fun removeNote(
+        did: Did,
+        isBlockNote: Boolean,
+    ): Result<Unit> {
         return suspendRunCatching {
             create().onFailure {
                 return Result.failure(it)
@@ -2294,29 +2338,46 @@ class BlueskyConn(val context: Context) {
             val prefs = pdsClient!!.getPreferencesForActor().requireResponse()
             val updatedPrefs = prefs.preferences.toMutableList()
 
+            val matcher = if (isBlockNote) ::isMonarchBlockNotesPref else ::isMonarchAccountNotesPref
+            val serializer = if (isBlockNote) MonarchBlockNotesPref.serializer() else MonarchAccountNotesPref.serializer()
+
             val mergedNotes = updatedPrefs
-                .filter { isMonarchAccountNotesPref(it) }
+                .filter { matcher(it) }
                 .flatMap {
                     BlueskyJson.decodeFromJsonElement(
-                        MonarchAccountNotesPref.serializer(),
+                        serializer,
                         (it as PreferencesUnion.Unknown).value.value,
-                    ).profileNotes
+                    ).let { pref ->
+                        if (isBlockNote) (pref as MonarchBlockNotesPref).blockNotes
+                        else (pref as MonarchAccountNotesPref).profileNotes
+                    }
                 }
                 .associateBy { it.did }
                 .toMutableMap()
 
-            updatedPrefs.removeAll { isMonarchAccountNotesPref(it) }
+            updatedPrefs.removeAll { matcher(it) }
             mergedNotes.remove(did.did)
 
             if (mergedNotes.isNotEmpty()) {
-                val newPrefJson = BlueskyJson.encodeAsJsonContent(
-                    MonarchAccountNotesPref(profileNotes = mergedNotes.values.toList())
-                )
+                val newPrefJson = if (isBlockNote) {
+                    BlueskyJson.encodeAsJsonContent(
+                        MonarchBlockNotesPref(blockNotes = mergedNotes.values.toList())
+                    )
+                } else {
+                    BlueskyJson.encodeAsJsonContent(
+                        MonarchAccountNotesPref(profileNotes = mergedNotes.values.toList())
+                    )
+                }
                 updatedPrefs.add(PreferencesUnion.Unknown(newPrefJson))
             }
             pdsClient!!.putPreferences(PutPreferencesRequest(preferences = updatedPrefs)).requireResponse()
         }
     }
+
+    suspend fun addBlockNote(did: Did, note: String): Result<Unit> = addNote(did, note, isBlockNote = true)
+    suspend fun removeBlockNote(did: Did): Result<Unit> = removeNote(did, isBlockNote = true)
+    suspend fun addAccountNote(did: Did, note: String): Result<Unit> = addNote(did, note, isBlockNote = false)
+    suspend fun removeAccountNote(did: Did): Result<Unit> = removeNote(did, isBlockNote = false)
 
     suspend fun notifications(
         cursor: String? = null,
