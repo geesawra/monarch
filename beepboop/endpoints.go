@@ -31,7 +31,7 @@ func (sr subscriptionRequest) Validate() error {
 	return nil
 }
 
-func runEndpoints(ctx context.Context, bind string, t *tokens, l *zap.SugaredLogger) func() {
+func runEndpoints(ctx context.Context, bind string, t *tokens, l *zap.SugaredLogger, stop func()) func() {
 	mux := http.NewServeMux()
 	ep := srpc.NewEndpoint(http.MethodPost, "/subscribe", srpc.NewCodecJSON[struct{}](), srpc.NewCodecJSON[subscriptionRequest]())
 
@@ -54,6 +54,7 @@ func runEndpoints(ctx context.Context, bind string, t *tokens, l *zap.SugaredLog
 	}
 
 	go func() {
+		defer recoverPanic(l, stop)
 		l.Infow("endpoints listening", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)

@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
@@ -144,7 +145,16 @@ func newLogger(ctx context.Context, c Config) loggers {
 	}
 
 	sl := l.Sugar()
-	return loggers{zap: sl, slog: mkSlog(l), stop: lp.Stop}
+	var stopOnce sync.Once
+	return loggers{zap: sl, slog: mkSlog(l), stop: func() { stopOnce.Do(lp.Stop) }}
+}
+
+func recoverPanic(l *zap.SugaredLogger, stop func()) {
+	if r := recover(); r != nil {
+		l.Errorw("panic recovered", "error", r, "stacktrace", string(debug.Stack()))
+		stop()
+		os.Exit(1)
+	}
 }
 
 func main() {
@@ -156,6 +166,8 @@ func main() {
 	}
 
 	ll := newLogger(ctx, c)
+	defer recoverPanic(ll.zap, ll.stop)
+
 	ll.zap.Infow("starting beepboop",
 		"version", buildVersion(),
 		"handle", c.Handle,
@@ -195,7 +207,7 @@ func main() {
 		runtime.NumCPU()*8,
 		"jetstream_processor",
 		ll.slog,
-		handleEvent(ll.zap, atc, msg, &t, m),
+		handleEvent(ll.zap, atc, msg, &t, m, ll.stop),
 	)
 
 	jc, err := client.NewClient(
@@ -213,9 +225,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	epShutdown := runEndpoints(ctx, ":9999", &t, ll.zap)
+	epShutdown := runEndpoints(ctx, ":9999", &t, ll.zap, ll.stop)
 
 	go func() {
+		defer recoverPanic(ll.zap, ll.stop)
 		if err := jc.ConnectAndRead(ctx, nil); err != nil {
 			log.Fatal(err)
 		}

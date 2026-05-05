@@ -78,8 +78,8 @@ func testEventHandler(t *testing.T, mock *mockLexClient, tk *tokens) *eventHandl
 		t:            tk,
 		m:            testMetrics(t),
 		throttle:     newAdaptiveThrottle(),
-		profileCache: newProfileCache(mock),
-		recordCache:  newRecordCache(mock),
+		profileCache: newProfileCache(zap.NewNop().Sugar(), func() {}, mock),
+		recordCache:  newRecordCache(zap.NewNop().Sugar(), func() {}, mock),
 	}
 }
 
@@ -871,7 +871,7 @@ func TestHandleEvent(t *testing.T) {
 			sender := &mockSender{err: tt.wantSendErr}
 			tk := testTokens(t, tt.tokens)
 
-			handler := handleEvent(l.Sugar(), mock, sender, tk, testMetrics(t))
+			handler := handleEvent(l.Sugar(), mock, sender, tk, testMetrics(t), func() {})
 			err := handler(context.Background(), tt.event)
 
 			if tt.wantErr != "" {

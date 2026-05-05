@@ -56,7 +56,7 @@ type messageSender interface {
 	Send(ctx context.Context, message *messaging.Message) (string, error)
 }
 
-func newProfileCache(atc lexutil.LexClient) *ttlcache.Cache[string, *bsky.ActorDefs_ProfileViewDetailed] {
+func newProfileCache(l *zap.SugaredLogger, stop func(), atc lexutil.LexClient) *ttlcache.Cache[string, *bsky.ActorDefs_ProfileViewDetailed] {
 	loader := ttlcache.LoaderFunc[string, *bsky.ActorDefs_ProfileViewDetailed](
 		func(c *ttlcache.Cache[string, *bsky.ActorDefs_ProfileViewDetailed], key string) *ttlcache.Item[string, *bsky.ActorDefs_ProfileViewDetailed] {
 			profile, err := bsky.ActorGetProfile(context.Background(), atc, key)
@@ -72,11 +72,14 @@ func newProfileCache(atc lexutil.LexClient) *ttlcache.Cache[string, *bsky.ActorD
 		ttlcache.WithTTL[string, *bsky.ActorDefs_ProfileViewDetailed](30*time.Minute),
 		ttlcache.WithLoader[string, *bsky.ActorDefs_ProfileViewDetailed](loader),
 	)
-	go cache.Start()
+	go func() {
+		defer recoverPanic(l, stop)
+		cache.Start()
+	}()
 	return cache
 }
 
-func newRecordCache(atc lexutil.LexClient) *ttlcache.Cache[string, *bsky.FeedPost] {
+func newRecordCache(l *zap.SugaredLogger, stop func(), atc lexutil.LexClient) *ttlcache.Cache[string, *bsky.FeedPost] {
 	loader := ttlcache.LoaderFunc[string, *bsky.FeedPost](
 		func(c *ttlcache.Cache[string, *bsky.FeedPost], key string) *ttlcache.Item[string, *bsky.FeedPost] {
 			uri, err := syntax.ParseATURI(key)
@@ -100,19 +103,22 @@ func newRecordCache(atc lexutil.LexClient) *ttlcache.Cache[string, *bsky.FeedPos
 		ttlcache.WithTTL[string, *bsky.FeedPost](10*time.Minute),
 		ttlcache.WithLoader[string, *bsky.FeedPost](loader),
 	)
-	go cache.Start()
+	go func() {
+		defer recoverPanic(l, stop)
+		cache.Start()
+	}()
 	return cache
 }
 
-func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender, t *tokens, m *metrics) func(ctx context.Context, e *models.Event) error {
+func handleEvent(l *zap.SugaredLogger, atc lexutil.LexClient, msg messageSender, t *tokens, m *metrics, stop func()) func(ctx context.Context, e *models.Event) error {
 	eh := eventHandler{
 		l:            l,
 		atc:          atc,
 		t:            t,
 		m:            m,
 		throttle:     newAdaptiveThrottle(),
-		profileCache: newProfileCache(atc),
-		recordCache:  newRecordCache(atc),
+		profileCache: newProfileCache(l, stop, atc),
+		recordCache:  newRecordCache(l, stop, atc),
 	}
 
 	return func(ctx context.Context, e *models.Event) error {
